@@ -1,0 +1,2826 @@
+/* One light palette in every system theme: the page is white. */
+:root {
+	--bg: #ffffff;
+	--fg: #1d1d1b;
+	--muted: #66665f;
+	--line: #d6d6cf;
+	--panel: #ffffff;
+	--accent: #1f6f50;
+	--warn-bg: #fff4d6;
+	--warn-fg: #5c4300;
+	--online: #2e9d5b;
+	--offline: #b0b0a8;
+	--felt: #3d7a5c;
+	--felt-fg: #f2f5ef;
+	--card-bg: #ffffff;
+	--card-fg: #1d1d1b;
+	--red-suit: #c0262d;
+	--call-green: #1f7a46;
+	--call-orange: #c75b00;
+	--tile-bg: #2f5f47;
+	--tile-caption-bg: #1d3a2c;
+	color-scheme: light;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--fg);
+	font:
+		16px / 1.5 system-ui,
+		sans-serif;
+}
+
+main {
+	max-width: 44rem;
+	margin: 0 auto;
+	padding: 1rem;
+}
+
+h1 {
+	font-size: 1.4rem;
+}
+
+h2 {
+	font-size: 1.1rem;
+	margin-top: 1.5rem;
+}
+
+button {
+	font: inherit;
+	padding: 0.35rem 0.8rem;
+	border: 1px solid var(--accent);
+	border-radius: 0.3rem;
+	background: var(--accent);
+	color: var(--bg);
+	cursor: pointer;
+}
+
+button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 0.3rem;
+	padding: 0.3rem 0.5rem;
+	max-width: 100%;
+}
+
+label {
+	display: block;
+	margin: 0.6rem 0;
+}
+
+.language-control {
+	position: fixed;
+	top: 0.4rem;
+	right: 0.5rem;
+	z-index: 1200;
+	margin: 0;
+}
+
+.language-control select {
+	padding: 0.2rem 0.4rem;
+	font-size: 0.9rem;
+}
+
+body:has(.language-control) main:not([data-screen="table"]) {
+	padding-top: 3.5rem;
+}
+
+table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+th,
+td {
+	text-align: left;
+	padding: 0.3rem;
+}
+
+td label {
+	margin: 0;
+}
+
+.errors {
+	color: #b3261e;
+}
+
+.you {
+	margin: 0 0 0.3rem;
+	font-weight: 600;
+}
+
+.banner {
+	background: var(--warn-bg);
+	color: var(--warn-fg);
+	padding: 0.6rem 0.8rem;
+	border-radius: 0.3rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.banner[hidden] {
+	display: none;
+}
+
+.copy-field {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	align-items: center;
+	margin: 0.5rem 0;
+}
+
+.roster,
+.transcript,
+.pending {
+	padding: 0;
+	list-style: none;
+}
+
+.roster li,
+.transcript li,
+.pending li {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+	padding: 0.4rem 0;
+	border-bottom: 1px solid var(--line);
+}
+
+.dot {
+	width: 0.7rem;
+	height: 0.7rem;
+	border-radius: 50%;
+	background: var(--offline);
+}
+
+[data-state="online"] > .dot {
+	background: var(--online);
+}
+
+[data-state="free"] > .dot {
+	background: transparent;
+	border: 1px solid var(--offline);
+}
+
+.tag {
+	font-size: 0.8rem;
+	border: 1px solid var(--line);
+	border-radius: 0.8rem;
+	padding: 0 0.5rem;
+}
+
+.state,
+.receipt,
+.status,
+.note {
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+
+.from {
+	font-weight: 600;
+}
+
+.text {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	flex: 1 1 12rem;
+}
+
+.pending li[data-state="not-sent"] .status,
+.pending li[data-state="undone"] .status {
+	color: #b3261e;
+}
+
+.notice {
+	background: var(--warn-bg);
+	color: var(--warn-fg);
+	padding: 0.4rem 0.6rem;
+	border-radius: 0.3rem;
+}
+
+.rate-limit-reminder {
+	position: fixed;
+	top: 1rem;
+	left: 50%;
+	z-index: 1100;
+	transform: translateX(-50%);
+	max-width: calc(100vw - 2rem);
+	padding: 0.65rem 1rem;
+	border-radius: 0.4rem;
+	background: var(--warn-bg);
+	color: var(--warn-fg);
+	box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 25%);
+	font-weight: 600;
+}
+
+.rate-limit-reminder[hidden] {
+	display: none;
+}
+
+.network {
+	margin: 0.8rem 0;
+}
+
+.network dl {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0.2rem 0.8rem;
+	margin: 0.4rem 0 0;
+	font-size: 0.9rem;
+}
+
+.network dd {
+	margin: 0;
+	color: var(--muted);
+}
+
+.send textarea {
+	width: 100%;
+}
+
+.choices {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	align-items: flex-start;
+	margin-bottom: 1rem;
+}
+
+/*
+ * Room page and bridge table (call/layout handover §6). The viewer sits at the bottom. `data-form` on the
+ * room selects the layout: "desktop" (the default rules) or "compact" (the overrides at the end).
+ */
+
+.room [hidden] {
+	/* biome-ignore lint/complexity/noImportantStyles: `hidden` must beat every layout display rule. */
+	display: none !important;
+}
+
+main:has(> .room) {
+	max-width: 76rem;
+}
+
+.room-extra {
+	max-width: 44rem;
+}
+
+.icon {
+	width: 1.25rem;
+	height: 1.25rem;
+	flex: none;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.bridge-table {
+	/* Card height H; tiles are H tall and 4H/3 wide. A strip shows the widest rank (10) and the deepest (J) in full. */
+	--card-h: clamp(3.6rem, 9vh, 6rem);
+	--card-w: calc(var(--card-h) * 0.68);
+	--rank-size: clamp(0.7rem, calc(var(--card-h) * 0.22), 1.1rem);
+	--card-step: calc(var(--rank-size) * 1.2 + 0.3rem);
+	--card-vstep: calc(var(--rank-size) * 1.2);
+	/* A side hand shows the top strip of each suit; only its last suit shows the whole card. */
+	--side-strip: calc(var(--rank-size) * 2.6);
+	--back-step: calc(var(--card-step) * 0.5);
+	--back-vstep: calc(var(--card-vstep) * 0.5);
+	--suit-gap: 2rem;
+}
+
+.table-status {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 1rem;
+	align-items: baseline;
+}
+
+.table-status h3,
+.table-status p {
+	margin: 0.15rem 0;
+}
+
+.table-status h3 {
+	font-size: 1.05rem;
+}
+
+.table-prompt,
+.result {
+	font-weight: 600;
+}
+
+.table-prompt,
+.table-actions {
+	flex-basis: 100%;
+}
+
+.table-actions {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.table-actions li {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	padding: 0.2rem 0;
+}
+
+.table-actions li[data-state="not-accepted"] .status,
+.table-actions li[data-state="undone"] .status {
+	color: #b3261e;
+}
+
+/*
+ * Felt: a top row with the three opponents' video tiles and the call panel, then three columns: the left seat,
+ * the centre (the partner, the auction or the trick, the own seat), and the right seat. Each seat is centred in
+ * its column, so a tile and its cards share one centre line.
+ */
+
+.felt {
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	padding: 0.6rem;
+	margin: 0.5rem 0;
+	background: var(--felt);
+	color: var(--felt-fg);
+	border-radius: 0.6rem;
+}
+
+.video-row {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.video-slot {
+	display: flex;
+	justify-content: center;
+	min-width: 0;
+}
+
+.body {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	gap: 0.6rem;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.col {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	min-width: 0;
+}
+
+.col-centre {
+	justify-content: flex-start;
+}
+
+.place {
+	display: flex;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.place-top {
+	grid-area: top;
+	justify-content: center;
+	align-items: flex-end;
+}
+
+.place-left {
+	grid-area: left;
+	flex-direction: column;
+	align-items: flex-start;
+}
+
+/* The right tile sits low, beside the own hand. */
+.place-right {
+	grid-area: right;
+	flex-direction: column;
+	justify-content: flex-end;
+	align-items: flex-end;
+}
+
+.place-bottom {
+	grid-area: bottom;
+	justify-content: center;
+}
+
+.seat {
+	min-width: 0;
+}
+
+.place-left .seat,
+.place-right .seat {
+	max-width: 11rem;
+}
+
+.center {
+	grid-area: center;
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 0.8rem;
+	align-items: center;
+	justify-content: center;
+	min-width: 0;
+}
+
+.scoring {
+	width: min(100%, 38rem);
+	padding: 1rem;
+	border-radius: 0.6rem;
+	background: var(--card-bg);
+	color: var(--card-fg);
+	text-align: center;
+}
+
+.scoring h2 {
+	margin: 0 0 0.6rem;
+}
+
+.scoring p {
+	margin: 0.4rem 0;
+}
+
+.scoring-contract {
+	font-size: 1.4rem;
+	font-weight: 600;
+}
+
+.scoring-contract .strain-H,
+.scoring-contract .strain-D {
+	color: var(--red-suit);
+}
+
+.scoring-contract .strain-NT {
+	color: var(--call-green);
+}
+
+.scoring-result {
+	font-size: 1.35rem;
+	font-weight: 700;
+}
+
+:is(.scoring-result, .mobile-scoring-outcome)[data-outcome="WON"] {
+	color: var(--call-green);
+}
+
+:is(.scoring-result, .mobile-scoring-outcome)[data-outcome="LOST"] {
+	color: var(--red-suit);
+}
+
+.scoring-countdown {
+	font-size: 1.15rem;
+	font-weight: 700;
+}
+
+.scoring[hidden],
+.scoring-countdown[hidden] {
+	display: none;
+}
+
+/* The call panel sits at the right end of the top row of the felt. */
+.call-slot {
+	min-width: 0;
+}
+
+.seat-label {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+	align-items: center;
+	margin-bottom: 0.25rem;
+	font-size: 0.85rem;
+	line-height: 1.3;
+}
+
+/* Names and role pills share one look: a white frame with green text inside. */
+.seat-label .name {
+	padding: 0 0.35rem;
+	border-radius: 0.3rem;
+	background: var(--felt-fg);
+	color: var(--felt);
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.seat-label .tag {
+	border-color: #fff;
+	background: var(--felt-fg);
+	color: var(--felt);
+}
+
+.seat-label .host-autoplay-toggle {
+	margin: 0;
+	padding: 0.05rem 0.35rem;
+	border-color: #fff;
+	border-radius: 0.8rem;
+	font-size: 0.75rem;
+	line-height: 1.25;
+}
+
+.seat-label .player-autoplay-toggle {
+	margin: 0;
+	padding: 0.05rem 0.35rem;
+	border-color: #fff;
+	border-radius: 0.8rem;
+	font-size: 0.75rem;
+	line-height: 1.25;
+}
+
+.seat-label .player-autoplay-status {
+	font-size: 0.75rem;
+}
+
+.seat-label .presence {
+	opacity: 0.85;
+}
+
+.seat[data-presence="online"] .seat-label .presence::before {
+	content: "● ";
+	color: #6ee7a0;
+}
+
+.seat[data-presence="free"] {
+	filter: grayscale(1);
+	opacity: 0.6;
+}
+
+.connecting {
+	margin: 0.3rem 0;
+	padding: 0.3rem 0.6rem;
+	border-radius: 0.4rem;
+	background: #e8b84a;
+	color: #1d1a0b;
+	font-weight: 700;
+	text-align: center;
+}
+
+.hand.waiting {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 2.5rem;
+	border: 2px dashed #c9c9c9;
+	border-radius: 0.4rem;
+}
+
+.waiting-text {
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	color: #e6e6e6;
+}
+
+.hand-column.waiting .waiting-text {
+	writing-mode: vertical-rl;
+	transform: rotate(180deg);
+}
+
+.call-state {
+	display: none;
+	align-items: center;
+	gap: 0.2rem;
+	opacity: 0.85;
+}
+
+.call-state .icon {
+	width: 0.9rem;
+	height: 0.9rem;
+}
+
+/*
+ * Hands. Each card's box is the strip that stays visible; its face is drawn over the next strips, and a later
+ * card covers the earlier face. So the visible strip of a card is also its click target.
+ */
+
+.hand {
+	display: flex;
+}
+
+/* The hand of the seat whose turn it is sits on a light green sheet, so the cards it can play stand out. */
+.seat[data-turn="true"] .hand:not(.backs) {
+	padding: 0.3rem;
+	border-radius: 0.4rem;
+	background: #c8dccf;
+}
+
+/* The seat whose card is next has a bright red name. Dummy counts as a seat here, even when declarer plays its card. */
+.seat[data-turn="true"] .seat-label .name {
+	color: #ff2a2a;
+}
+
+.hand-column {
+	flex-direction: column;
+}
+
+.hand .card,
+.hand .back {
+	position: relative;
+	flex: none;
+	display: block;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	color: var(--card-fg);
+	font: inherit;
+}
+
+.hand-row .card {
+	width: var(--card-step);
+	height: var(--card-h);
+}
+
+.hand-row .back {
+	width: var(--back-step);
+	height: var(--card-h);
+}
+
+/* A side hand's back lies landscape: its long edge is the card height, the same as on the top and bottom. */
+.hand-column .back {
+	width: var(--card-h);
+	height: var(--back-vstep);
+}
+
+.hand-column.backs > :last-child {
+	height: calc(var(--card-h) * 5 / 7);
+}
+
+.hand-row > :last-child:not(.suit-group) {
+	width: var(--card-w);
+}
+
+/* Visible side hands: the suits are rows of cards, stacked from top to bottom. */
+.hand-stack {
+	flex-direction: column;
+}
+
+/* The active side hand has no sheet: its suit rows sit on the felt. */
+.seat[data-turn="true"] .hand.hand-stack {
+	background: transparent;
+}
+
+.hand-stack > .suit-row {
+	position: relative;
+	display: flex;
+	flex-direction: row;
+}
+
+.trump-label {
+	display: block;
+	margin-bottom: 0.15rem;
+	color: #ffe14d;
+	font-size: 0.7rem;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.hand-stack .suit-row .card {
+	width: var(--card-step);
+	height: var(--side-strip);
+	overflow: hidden;
+}
+
+.hand-stack .suit-row > .card:last-child {
+	width: var(--card-w);
+}
+
+.hand-stack .suit-row:last-child .card {
+	height: var(--card-h);
+	overflow: visible;
+}
+
+/* The trump group is a wrapper that keeps the card fan; its own frame and label mark the trump suit. */
+.suit-group {
+	position: relative;
+	display: flex;
+}
+
+.hand-row > .suit-group {
+	flex-direction: row;
+}
+
+/* The frame is drawn above the cards of the other suits, so no card covers it. */
+.suit-group.trump {
+	z-index: 1;
+	outline: 2px solid #e8b923;
+	outline-offset: 3px;
+	border-radius: 0.4rem;
+}
+
+/* The last card of a trump group is drawn at full width, so the frame ends after it and does not cut across it. */
+.hand-row > .suit-group > :last-child {
+	width: var(--card-w);
+}
+
+.hand-row > .suit-start {
+	margin-left: var(--suit-gap);
+}
+
+.face {
+	position: absolute;
+	top: 0;
+	left: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	padding: 0.1rem 0.2rem;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	background: var(--card-bg);
+	box-shadow: -1px 0 2px rgb(0 0 0 / 0.2);
+	font-size: var(--rank-size);
+	font-weight: 700;
+	line-height: 1.1;
+	letter-spacing: -0.04em;
+}
+
+/* The rank and the suit share one centre line: each sits in a box of the same width, with its text centred. The glyph side-bearings then no longer shift the suit. */
+.face > .rank,
+.face > .pip {
+	display: block;
+	width: 1.3em;
+	text-align: center;
+}
+
+.hand-row .face {
+	width: var(--card-w);
+	height: var(--card-h);
+}
+
+/* Side hands: the rank sits above the suit symbol on one vertical axis, in a card as narrow as the marker. */
+.hand-column .face {
+	width: var(--card-w);
+	height: var(--card-w);
+	flex-direction: column;
+	align-items: center;
+	gap: 0.1rem;
+	padding: 0.1rem 0;
+	line-height: 1;
+}
+
+/* The back is the bridge card-back artwork (600 × 840, 5:7). The face keeps that ratio at every hand size, and the artwork fills it without a border, clipped to the rounded corners. */
+.back .face {
+	width: var(--card-w);
+	height: auto;
+	aspect-ratio: 5 / 7;
+	padding: 0;
+	border: 0;
+	overflow: hidden;
+}
+
+.back-art {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* Side hands: the face is landscape, and the artwork turns with it. Unrotated, the artwork stands 5:7 with card height as its long edge; the quarter turn lays it down so that edge is horizontal. */
+.hand-column .back .face {
+	width: var(--card-h);
+	aspect-ratio: 7 / 5;
+}
+
+.hand-column .back-art {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: calc(var(--card-h) * 5 / 7);
+	height: var(--card-h);
+	transform: translate(-50%, -50%) rotate(90deg);
+}
+
+/* Top and bottom backs stand: the long edge is the card height, the same as the cards, and the short edge follows the 5:7 artwork. */
+.hand-row .back .face {
+	width: calc(var(--card-h) * 5 / 7);
+	height: var(--card-h);
+	aspect-ratio: auto;
+}
+
+.hand-row > .back:last-child {
+	width: calc(var(--card-h) * 5 / 7);
+}
+
+.hand .card:disabled {
+	opacity: 1;
+	cursor: default;
+}
+
+.card[data-suit="H"] .face,
+.card[data-suit="D"] .face {
+	color: var(--red-suit);
+}
+
+.hand .card:enabled .face {
+	border-color: var(--accent);
+	box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.hand .card:focus-visible {
+	outline: none;
+}
+
+.hand .card:focus-visible .face {
+	outline: 3px solid var(--accent);
+	outline-offset: 1px;
+}
+
+/* A playable card lifts out of the fan by a quarter of its height; rules are in ascending specificity. */
+.hand-row .card:focus-visible .face {
+	transform: translateY(-25%);
+}
+
+.hand-row .card:enabled:hover .face {
+	transform: translateY(-25%);
+}
+
+/* A side card shows only its strip, so it does not lift: the border marks it as playable. */
+.hand-stack .card:enabled:focus-visible .face,
+.hand-stack .card:enabled:hover .face {
+	transform: none;
+}
+
+/* The dummy hand is at the top: its playable cards move down into the table instead. */
+.seat.pos-top .hand-row .card:focus-visible .face,
+.seat.pos-top .hand-row .card:enabled:hover .face {
+	transform: translateY(25%);
+}
+
+/* Video tiles: reserved while video is off. */
+
+.tile {
+	position: relative;
+	flex: none;
+	display: grid;
+	place-items: center;
+	width: calc(var(--card-h) * 4 / 3);
+	height: var(--card-h);
+	overflow: visible;
+	border-radius: 0.4rem;
+	background: var(--tile-bg);
+	color: var(--felt-fg);
+}
+
+.avatar {
+	display: grid;
+	place-items: center;
+	height: 48%;
+	aspect-ratio: 1;
+	margin-bottom: 0.9rem;
+	border-radius: 50%;
+	background: var(--felt-fg);
+	color: var(--felt);
+	font-weight: 700;
+}
+
+/* The picture covers the avatar inside the fixed tile box, so the tile never moves when video starts or stops. */
+.tile video {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: 0.4rem;
+}
+
+.tile video[hidden] {
+	display: none;
+}
+
+.tile-call-presence {
+	position: absolute;
+	top: 0.25rem;
+	right: 0.25rem;
+	z-index: 1;
+	display: flex;
+	gap: 0.2rem;
+	padding: 0.2rem;
+	border-radius: 0.25rem;
+	background: rgb(0 0 0 / 65%);
+	color: white;
+}
+
+.tile-call-presence[hidden] {
+	display: none;
+}
+
+.tile-call-presence .icon {
+	width: 0.9rem;
+	height: 0.9rem;
+}
+
+.bot-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	display: grid;
+	place-items: center;
+	font-size: clamp(2.5rem, 7vw, 4.5rem);
+	line-height: 1;
+	text-shadow: 0 2px 8px #000;
+	pointer-events: none;
+}
+
+.bot-overlay[hidden] {
+	display: none;
+}
+
+.bot-artwork {
+	width: min(68%, 8rem);
+	height: min(68%, 8rem);
+	object-fit: contain;
+	background: var(--tile-bg);
+}
+
+.bot-overlay-fallback[hidden] {
+	display: none;
+}
+
+.tile-caption {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	padding: 0 0.3rem;
+	overflow: hidden;
+	background: var(--tile-caption-bg);
+	font-size: 0.7rem;
+	line-height: 1.5;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tile-bot-control {
+	position: absolute;
+	top: calc(100% + 0.15rem);
+	left: 0;
+	z-index: 2;
+	width: 100%;
+	margin: 0;
+	padding: 0.1rem 0.2rem;
+	font-size: 0.65rem;
+}
+
+.room-control-row {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.room-control-row button {
+	padding-right: 0.55rem;
+	padding-left: 0.55rem;
+}
+
+.room-primary-controls {
+	justify-content: flex-start;
+}
+
+.room-bot-controls {
+	justify-content: space-between;
+}
+
+.model-priority-list {
+	display: grid;
+	gap: 0.25rem;
+	padding-left: 1.8rem;
+}
+
+.model-priority-list li {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.model-priority-label {
+	flex: 1;
+}
+
+.model-priority-list button {
+	margin: 0;
+	padding: 0.15rem 0.45rem;
+}
+
+.bot-spend-counter {
+	margin-right: auto;
+	margin-left: auto;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.mobile-bot-controls {
+	display: grid;
+	gap: 0.3rem;
+}
+
+.mobile-player-control {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.mobile-player-control button {
+	margin: 0;
+}
+
+/* Center: the auction. */
+
+.auction {
+	width: auto;
+	min-width: 16rem;
+	margin: 0;
+	border-radius: 0.4rem;
+	background: var(--panel);
+	color: var(--fg);
+}
+
+.auction th,
+.auction td,
+.scores th,
+.scores td {
+	padding: 0.2rem 0.6rem;
+	border-bottom: 1px solid var(--line);
+}
+
+.auction th,
+.auction td {
+	text-align: center;
+}
+
+/* The bids grid fills the centre of the felt, with a larger cell than a sidebar table. */
+.bridge-table .auction {
+	width: min(100%, 42rem);
+	border-collapse: separate;
+	border-spacing: 0.25rem;
+	/* The bidding history is a white sheet with black ink in both themes, so its suit colours are set for white. */
+	--call-green: #1f7a46;
+	--call-orange: #c75b00;
+	background: var(--card-bg);
+	color: var(--card-fg);
+}
+
+.bridge-table .auction th,
+.bridge-table .auction td {
+	padding: 0.5rem 0.6rem;
+	border: 0;
+}
+
+.bridge-table .auction th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 0.15rem 0.2rem;
+	background: var(--card-bg);
+	font-size: 0.82rem;
+	font-weight: 600;
+	line-height: 1.1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bridge-table .auction td {
+	padding: 0.2rem 0.1rem;
+	border-radius: 0.4rem;
+	background: #efefea;
+	font-weight: 600;
+}
+
+/* The bid mark stays clear while the history uses a compact, scrollable viewport. */
+.bridge-table .auction .bid-mark {
+	font-size: 1.25em;
+	line-height: 1;
+}
+
+.bridge-table .auction .bid-mark.strain-S,
+.bridge-table .auction .bid-mark.strain-C {
+	color: var(--card-fg);
+}
+
+.auction .bid-mark.strain-H,
+.auction .bid-mark.strain-D {
+	color: var(--red-suit);
+}
+
+.bridge-table .auction .bid-mark.strain-NT {
+	color: var(--call-green);
+}
+
+.bridge-table .auction .call-double {
+	color: var(--call-orange);
+}
+
+.bridge-table .auction .call-redouble {
+	color: var(--red-suit);
+}
+
+/* Center: the cards of the current trick, each on the side of the player who played it. */
+
+.trick {
+	display: grid;
+	grid-template-columns: var(--card-h) var(--card-w) var(--card-h);
+	grid-template-rows: var(--card-h) var(--card-w) var(--card-h);
+	grid-template-areas:
+		". top ."
+		"left . right"
+		". bottom .";
+	gap: 0.2rem;
+	align-items: center;
+	justify-items: center;
+}
+
+.trick[hidden] {
+	display: none;
+}
+
+/* A played card is drawn as a full card of the hand size: the rank above the suit symbol, all portrait. */
+.played {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	width: var(--card-w);
+	height: var(--card-h);
+	border: 1px solid var(--line);
+	border-radius: 0.3rem;
+	background: var(--card-bg);
+	color: var(--card-fg);
+	font-weight: 700;
+	font-size: var(--rank-size);
+	line-height: 1;
+}
+
+.played-legacy {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+.played.pos-left .played-legacy,
+.played.pos-right .played-legacy {
+	flex-direction: row;
+	gap: 0.3rem;
+}
+
+.played-corners,
+.played-center-suit {
+	display: none;
+}
+
+.played-corners {
+	position: absolute;
+	inset: 0.08rem;
+}
+
+.rank-corner {
+	position: absolute;
+	font-size: var(--rank-size);
+}
+
+.played[data-suit="H"] .rank-corner,
+.played[data-suit="D"] .rank-corner {
+	color: var(--red-suit);
+}
+
+.rank-corner.top-left {
+	top: 0;
+	left: 0;
+}
+
+.rank-corner.top-right {
+	top: 0;
+	right: 0;
+}
+
+.rank-corner.bottom-left {
+	bottom: 0;
+	left: 0;
+}
+
+.rank-corner.bottom-right {
+	right: 0;
+	bottom: 0;
+}
+
+.played-center-suit {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	font-size: calc(var(--rank-size) * 1.5);
+	transform: translate(-50%, -50%);
+}
+
+.bridge-table[data-played-card-style="classic-large"] .played {
+	font-size: calc(var(--rank-size) * 1.5);
+}
+
+.bridge-table[data-played-card-style="corners-upright"] .played-legacy,
+.bridge-table[data-played-card-style="corners-oriented"] .played-legacy {
+	display: none;
+}
+
+.bridge-table[data-played-card-style="corners-upright"] .played-corners,
+.bridge-table[data-played-card-style="corners-upright"] .played-center-suit,
+.bridge-table[data-played-card-style="corners-oriented"] .played-corners,
+.bridge-table[data-played-card-style="corners-oriented"] .played-center-suit {
+	display: block;
+}
+
+.bridge-table[data-played-card-style="corners-oriented"]
+	.played.pos-top
+	.rank-corner {
+	transform: rotate(0deg);
+}
+
+.bridge-table[data-played-card-style="corners-oriented"]
+	.played.pos-left
+	.rank-corner {
+	transform: rotate(90deg);
+}
+
+.bridge-table[data-played-card-style="corners-oriented"]
+	.played.pos-right
+	.rank-corner {
+	transform: rotate(-90deg);
+}
+
+.bridge-table[data-played-card-style="corners-oriented"]
+	.played.pos-bottom
+	.rank-corner {
+	transform: rotate(180deg) scaleY(-1);
+}
+
+.bridge-table[data-played-card-style="corners-oriented"]
+	.played.pos-top
+	.played-center-suit {
+	transform: translate(-50%, -50%) rotate(0deg);
+}
+
+.bridge-table[data-played-card-style="corners-oriented"]
+	.played.pos-left
+	.played-center-suit {
+	transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.bridge-table[data-played-card-style="corners-oriented"]
+	.played.pos-right
+	.played-center-suit {
+	transform: translate(-50%, -50%) rotate(-90deg);
+}
+
+.bridge-table[data-played-card-style="corners-oriented"]
+	.played.pos-bottom
+	.played-center-suit {
+	transform: translate(-50%, -50%) rotate(180deg) scaleY(-1);
+}
+
+.played[data-suit="H"],
+.played[data-suit="D"] {
+	color: var(--red-suit);
+}
+
+.played.pos-top {
+	grid-area: top;
+}
+
+.played.pos-left {
+	grid-area: left;
+}
+
+.played.pos-right {
+	grid-area: right;
+}
+
+/* The long edge points to the player who played the card: landscape on the left and right, portrait at top and bottom. */
+.played.pos-left,
+.played.pos-right {
+	flex-direction: row;
+	width: var(--card-h);
+	height: var(--card-w);
+	gap: 0.3rem;
+}
+
+.played.pos-bottom {
+	grid-area: bottom;
+}
+
+.bridge-table[data-played-card-style="corners-oriented"] .played.pos-bottom {
+	transform: scaleX(-1);
+}
+
+/* Dock: the call panel bottom-left, the game controls bottom-center. */
+
+.dock {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	align-items: stretch;
+}
+
+/* The heading and Join call share the first row, so the panel is about as tall as the bid grid. */
+.call-panel {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.3rem;
+	align-items: center;
+	padding: 0.5rem;
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	background: var(--panel);
+}
+
+.call-panel h4 {
+	margin: 0;
+	font-size: 0.9rem;
+}
+
+.camera-setup {
+	width: min(28rem, calc(100vw - 2rem));
+	padding: 1rem;
+	border: 1px solid var(--line);
+	border-radius: 0.6rem;
+	background: #fff;
+	color: #1d1d1b;
+}
+
+.camera-setup::backdrop {
+	background: rgb(0 0 0 / 65%);
+}
+
+.camera-setup h2 {
+	margin: 0 0 0.7rem;
+	font-size: 1.1rem;
+}
+
+.camera-setup select {
+	width: 100%;
+	margin-bottom: 0.6rem;
+}
+
+.camera-setup video {
+	display: block;
+	width: 100%;
+	max-height: 55vh;
+	aspect-ratio: 16 / 9;
+	border-radius: 0.4rem;
+	background: #171717;
+	object-fit: cover;
+	transform: scaleX(-1);
+}
+
+.camera-setup p {
+	min-height: 1.3em;
+	margin: 0.45rem 0;
+	font-size: 0.85rem;
+}
+
+.camera-setup-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+}
+
+.call-panel .note {
+	grid-column: 1 / -1;
+	margin: 0;
+	font-size: 0.8rem;
+}
+
+.call-switches {
+	display: grid;
+	grid-column: 1 / -1;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.3rem;
+}
+
+.call-toggle,
+.call-join,
+.icon-row button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	border-color: var(--line);
+	background: var(--panel);
+	color: var(--fg);
+}
+
+.call-toggle,
+.call-join {
+	padding: 0.25rem 0.4rem;
+	font-size: 0.8rem;
+}
+
+.icon-slash {
+	stroke-width: 2.2;
+}
+
+/* A switch that is on is filled; one that is off keeps the outline and the slash, so color is not the only cue. */
+.call-toggle[aria-pressed="true"] {
+	border-color: var(--accent);
+	background: var(--accent);
+	color: var(--bg);
+}
+
+/* Inside the call the phone icon turns down: it leaves. */
+.call-join[data-in-call="true"] .icon {
+	transform: rotate(135deg);
+}
+
+/* Join is big green text with a green phone; Leave call is the same in red. The icon takes the text colour. */
+/* A fixed dark green: it reads on the white call sheet in both themes. */
+button.call-join {
+	font-size: 1.1rem;
+	font-weight: 700;
+	color: #166534;
+}
+
+button.call-join[data-in-call="true"] {
+	color: var(--red-suit);
+}
+
+.call-retries {
+	display: flex;
+	flex-wrap: wrap;
+	grid-column: 1 / -1;
+	gap: 0.3rem;
+}
+
+.call-retries:empty {
+	display: none;
+}
+
+.call-retry {
+	padding: 0.15rem 0.5rem;
+	font-size: 0.8rem;
+}
+
+/* The compact message about a local problem; the desktop panel note says the same. */
+.call-alert {
+	display: none;
+	margin: 0;
+	padding: 0.3rem 0.5rem;
+	border-radius: 0.3rem;
+	background: var(--warn-bg);
+	color: var(--warn-fg);
+	font-size: 0.8rem;
+}
+
+.remote-audio {
+	display: none;
+}
+
+.game-slot {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.4rem;
+	width: min(100%, 44rem);
+	min-width: 0;
+}
+
+/* The bidding block is a white sheet, so it stands apart from the green felt. */
+.bid-box {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	width: 100%;
+	padding: 0.5rem;
+	border-radius: 0.5rem;
+	background: var(--card-bg);
+	color: var(--card-fg);
+}
+
+/* During the auction the bidding history and the bid box sit together; on a phone they stack. */
+.bid-row {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	width: 100%;
+}
+
+/* Four columns: levels 1-4 and 5-7, the suits, then NT, X, XX and PASS; Confirm and Undo share a row. */
+.bid-levels,
+.bid-calls {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.3rem;
+}
+
+.bid-actions {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.3rem;
+}
+
+.undo-message {
+	margin: 0;
+	font-size: 0.9rem;
+}
+
+.bid-actions .undo-message {
+	grid-column: 1 / -1;
+}
+
+.bid-levels button,
+.bid-calls button,
+.bid-actions button {
+	flex: 1 1 0;
+	min-width: 0;
+	min-height: 2.5rem;
+	padding: 0.25rem 0.2rem;
+	border-color: var(--line);
+	background: var(--card-bg);
+	color: var(--card-fg);
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+/* The levels and suits are light gray, the same as a bid in the bidding history. */
+.bid-levels button,
+.bid-calls button {
+	background: #efefea;
+}
+
+.bid-levels button[aria-pressed="true"],
+.bid-calls button[aria-pressed="true"] {
+	border-color: #e8b923;
+	box-shadow: inset 0 0 0 2px #e8b923;
+}
+
+.bid-calls .strain-H,
+.bid-calls .strain-D {
+	color: var(--red-suit);
+}
+
+.bid-calls .strain-NT {
+	color: var(--call-green);
+}
+
+.bid-calls .double {
+	color: var(--call-orange);
+}
+
+.bid-calls .redouble {
+	color: var(--red-suit);
+}
+
+/* Unavailable actions use a disabled gray surface, including the red Undo button. */
+.play-controls button:disabled {
+	border-color: var(--line);
+	background: #efefea;
+	color: #9a9a9a;
+	opacity: 1;
+}
+
+/* A call that is not legal now is crossed out in gray, so it reads as not selectable. */
+.bid-box:not(.not-turn) .bid-levels button:disabled,
+.bid-box:not(.not-turn) .bid-calls button:disabled {
+	background-image: linear-gradient(
+		to bottom right,
+		transparent 49.5%,
+		#8a8a84 49.5%,
+		#8a8a84 50.5%,
+		transparent 50.5%
+	);
+}
+
+.bid-calls .pass {
+	flex: 1.6 1 0;
+}
+
+.bid-box button {
+	font-size: 1.15rem;
+}
+
+/* Not the viewer's call: the levels and suits stay visible, but grayed out and inactive. */
+.bid-box.not-turn {
+	opacity: 0.4;
+	pointer-events: none;
+}
+
+.bid-actions .confirm {
+	flex: 7 1 0;
+	min-height: 2.8rem;
+	border-color: #2e7d57;
+	background: #2e7d57;
+	color: #ffffff;
+	font-weight: 700;
+}
+
+.bid-actions .undo-call {
+	flex: 3 1 0;
+	min-height: 2.8rem;
+}
+
+.mobile-auction {
+	display: none;
+}
+
+.mobile-undo-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: grid;
+	place-items: center;
+	padding: 1rem;
+	background: rgb(0 0 0 / 55%);
+}
+
+.mobile-undo-dialog {
+	width: min(100%, 24rem);
+	padding: 1.25rem;
+	border: 1px solid var(--line);
+	border-radius: 0.75rem;
+	background: var(--card-bg);
+	box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 25%);
+}
+
+.mobile-undo-dialog h2 {
+	margin: 0 0 0.75rem;
+	font-size: 1.2rem;
+}
+
+.mobile-undo-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-top: 1rem;
+}
+
+.mobile-undo-actions button {
+	flex: 1 1 6rem;
+	min-height: 2.75rem;
+}
+
+/* The seat to call gets a gold frame; its pills sit in the frame corners. */
+.seat[data-bidding="true"] {
+	position: relative;
+	outline: 4px solid #e8b923;
+	outline-offset: 4px;
+	border-radius: 12px;
+}
+
+.seat[data-visible="true"] {
+	position: relative;
+}
+
+.hcp-pill,
+.turn-pill {
+	position: absolute;
+	top: 0.35rem;
+	z-index: 1;
+	padding: 0.1rem 0.6rem;
+	border-radius: 999px;
+	font-size: 0.8rem;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.hcp-pill {
+	left: 0.5rem;
+	background: #e8b923;
+	color: #1b1b1b;
+}
+
+/* The pill sits above the seat's golden frame (4px outline, 4px offset), not inside it. */
+.turn-pill {
+	top: auto;
+	right: 0.5rem;
+	bottom: calc(100% + 0.7rem);
+	border: 1px solid #e8b923;
+	background: #fff8dc;
+	color: #1b1b1b;
+}
+
+.play-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+	justify-content: center;
+}
+
+/* Claim, Claim all and Undo: white buttons with black text, Undo in red. */
+.play-controls button {
+	background: #fff;
+	border-color: #fff;
+	color: #000;
+	font-size: 1.2rem;
+	font-weight: 700;
+	opacity: 1;
+}
+
+.play-controls .claim-undo {
+	color: var(--red-suit);
+}
+
+.play-controls[hidden] {
+	display: none;
+}
+
+.icon-row {
+	display: none;
+}
+
+.scores {
+	margin: 0.8rem 0;
+}
+
+.scores caption {
+	padding: 0.3rem 0;
+	font-weight: 600;
+	text-align: left;
+}
+
+.scores .num {
+	text-align: right;
+}
+
+.scores .total > * {
+	font-weight: 700;
+	border-top: 2px solid var(--line);
+}
+
+/* Right column on wide screens: the stage on the left, the sidebar on the right; stacked on narrow screens. */
+.table-sidebar {
+	display: flex;
+	flex-direction: column;
+	gap: 0.8rem;
+	max-width: 22rem;
+}
+
+.room-controls {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	padding-top: 2.8rem;
+}
+
+.reset-decision {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+/* The right panel and the call settings are white sheets with black ink in both themes; their controls follow the sheet. */
+.table-sidebar,
+.call-panel {
+	--panel: #ffffff;
+	--fg: #1d1d1b;
+	--line: #d6d6cf;
+	color: var(--fg);
+}
+
+.history-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.auction-scroll {
+	max-height: 8rem;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.auction-scroll .auction {
+	width: 100%;
+	table-layout: fixed;
+}
+
+.panel-title {
+	margin: 0;
+	font-size: 0.95rem;
+}
+
+.side-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+/* The contract header: "1♣ by North · Anna", the largest type in the sidebar. */
+.contract-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.35em;
+	margin: 0;
+	font-size: 2rem;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.contract-head .strain.red {
+	color: var(--red-suit);
+}
+
+.contract-head .by,
+.contract-head .declarer {
+	font-size: 1.1rem;
+	font-weight: 400;
+}
+
+.tricks-counts {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	text-align: center;
+}
+
+.tricks-counts .count-label {
+	display: block;
+	font-size: 0.95rem;
+}
+
+.tricks-counts strong {
+	font-size: 2rem;
+}
+
+.tricks-needed {
+	margin: 0;
+	text-align: center;
+	font-size: 1.1rem;
+	white-space: nowrap;
+}
+
+.tricks-needed[data-status="at-risk"] {
+	color: var(--call-orange);
+}
+
+.tricks-needed[data-status="secured"] {
+	color: var(--call-green);
+}
+
+.tricks-needed[data-status="defeated"] {
+	color: var(--red-suit);
+}
+
+.tricks-status {
+	margin: 0;
+	text-align: center;
+	font-size: 0.95rem;
+}
+
+/*
+ * The table screens show only the felt, the seats, the call panel and the sidebar statistics (reference layout).
+ * The players list, the invite link, the network panel and the messages are off screen.
+ */
+.room-extra {
+	display: none;
+}
+
+[data-waiting="true"] .table-sidebar {
+	display: flex;
+}
+
+[data-waiting="true"] .table-sidebar > :not(.room-controls) {
+	display: none;
+}
+
+main[data-screen="table"] > .room {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 20rem;
+	gap: 1rem;
+	align-items: start;
+}
+
+main[data-screen="table"] > .room > :not(.table-sidebar) {
+	grid-column: 1;
+}
+
+main[data-screen="table"] > .room > .table-sidebar {
+	grid-column: 2;
+	grid-row: 1;
+}
+
+@media screen {
+	/*
+ * The room uses a 1920×1080 reference canvas. A single transform scales this whole layout for the viewport.
+	 */
+	html:has(main[data-screen="table"]) {
+		font-size: 22.68px;
+	}
+
+	/* At the reference size, the card height matches the existing Full HD layout. */
+	main[data-screen="table"] .bridge-table {
+		--card-h: 162px;
+	}
+
+	/* The own cards overlap: each card shows its rank and suit, and the last card shows in full. The top hand has the same shape, so a card face never covers the next suit. */
+	main[data-screen="table"] .place-top,
+	main[data-screen="table"] .place-bottom {
+		--card-w: calc(var(--rank-size) * 2.2);
+	}
+
+	/* The top cards move 10px down; the bottom cards move up so their bottom edge is 20px above the felt's bottom edge, like the call panel and the right window. */
+	main[data-screen="table"] .place-top {
+		position: relative;
+		top: 10px;
+	}
+
+	main[data-screen="table"] .place-bottom {
+		position: relative;
+		top: -20px;
+	}
+
+	/* On the desktop the history and the bid box share the row equally, so the bid box is half the old width. */
+	main[data-screen="table"] .bid-row {
+		flex-direction: row;
+		align-items: stretch;
+		gap: 0.8rem;
+	}
+
+	main[data-screen="table"] .bid-row > .history-panel,
+	main[data-screen="table"] .bid-row > .bid-box {
+		flex: 1 1 0;
+		min-width: 0;
+	}
+
+	/* The bid box is 25% narrower than the history: 0.6 : 1 gives 37.5% of the row against 50% before. */
+	main[data-screen="table"] .bid-row > .bid-box {
+		flex-grow: 0.6;
+	}
+
+	/*
+	 * While bidding the top and bottom seats stay at the ends of the centre column, and the bidding windows are centred
+	 * on the body's height, the same line as the left and right seats' cards.
+	 */
+	main[data-screen="table"] .bridge-table[data-phase="auction"] .col-centre {
+		position: relative;
+		justify-content: space-between;
+	}
+
+	main[data-screen="table"] .bridge-table[data-phase="auction"] .center {
+		position: absolute;
+		top: 50%;
+		left: 0;
+		right: 0;
+		transform: translateY(-50%);
+		justify-content: center;
+	}
+
+	/* No margin or vertical padding around the felt or the right panel: that space is the active area's, not decoration. */
+	main[data-screen="table"] {
+		padding: 0;
+	}
+
+	main[data-screen="table"] .felt {
+		margin-block: 0;
+		padding-block: 0;
+	}
+
+	main[data-screen="table"] .scores {
+		margin-block: 0;
+	}
+
+	/* The table and sidebar fill the fixed canvas. */
+	main[data-screen="table"] > .room {
+		align-items: stretch;
+		width: 100%;
+		height: 100%;
+		min-height: 1080px;
+		grid-template-rows: minmax(0, 1fr);
+	}
+
+	main[data-screen="table"] .stage {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
+
+	main[data-screen="table"] .bridge-table {
+		display: flex;
+		flex: 1 1 auto;
+		flex-direction: column;
+		min-height: 0;
+	}
+
+	main[data-screen="table"] .felt {
+		flex: 1 1 auto;
+	}
+}
+
+main[data-screen="table"] {
+	max-width: none;
+}
+
+html:has(main[data-screen="table"]),
+body:has(main[data-screen="table"]) {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+body:has(main[data-screen="table"]) {
+	background: #000;
+}
+
+main[data-screen="table"] {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	width: 1920px;
+	height: 1080px;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	background: var(--bg);
+	transform: translate(-50%, -50%) scale(var(--room-canvas-scale, 1));
+	transform-origin: center;
+}
+
+/*
+ * Compact: the stage fills the dynamic viewport while a board is on the table. The far hands and the center
+ * scroll inside their area; the own hand, the game controls and the icon row always stay on the screen.
+ */
+
+main:has(> .room[data-form="compact"]) {
+	width: auto;
+	margin-inline: auto;
+	padding: 0;
+}
+
+[data-form="compact"] .stage,
+[data-form="compact"] .room-extra,
+[data-form="compact"] > .scores {
+	padding: 0 0.5rem;
+}
+
+[data-form="compact"] .stage {
+	display: flex;
+	flex-direction: column;
+	padding-top: 0.3rem;
+}
+
+[data-form="compact"] .stage:has(.felt:not([hidden])) {
+	height: 100dvh;
+}
+
+[data-form="compact"] .you {
+	margin: 0;
+	font-size: 0.85rem;
+}
+
+[data-form="compact"] .bridge-table {
+	--card-h: 3.6rem;
+	--card-w: 2.5rem;
+	--card-step: min(1.6rem, (100% - var(--card-w) - 3 * var(--suit-gap)) / 12);
+	--suit-gap: 0.5rem;
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
+}
+
+[data-form="compact"] .table-status {
+	gap: 0 0.6rem;
+	font-size: 0.8rem;
+	line-height: 1.3;
+}
+
+[data-form="compact"] .table-status h3 {
+	font-size: 0.9rem;
+}
+
+[data-form="compact"] .table-status .note {
+	font-size: 0.75rem;
+}
+
+[data-form="compact"] .felt {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	gap: 0.4rem;
+	min-height: 0;
+	padding: 0.4rem;
+	margin: 0.3rem 0;
+}
+
+/* The phone keeps one grid: the top seat, the left and right seats beside the centre, and the own seat. */
+[data-form="compact"] .video-row,
+[data-form="compact"] .col {
+	display: contents;
+}
+
+[data-form="compact"] .video-slot {
+	display: none;
+}
+
+[data-form="compact"] .call-slot {
+	order: 1;
+}
+
+[data-form="compact"] .body {
+	--card-h: 2.6rem;
+	--card-w: 1.8rem;
+	--rank-size: 0.7rem;
+	--card-step: 1.15rem;
+	--card-vstep: 0.95rem;
+	--back-step: 0.3rem;
+	--back-vstep: 0.3rem;
+	display: grid;
+	flex: 1 1 auto;
+	grid-template-columns: 3.6rem minmax(0, 1fr) 3.6rem;
+	grid-template-areas:
+		"top top top"
+		"left center right"
+		"bottom bottom bottom";
+	gap: 0.4rem;
+	align-content: start;
+	min-height: 0;
+	overflow: auto;
+}
+
+[data-form="compact"] .place-left .seat,
+[data-form="compact"] .place-right .seat {
+	max-width: none;
+}
+
+[data-form="compact"] .place-right {
+	justify-content: flex-start;
+}
+
+[data-form="compact"] .place-bottom {
+	flex: none;
+}
+
+[data-form="compact"] .place-bottom .seat,
+[data-form="compact"] .place-bottom .hand {
+	width: 100%;
+}
+
+[data-form="compact"] .seat-label {
+	gap: 0.15rem 0.25rem;
+	font-size: 0.7rem;
+}
+
+/* The pills sit over the top of the own seat, so the name row starts below them. */
+.seat[data-visible="true"] .seat-label {
+	padding-top: 1.9rem;
+}
+
+[data-form="compact"] .seat-label .tag {
+	font-size: 0.65rem;
+	padding: 0 0.3rem;
+}
+
+[data-form="compact"] .call-state {
+	display: inline-flex;
+}
+
+[data-form="compact"] .call-state .call-retry {
+	padding: 0 0.3rem;
+	font-size: inherit;
+}
+
+[data-form="compact"] .call-alert {
+	display: block;
+	flex: none;
+}
+
+[data-form="compact"] .tile,
+[data-form="compact"] .call-panel,
+[data-form="compact"] .play-controls {
+	display: none;
+}
+
+[data-form="compact"] .center {
+	gap: 0.4rem;
+}
+
+[data-form="compact"] .auction {
+	width: 100%;
+	min-width: 0;
+	table-layout: fixed;
+	font-size: 0.7rem;
+	overflow-wrap: anywhere;
+}
+
+[data-form="compact"] .auction th,
+[data-form="compact"] .auction td {
+	padding: 0.1rem 0.15rem;
+}
+
+/* During play the contract line names the contract; the trick needs the room. */
+[data-form="compact"] .bridge-table[data-phase="play"] .auction {
+	display: none;
+}
+
+[data-form="compact"] .dock {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 0.3rem;
+	margin-top: auto;
+}
+
+[data-form="compact"] .game-slot {
+	align-items: stretch;
+	max-height: 7.4rem;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+[data-form="compact"] .scoring {
+	width: 100%;
+	padding: 0.35rem 0.5rem;
+}
+
+[data-form="compact"] .mobile-scoring-outcome {
+	display: block;
+	font-size: 1.1rem;
+	line-height: 1.1;
+}
+
+[data-form="compact"] .mobile-scoring-detail {
+	margin: 0.1rem 0;
+	font-size: 0.9rem;
+	font-weight: 700;
+}
+
+[data-form="compact"] .scoring-countdown {
+	margin: 0.15rem 0 0;
+	font-size: 0.75rem;
+}
+
+[data-form="compact"] .bid-box {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+[data-form="compact"] .icon-row {
+	display: flex;
+	flex: none;
+	flex-wrap: nowrap;
+	align-items: center;
+	gap: 0.25rem;
+	min-height: calc(3rem + env(safe-area-inset-bottom));
+	padding-bottom: env(safe-area-inset-bottom);
+	border-top: 1px solid var(--line);
+}
+
+.icon-group {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.game-group {
+	margin-left: auto;
+}
+
+.icon-separator {
+	align-self: stretch;
+	width: 1px;
+	margin: 0.4rem 0.25rem;
+	background: var(--line);
+}
+
+[data-form="compact"] .icon-row button {
+	justify-content: center;
+	width: 2.75rem;
+	height: 2.75rem;
+	padding: 0;
+}
+
+[data-form="compact"]
+	.bridge-table:is([data-phase="auction"], [data-phase="play"])
+	.mobile-auction {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	gap: 0.45rem;
+	min-height: 0;
+	padding: 0.25rem;
+}
+
+.mobile-auction-topbar {
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.4rem;
+}
+
+.mobile-auction-topbar .icon-group {
+	gap: 0.35rem;
+}
+
+.mobile-auction-topbar .icon-group button,
+.mobile-auction-exit,
+.mobile-auction-share {
+	min-width: 2.6rem;
+	min-height: 2.5rem;
+	margin: 0;
+}
+
+.mobile-auction-share {
+	flex: none;
+	padding: 0 0.55rem;
+}
+
+.room[data-form="compact"] .reset-button {
+	display: none;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.mobile-round-status {
+	display: flex;
+	flex: none;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.15rem 0.35rem;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	background: var(--card-bg);
+	color: var(--card-fg);
+	font-size: 1.08rem;
+	line-height: 1.2;
+	white-space: nowrap;
+}
+
+.mobile-round-record[data-own-side="true"][data-result="positive"] strong {
+	color: #247a3e;
+}
+
+.mobile-round-record[data-own-side="true"][data-result="negative"] strong {
+	color: #b3261e;
+}
+
+.mobile-round-record[data-own-side="true"][data-result="zero"] strong {
+	color: #171717;
+}
+
+.mobile-auction-board {
+	display: grid;
+	flex: none;
+	align-content: center;
+	grid-template-columns: minmax(2.6rem, 1fr) minmax(0, 1fr) minmax(2.6rem, 1fr);
+	grid-template-rows: auto auto auto;
+	grid-template-areas:
+		"top top top"
+		"left center right"
+		"bottom bottom bottom";
+	align-items: center;
+	gap: 0.2rem 0.25rem;
+	min-height: 0;
+	padding: 0.2rem;
+	border-radius: 0.45rem;
+	background: var(--felt);
+	color: var(--felt-fg);
+}
+
+.mobile-board-top {
+	grid-area: top;
+	width: 100%;
+	min-width: 0;
+	overflow: visible;
+}
+
+.mobile-board-top .hand-row {
+	--card-h: 3.1rem;
+	--card-w: 2.1rem;
+	--card-step: 1rem;
+	--rank-size: 0.95rem;
+	--back-card-w: calc(var(--card-h) * 5 / 7);
+	--back-step: calc((100% - var(--back-card-w)) / 12);
+	--suit-gap: 0.9rem;
+	width: 100%;
+}
+
+.mobile-board-top .hand-row > .back:last-child {
+	width: var(--back-card-w);
+}
+
+.mobile-board-left,
+.mobile-board-right {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.mobile-board-left {
+	grid-area: left;
+	justify-content: flex-start;
+}
+
+.mobile-board-right {
+	grid-area: right;
+	justify-content: flex-end;
+}
+
+.mobile-board-center {
+	grid-area: center;
+}
+
+.mobile-board-center .trick {
+	--card-h: 2.8rem;
+	--card-w: 2rem;
+	--rank-size: 0.85rem;
+	gap: 0.1rem;
+}
+
+.mobile-board-left .hand-column,
+.mobile-board-right .hand-column {
+	--card-h: 2.6rem;
+	--card-w: 1.8rem;
+	--back-vstep: calc(var(--card-h) * 5 / 14);
+}
+
+.mobile-auction-bids {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	gap: 0.3rem;
+	min-height: 0;
+	padding: 0.35rem;
+	border: 1px solid var(--line);
+	border-radius: 0.45rem;
+	background: var(--card-bg);
+	color: var(--card-fg);
+}
+
+.mobile-auction-controls {
+	flex: none;
+	padding: 0.35rem;
+	border: 1px solid var(--line);
+	border-radius: 0.45rem;
+	background: var(--card-bg);
+	color: var(--card-fg);
+}
+
+.mobile-tricks {
+	flex: none;
+	padding: 0.25rem 0.35rem;
+	border: 1px solid var(--line);
+	border-radius: 0.45rem;
+	background: var(--card-bg);
+	color: var(--card-fg);
+}
+
+.mobile-tricks .tricks-counts > * {
+	min-width: 0;
+}
+
+.mobile-auction-bids .history-panel {
+	gap: 0.2rem;
+}
+
+.mobile-auction-bids .history-panel .panel-title {
+	font-size: 0.75rem;
+}
+
+.mobile-auction-bids .auction-scroll {
+	max-height: 6.2rem;
+}
+
+[data-form="compact"]
+	.bridge-table[data-phase="auction"]
+	.mobile-auction-bids
+	.auction {
+	font-size: 1.02rem;
+}
+
+[data-form="compact"]
+	.bridge-table[data-phase="play"]
+	.mobile-auction-bids
+	.auction {
+	display: table;
+	font-size: 1.02rem;
+}
+
+[data-form="compact"] .mobile-auction-bids .auction th {
+	font-size: 0.82rem;
+}
+
+.mobile-auction-controls .bid-box {
+	gap: 0.2rem;
+	padding: 0;
+}
+
+.mobile-auction-controls .bid-levels {
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 0.2rem;
+}
+
+.mobile-auction-controls .bid-calls {
+	grid-template-columns: repeat(8, minmax(0, 1fr));
+	gap: 0.2rem;
+}
+
+.mobile-auction-controls .bid-levels button,
+.mobile-auction-controls .bid-calls button,
+.mobile-auction-controls .bid-actions button {
+	min-height: 2.15rem;
+	padding: 0.15rem;
+	font-size: 0.9rem;
+}
+
+.mobile-auction-controls .bid-actions .confirm,
+.mobile-auction-controls .bid-actions .undo-call {
+	min-height: 2.3rem;
+}
+
+.mobile-auction-hand {
+	grid-area: bottom;
+	flex: none;
+	min-width: 0;
+	width: 100%;
+	padding: 0.2rem 0;
+	background: transparent;
+	color: var(--felt-fg);
+}
+
+.mobile-auction-hand .seat .seat-label {
+	margin-bottom: 0.15rem;
+}
+
+.mobile-auction-hand .seat[data-visible="true"] .seat-label {
+	padding-top: 0;
+}
+
+.mobile-auction-hand .seat[data-bidding="true"] {
+	outline: none;
+	outline-offset: 0;
+}
+
+.mobile-auction-hand .turn-pill,
+.mobile-auction-hand .hcp-pill,
+.mobile-auction-hand .trump-label {
+	display: none;
+}
+
+.mobile-auction-hand .hand-row {
+	--card-h: 3.1rem;
+	--card-w: 2.1rem;
+	--card-step: 1rem;
+	--rank-size: 0.95rem;
+	--suit-gap: 0.9rem;
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 3.2rem;
+	overflow: visible;
+}
+
+:is(.mobile-auction-hand, .mobile-board-top)
+	.hand-row[data-mobile-card-layout="1-1"] {
+	--card-step: calc((100% - 2.1rem) / 12);
+}
+
+:is(.mobile-auction-hand, .mobile-board-top)
+	.hand-row[data-mobile-card-layout="2-1"] {
+	--card-step: calc((100% - 3rem) / 12);
+}
+
+:is(.mobile-auction-hand, .mobile-board-top)
+	.hand-row[data-mobile-card-layout="2-2"] {
+	--card-step: calc((100% - 5.1rem) / 11);
+}
+
+:is(.mobile-auction-hand, .mobile-board-top)
+	.hand-row[data-mobile-card-layout="3-1"] {
+	--card-step: calc((100% - 3.9rem) / 12);
+}
+
+:is(.mobile-auction-hand, .mobile-board-top)
+	.hand-row[data-mobile-card-layout="3-2"] {
+	--card-step: calc((100% - 6rem) / 11);
+}
+
+:is(.mobile-auction-hand, .mobile-board-top)
+	.hand-row[data-mobile-card-layout="4-1"] {
+	--card-step: calc((100% - 4.8rem) / 12);
+}
+
+:is(.mobile-auction-hand, .mobile-board-top)
+	.hand-row[data-mobile-card-layout="4-2"] {
+	--card-step: calc((100% - 6.9rem) / 11);
+}
+
+.mobile-auction-hand .hand-row .suit-group {
+	flex: none;
+}
+
+.mobile-auction-players {
+	flex: none;
+	font-size: 0.72rem;
+	line-height: 1.3;
+}
+
+.mobile-auction-players p {
+	margin: 0;
+}
+
+.mobile-auction-controls .play-controls {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.3rem;
+	width: 100%;
+}
+
+.mobile-auction-controls .play-controls button {
+	min-width: 0;
+	min-height: 2.4rem;
+	margin: 0;
+	padding: 0.15rem;
+	font-size: 0.82rem;
+}
+
+.mobile-auction-controls .claim-panel {
+	gap: 0.3rem;
+	margin-top: 0.35rem;
+	padding-top: 0.35rem;
+	border-top: 1px solid var(--line);
+}
+
+.mobile-auction-controls .claim-panel .panel-title {
+	font-size: 0.8rem;
+}
+
+.mobile-auction-controls .claim-panel p,
+.mobile-auction-controls .claim-panel select,
+.mobile-auction-controls .claim-panel button {
+	margin: 0;
+}
+
+.mobile-auction-controls .claim-panel select,
+.mobile-auction-controls .claim-panel button {
+	min-height: 2.4rem;
+}
+
+.room[data-form="compact"]:has(
+		.bridge-table:is([data-phase="auction"], [data-phase="play"])
+	)
+	.table-sidebar
+	> :not(.room-controls) {
+	display: none;
+}
+
+/*
+ * Desktop: the three columns of the felt are left (left seat, room call), centre (top seat, middle, own seat)
+ * and right (right seat). The top and own seats are centred on their column. The side seats sit on the felt's outer
+ * border (see below).
+ */
+.room[data-form="desktop"] .place-top,
+.room[data-form="desktop"] .place-bottom {
+	flex-direction: column;
+	align-items: center;
+	pointer-events: none;
+}
+
+.room[data-form="desktop"] .place-bottom button {
+	pointer-events: auto;
+}
+
+/*
+ * The side seats sit on the felt's outer border. A side column takes no width from its seat, so a seat as wide as its
+ * longest suit overflows towards the centre and leaves the centre columns where they are.
+ */
+.room[data-form="desktop"] .place-left,
+.room[data-form="desktop"] .place-right {
+	width: 0;
+}
+
+.room[data-form="desktop"] .place-left {
+	flex-direction: column;
+	align-items: flex-start;
+}
+
+.room[data-form="desktop"] .place-right {
+	flex-direction: column;
+	align-items: flex-end;
+}
+
+.room[data-form="desktop"] .place-left .seat,
+.room[data-form="desktop"] .place-right .seat {
+	max-width: none;
+	width: max-content;
+}
+
+/* The top seat's cards start at the top of the top window: the felt gap (0.6rem) plus this margin puts the body at 10px, and the top seat moves 10px down. */
+.room[data-form="desktop"] .video-row + .body {
+	margin-top: calc(10px - 0.6rem);
+}
+
+/*
+ * Desktop: the call panel sits in the bottom-left corner of the felt, the left window in the top-left corner, the top
+ * window in the top-right corner and the right window in the bottom-right corner, with the right window 40px from
+ * the bottom edge. The windows are 40% larger and take no space in the flow; the top seat starts at the top window's edge.
+ */
+.room[data-form="desktop"] .felt {
+	position: relative;
+}
+
+.room[data-form="desktop"] .video-row {
+	height: 0;
+}
+
+.room[data-form="desktop"] .video-row .tile {
+	width: calc(var(--card-h) * 4 / 3 * 1.4);
+	height: calc(var(--card-h) * 1.4);
+}
+
+.room[data-form="desktop"] .video-left,
+.room[data-form="desktop"] .video-top,
+.room[data-form="desktop"] .video-right,
+.room[data-form="desktop"] .call-slot {
+	position: absolute;
+}
+
+.room[data-form="desktop"] .video-left {
+	top: 20px;
+	left: 20px;
+}
+
+.room[data-form="desktop"] .video-top {
+	top: 20px;
+	right: 20px;
+}
+
+.room[data-form="desktop"] .video-right {
+	right: 20px;
+	bottom: 40px;
+}
+
+.room[data-form="desktop"] .call-slot {
+	left: 20px;
+	bottom: 20px;
+	z-index: 1;
+}
+
+[data-form="compact"]
+	.bridge-table:is([data-phase="auction"], [data-phase="play"])
+	:is(.table-status, .felt, .dock) {
+	display: none;
+}
+
+.room[data-form="compact"]
+	.bridge-table:is([data-phase="auction"], [data-phase="play"])
+	.mobile-auction-hand
+	.seat
+	.hand {
+	width: 100%;
+	padding: 0;
+}
+
+html:has(
+	.room[data-form="compact"]
+		.bridge-table:is([data-phase="auction"], [data-phase="play"])
+) {
+	font-size: min(var(--compact-width-font-size, 4.444444vw), 2dvh);
+}
+
+body:has(
+	.room[data-form="compact"]
+		.bridge-table:is([data-phase="auction"], [data-phase="play"])
+) {
+	font-size: 1rem;
+}

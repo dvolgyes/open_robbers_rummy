@@ -1,0 +1,46 @@
+import type { JsonObject, RoomConfig, Seat } from "../protocol";
+
+/** What the host knows when it validates one persisted command. */
+export interface ApplyContext {
+	readonly roomId: string;
+	readonly config: RoomConfig;
+	/** Sender, taken from the stored command row, never from the payload. */
+	readonly seat: Seat;
+	/** The holder of the sender's seat, from the table's seat row, never from the payload. */
+	readonly holder: string;
+	readonly commandId: string;
+	/** Sequence number the event gets if the commit succeeds (room revision + 1). */
+	readonly seq: number;
+	/** Seats at the table now: the host's own seat and each seat whose current peer is connected to the host. */
+	readonly present: readonly Seat[];
+	/** Features reported by each currently bound seat; used only to avoid incompatible shared workflows. */
+	readonly features?: ReadonlyMap<Seat, readonly string[]>;
+}
+
+/** `event` is the body only; the host adds the envelope (v, roomId, type, seq, commandId, fromSeat). */
+export type ApplyResult =
+	| {
+			readonly ok: true;
+			readonly event: JsonObject;
+			readonly state: JsonObject;
+	  }
+	| {
+			readonly ok: false;
+			readonly reason: string;
+			/** The command needs players who are not present; the sender keeps it and sends it again. */
+			readonly waiting?: true;
+	  };
+
+/**
+ * Game rules run only in the host browser. A module is pure: the same state, context and payload give the
+ * same result, with the exception of randomness that a module documents (for example, a deal).
+ */
+export interface GameModule {
+	initialState(roomId: string, config: RoomConfig): JsonObject;
+	isState(state: JsonObject, roomId: string): boolean;
+	apply(
+		state: JsonObject,
+		context: ApplyContext,
+		payload: unknown,
+	): ApplyResult;
+}

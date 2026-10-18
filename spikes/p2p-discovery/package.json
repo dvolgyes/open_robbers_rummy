@@ -1,0 +1,19 @@
+{
+	"name": "libre-bridge-p2p-discovery-probe",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Throwaway probe: can public WebTorrent trackers connect the browsers of one bridge table? It does not touch the app.",
+	"type": "module",
+	"scripts": {
+		"dev": "../../node_modules/.bin/vite --port 4180 --strictPort",
+		"typecheck": "../../node_modules/.bin/tsc --noEmit -p tsconfig.json",
+		"probe": "../../node_modules/.bin/playwright test -c playwright.config.ts",
+		"phone:build": "node build-phone.mjs",
+		"phone:check": "../../node_modules/.bin/playwright test -c playwright.phone.config.ts",
+		"phone:wait": "PHONE_WAIT_MIN=${PHONE_WAIT_MIN:-15} ../../node_modules/.bin/playwright test -c playwright.phone.config.ts -g \"real phone\"",
+		"phone:serve": "../../node_modules/.bin/vite preview --outDir phone-dist --port 4181 --strictPort"
+	},
+	"dependencies": {
+		"@trystero-p2p/torrent": "0.26.0"
+	}
+}

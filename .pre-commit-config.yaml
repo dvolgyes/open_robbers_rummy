@@ -1,0 +1,37 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: biome
+        name: biome check
+        language: system
+        entry: npx --no-install biome check --no-errors-on-unmatched --files-ignore-unknown=true
+        types_or: [ts, javascript, json]
+      - id: no-html-sinks
+        name: user text must not reach HTML sinks (use textContent)
+        language: pygrep
+        entry: '\.(innerHTML|outerHTML)\s*[+]?=|insertAdjacentHTML|document\.write'
+        files: ^src/.*\.ts$
+      - id: typecheck
+        name: tsc --noEmit
+        language: system
+        entry: npm run --silent typecheck
+        pass_filenames: false
+        types_or: [ts, json]
+      - id: unit-tests
+        name: vitest (unit, and browser tests in Chrome)
+        language: system
+        entry: npm run --silent test
+        pass_filenames: false
+        types_or: [ts, json]
