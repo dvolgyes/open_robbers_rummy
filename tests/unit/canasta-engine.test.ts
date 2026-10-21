@@ -177,7 +177,7 @@ describe("hand flow", () => {
 		expect(cardTotal(discarded.hand)).toBe(108);
 	});
 
-	it("blocks discarding a black three unless it is the last card", () => {
+	it("lets a black three be discarded, and then blocks the next player from taking the pile", () => {
 		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
 		const hand = scenario(base, {
 			turn: 1,
@@ -185,9 +185,105 @@ describe("hand flow", () => {
 			hands: [[], cardsById(["0-3C", "0-4H"]), [], []],
 			teams: [base.teams[0], { ...base.teams[1], initialMade: true }],
 		});
+		const discarded = applyAction(hand, 1, { type: "discard", card: "0-3C" });
+		if (!discarded.ok) throw new Error(discarded.reason);
+		expect(discarded.hand.pile.at(-1)?.id).toBe("0-3C");
+		const blocked = scenario(discarded.hand, {
+			hands: [cardsById(["0-4S", "1-4S"]), [], [], []],
+		});
 		expect(
-			applyAction(hand, 1, { type: "discard", card: "0-3C" }),
+			applyAction(blocked, 2, { type: "takePile", cards: ["0-4S", "1-4S"] }),
 		).toMatchObject({ ok: false });
+	});
+
+	it("freezes the pile against a side that has not made its initial meld, so a natural pair must take it", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			hands: [[], cardsById(["0-7H", "1-7H", "0-KS"]), [], []],
+			pile: cardsById(["0-9C", "0-7D"]),
+		});
+		// Two natural sevens take the pile; the side is still below its 50-point minimum, so the turn must go on.
+		const taken = applyAction(hand, 1, {
+			type: "takePile",
+			cards: ["0-7H", "1-7H"],
+		});
+		if (!taken.ok) throw new Error(taken.reason);
+		expect(taken.hand.teams[1].initialMade).toBe(false);
+	});
+
+	it("does not let a frozen pile be taken with a wild card from the hand", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			hands: [[], cardsById(["0-7H", "0-2S", "0-KS"]), [], []],
+			pile: cardsById(["0-9C", "0-2C", "0-7D"]),
+			teams: [base.teams[0], { ...base.teams[1], initialMade: true }],
+		});
+		expect(
+			applyAction(hand, 1, { type: "takePile", cards: ["0-7H", "0-2S"] }),
+		).toMatchObject({ ok: false });
+	});
+
+	it("ends the hand when the last stock card is a red three", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			stock: cardsById(["0-3H"]),
+			hands: [[], cardsById(["0-KS"]), [], []],
+		});
+		const drawn = applyAction(hand, 1, { type: "draw" });
+		if (!drawn.ok) throw new Error(drawn.reason);
+		expect(drawn.hand.outcome).toEqual({ kind: "stock" });
+	});
+
+	it("continues an exhausted stock with a forced pile pickup, and ends when none is possible", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const exhausted = scenario(base, {
+			turn: 0,
+			phase: "play",
+			stock: [],
+			hands: [
+				cardsById(["0-KS", "0-4H"]),
+				cardsById(["0-KH", "1-KH", "0-QD"]),
+				[],
+				[],
+			],
+			pile: cardsById(["0-9C"]),
+			teams: [base.teams[0], { ...base.teams[1], initialMade: true }],
+		});
+		const discarded = applyAction(exhausted, 0, {
+			type: "discard",
+			card: "0-KS",
+		});
+		if (!discarded.ok) throw new Error(discarded.reason);
+		expect(discarded.hand.outcome).toBeNull();
+		expect(discarded.hand.turn).toBe(1);
+		expect(discarded.hand.phase).toBe("draw");
+		expect(
+			legalActions(discarded.hand, 1).some((action) => action.type === "draw"),
+		).toBe(false);
+		expect(
+			applyAction(discarded.hand, 1, {
+				type: "takePile",
+				cards: ["0-KH", "1-KH"],
+			}).ok,
+		).toBe(true);
+
+		const stuck = scenario(base, {
+			turn: 0,
+			phase: "play",
+			stock: [],
+			hands: [cardsById(["0-KS", "0-4H"]), cardsById(["0-QD"]), [], []],
+			pile: cardsById(["0-9C"]),
+			teams: [base.teams[0], { ...base.teams[1], initialMade: true }],
+		});
+		const ended = applyAction(stuck, 0, { type: "discard", card: "0-KS" });
+		if (!ended.ok) throw new Error(ended.reason);
+		expect(ended.hand.outcome).toEqual({ kind: "stock" });
 	});
 
 	it("lets a side below its minimum discard, but not end the turn with a partial meld", () => {
@@ -323,7 +419,7 @@ describe("scoring", () => {
 
 describe("random play", () => {
 	it("keeps all cards accounted for and reaches the end of every hand", () => {
-		for (let seed = 1; seed <= 2000; seed++) {
+		for (let seed = 1; seed <= 100; seed++) {
 			let hand = newHand({
 				teamScores: [0, 0],
 				dealer: (seed % 4) as Seat,

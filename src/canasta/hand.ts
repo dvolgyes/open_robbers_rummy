@@ -189,6 +189,9 @@ function applyDraw(hand: HandState, seat: Seat): Step {
 	const drawn = drawFromStock(hand.stock, hand.rules.drawCount);
 	const team = teamOf(seat);
 	const cards = [...(hand.hands[seat] ?? []), ...drawn.drawn];
+	const last = hand.stock.at(-1);
+	const endsOnRedThree =
+		drawn.rest.length === 0 && last !== undefined && isRed3(last);
 	const next: HandState = {
 		...hand,
 		stock: drawn.rest,
@@ -200,8 +203,8 @@ function applyDraw(hand: HandState, seat: Seat): Step {
 		phase: "play",
 		turnActions: hand.turnActions + 1,
 	};
-	// Only red threes were left in the stock: the player has nothing to discard, so the hand ends.
-	if (cards.length === 0)
+	// The last stock card is a red three, or only red threes were left: the player may not meld or discard, so the hand ends.
+	if (cards.length === 0 || endsOnRedThree)
 		return succeed({ ...next, outcome: { kind: "stock" } });
 	return succeed(next);
 }
@@ -218,12 +221,15 @@ function applyTakePile(
 	if (top === undefined) return fail("the pile is empty");
 	if (isWild(top) || isBlack3(top))
 		return fail("the top card of the pile cannot be picked up");
-	const frozen = hand.pile.some(isWild);
+	const team = teamOf(seat);
+	// A pile with a wild card is frozen, and so is the pile of a side that has not made its initial meld.
+	const frozen = hand.pile.some(isWild) || !initialSatisfied(hand, team);
 	if (frozen && extendId !== undefined)
 		return fail("a frozen pile cannot extend an existing meld");
 	const taken = takeFromHand(hand.hands[seat] ?? [], ids);
 	if (!taken.ok) return taken;
-	const team = teamOf(seat);
+	if (frozen && (taken.picked.length < 2 || taken.picked.some(isWild)))
+		return fail("a frozen pile needs two natural cards from your hand");
 	const pileMeld = [top, ...taken.picked];
 	let teams = hand.teams;
 	let nextMeldNo = hand.nextMeldNo;
@@ -322,13 +328,6 @@ function applyDiscard(hand: HandState, seat: Seat, id: string): Step {
 	const cards = hand.hands[seat] ?? [];
 	const card = cards.find((candidate) => candidate.id === id);
 	if (card === undefined) return fail(`card ${id} is not in your hand`);
-	// With the stock exhausted the hand ends after this turn, so the restrictions below no longer apply.
-	const exhausted = hand.stock.length === 0;
-	if (isBlack3(card) && cards.length !== 1 && !exhausted) {
-		return fail(
-			"a black three can be discarded only when going out or when the stock is exhausted",
-		);
-	}
 	const rest = cards.filter((candidate) => candidate.id !== id);
 	const team = teamOf(seat);
 	const afterDiscard: HandState = {
@@ -338,7 +337,7 @@ function applyDiscard(hand: HandState, seat: Seat, id: string): Step {
 	};
 	if (rest.length === 0) return checkOut(afterDiscard, seat);
 	// A side below its minimum may discard only when it has laid no partial meld this turn; resetTurn undoes one.
-	if (!exhausted && !initialSatisfied(hand, team) && hand.turnMeldPoints > 0) {
+	if (!initialSatisfied(hand, team) && hand.turnMeldPoints > 0) {
 		return fail(
 			"the side has not made its initial meld; reset the turn to take back the partial meld",
 		);
@@ -373,7 +372,10 @@ function checkOut(hand: HandState, seat: Seat): Step {
 	});
 }
 
-/** Ends the turn. The next player starts with a draw, unless the stock is exhausted, which ends the hand. */
+/**
+ * Ends the turn. The next player starts with a draw. With the stock exhausted, that player must take the
+ * discard pile instead, and the hand ends if they cannot.
+ */
 function passTurn(hand: HandState, seat: Seat): HandState {
 	const team = teamOf(seat);
 	const base: HandSnapshot = {
@@ -388,8 +390,16 @@ function passTurn(hand: HandState, seat: Seat): HandState {
 		turnActions: 0,
 	};
 	const next: HandSnapshot =
-		base.stock.length === 0 ? { ...base, outcome: { kind: "stock" } } : base;
+		base.stock.length === 0 && !canTakePile({ ...base, turnStart: base })
+			? { ...base, outcome: { kind: "stock" } }
+			: base;
 	return { ...next, turnStart: next };
+}
+
+function canTakePile(hand: HandState): boolean {
+	return pickupCandidates(hand, hand.turn).some(
+		(action) => applyAction(hand, hand.turn, action).ok,
+	);
 }
 
 function applyReset(hand: HandState): Step {

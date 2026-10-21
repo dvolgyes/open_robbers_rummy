@@ -23,20 +23,26 @@ Evidence, checked on 2026-10-22:
   It may be read as a reference for rule questions only, and no code is taken from it.
 - Represent the hand as plain immutable data.
   `applyAction` is the only authority: `legalActions` enumerates candidates and keeps only those that `applyAction` accepts.
-- Make these rule interpretations, which the rules configuration in `src/canasta/rules.ts` does not yet expose as options:
-  - A red three is set aside when dealt or drawn, and it adds or subtracts 100 points according to whether the side has made its initial meld.
-  - A black three can be discarded only to go out, or after the stock is exhausted.
-  - A pile whose contents include a wild card is frozen, and a frozen pile cannot be extended.
+- Follow the classic four-player partnership rules, as stated on Pagat (https://www.pagat.com/rummy/canasta.html, checked 2026-10-22), with these points:
+  - A red three is set aside when dealt or drawn.
+    It adds 100 points if the side has made its initial meld, and subtracts 100 otherwise.
+    Pagat does not state the subtraction; the rule comes from other sources and is not yet confirmed.
+  - A black three may be discarded at any time.
+    Discarding it blocks the next player from taking the pile.
+  - A pile that contains a wild card is frozen, and a frozen pile cannot be extended.
+    A side that has not made its initial meld is also blocked from the pile, so it can take the pile only with two natural cards from its hand.
   - Points for the initial meld count only cards taken from the hand, not the pile card.
-  - A side below its initial-meld minimum may lay partial melds in a turn.
-    It may not discard while a partial meld is on the table; `resetTurn` takes the partial melds back.
-    A side that has laid nothing may always discard.
-  - When the stock is exhausted, the hand ends after the current turn.
+  - The initial meld must be laid in the turn in which it is made, at or above the minimum for the side's score.
+    A discard is refused while the side has partial melds on the table; `resetTurn` takes them back.
+  - When the stock is exhausted, the next player must take the pile and meld or discard it.
+    If that player cannot take the pile, the hand ends.
+  - A last stock card that is a red three ends the hand when it is drawn, so its drawer may not meld or discard.
+    Two sources agree on this reading, but Pagat does not state it, so it is not yet confirmed.
 
 ## Consequences
 
 - The project owns about 1,000 lines of rules code.
-  Every rule is tested in `tests/unit/canasta-engine.test.ts`, including a random-play run of 2,000 hands that checks card conservation and termination.
+  Every rule is tested in `tests/unit/canasta-engine.test.ts`, including a random-play run of 100 hands that checks card conservation and termination.
 - Rule variants are a code change, not a configuration change, until the rules are made options.
   The rules that differ between published variants are listed above, so a reviewer can compare them with the ruleset the players expect.
 - A defect in the rules is fixed here, with no upstream to wait for.
