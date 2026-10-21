@@ -5,5 +5,4 @@ export const OTHER_ROOM_ID = "Other-ID-0123456789abc";
 
 export const CONFIG: RoomConfig = {
 	names: { N: "player1", E: "player3", S: "player2", W: "host" },
-	scoring: "duplicate",
 };

@@ -31,7 +31,7 @@ export interface CallProbe {
 	readonly tracks: MediaStreamTrack[];
 	/** The devices of each capture request, in order. */
 	readonly requests: { readonly audio: boolean; readonly video: boolean }[];
-	/** The send and arrival times of each call message (`lb-call` frame) on the data channels of this tab. */
+	/** The send and arrival times of each call message (`oc-call` frame) on the data channels of this tab. */
 	readonly callSent: number[];
 	readonly callReceived: number[];
 	captures: number;
@@ -81,7 +81,7 @@ export function installCallProbe(): void {
 	// 2..33, padded with zeros, when it is an inline message (kind 0) or the offer of a large one (kind 1). Its
 	// byte 1 holds the kind in the low 4 bits and the payload format in the high 4 bits. Only the token length,
 	// the kind and the name are read.
-	const callName = new TextEncoder().encode("lb-call");
+	const callName = new TextEncoder().encode("oc-call");
 	const isCallFrame = (data: unknown): boolean => {
 		const bytes =
 			data instanceof ArrayBuffer

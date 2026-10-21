@@ -1,12 +1,6 @@
 /** Shared vocabulary of the room protocol. Every command payload, event and state carries `v` and `roomId`. */
 
 export const PROTOCOL_VERSION = 1;
-export const APPLICATION_FEATURES = {
-	bridgeUndo: "bridge-undo-v1",
-	bridgeClaim: "bridge-claim-v1",
-	bridgeReset: "bridge-reset-v1",
-} as const;
-
 export const SEATS = ["N", "E", "S", "W"] as const;
 export type Seat = (typeof SEATS)[number];
 
@@ -18,8 +12,6 @@ export const SEAT_NAMES: Readonly<Record<Seat, string>> = {
 };
 
 export const MAX_NAME_LENGTH = 40;
-
-export type Scoring = "duplicate";
 
 export const DECISION_BOT_MODELS = [
 	"~perplexity/pplx-decider-latest",
@@ -113,7 +105,6 @@ export function botModelOrder(
 
 export interface RoomConfig {
 	readonly names: Readonly<Record<Seat, string>>;
-	readonly scoring: Scoring;
 	/** Optional for rooms created by older app versions. */
 	readonly botSetup?: BotSetup;
 }
@@ -130,7 +121,7 @@ export function isSeat(value: unknown): value is Seat {
 	);
 }
 
-/** Seat names containing "bot" or "robot" are reserved for an automated bridge player. */
+/** Seat names containing "bot" or "robot" are reserved for an automated player. */
 export function isBotName(name: string): boolean {
 	return /bot|robot/i.test(name);
 }
@@ -147,8 +138,6 @@ export function parseRoomConfig(value: unknown): RoomConfig | undefined {
 		if (typeof name !== "string" || name.length === 0) return undefined;
 		names[seat] = name;
 	}
-	const { scoring } = value;
-	if (scoring !== "duplicate") return undefined;
 	let botSetup: BotSetup | undefined;
 	if (Object.hasOwn(value, "botSetup")) {
 		const parsedBotSetup = parseBotSetup(value.botSetup);
@@ -157,7 +146,6 @@ export function parseRoomConfig(value: unknown): RoomConfig | undefined {
 	}
 	return {
 		names: names as Record<Seat, string>,
-		scoring,
 		...(botSetup === undefined ? {} : { botSetup }),
 	};
 }

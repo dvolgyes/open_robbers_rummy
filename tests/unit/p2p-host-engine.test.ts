@@ -340,7 +340,7 @@ describe("host-local bots", () => {
 	it("claims a free seat for a bot and frees it when the bot is disabled", async () => {
 		const rig = await new Rig().create();
 		expect(await rig.host.setBotSeat("E", true)).toBe(true);
-		const holder = await deriveHolder(TABLE, "libre-bridge|host-bot|E");
+		const holder = await deriveHolder(TABLE, "open-canasta|host-bot|E");
 		expect(rig.row("E")).toEqual({ seat: "E", holder, gen: 1 });
 		expect(await rig.host.setBotSeat("E", false)).toBe(true);
 		expect(rig.row("E")).toEqual({ seat: "E", holder: null, gen: 2 });

@@ -22,7 +22,7 @@ async function digest(text: string): Promise<string> {
 
 /** The Trystero room and storage name of the table; it satisfies `isRoomId`. */
 export async function deriveTableId(key: string): Promise<string> {
-	return (await digest(`libre-bridge|table|${key}`)).slice(0, TABLE_ID_LENGTH);
+	return (await digest(`open-canasta|table|${key}`)).slice(0, TABLE_ID_LENGTH);
 }
 
 /** The Trystero room in which two pages of the table meet (`rendezvous.ts`). Only pages with K can derive it. */
@@ -30,7 +30,7 @@ export async function derivePairRoomId(
 	key: string,
 	name: string,
 ): Promise<string> {
-	return (await digest(`libre-bridge|pair|${key}|${name}`)).slice(
+	return (await digest(`open-canasta|pair|${key}|${name}`)).slice(
 		0,
 		TABLE_ID_LENGTH,
 	);
@@ -41,7 +41,7 @@ export async function deriveHolder(
 	tableId: string,
 	clientId: string,
 ): Promise<string> {
-	return (await digest(`lb-holder|${tableId}|${clientId}`)).slice(
+	return (await digest(`oc-holder|${tableId}|${clientId}`)).slice(
 		0,
 		HOLDER_LENGTH,
 	);

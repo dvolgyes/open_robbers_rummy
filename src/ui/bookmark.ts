@@ -75,7 +75,6 @@ export function parseRoomSetup(search: string): RoomSetup | undefined {
 	return {
 		config: {
 			names,
-			scoring: "duplicate",
 			...(botSetup === undefined ? {} : { botSetup }),
 		},
 		host: bookmark.host,

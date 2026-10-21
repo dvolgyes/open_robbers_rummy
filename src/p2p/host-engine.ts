@@ -1,11 +1,5 @@
 import type { GameModule } from "../game/module";
-import {
-	APPLICATION_FEATURES,
-	envelopeEvent,
-	type JsonObject,
-	SEATS,
-	type Seat,
-} from "../protocol";
+import { envelopeEvent, type JsonObject, SEATS, type Seat } from "../protocol";
 import { type Authority, sameAuthority } from "./authority";
 import { idleMs, isIdle } from "./expiry";
 import { deriveHolder } from "./keys";
@@ -152,11 +146,6 @@ export class HostEngine {
 			if (row.holder !== null) this.#seen.set(row.seat, now);
 		}
 		this.#holders.set(deps.self, own.holder);
-		this.#features.set(deps.self, [
-			APPLICATION_FEATURES.bridgeUndo,
-			APPLICATION_FEATURES.bridgeClaim,
-			APPLICATION_FEATURES.bridgeReset,
-		]);
 		this.#connected.add(deps.self);
 		this.#bindings.set(deps.self, { seat: own.seat, gen: own.gen });
 		this.#rosterDue = now;
@@ -174,7 +163,7 @@ export class HostEngine {
 			let row = seatRow(table, seat);
 			const holder = await deriveHolder(
 				this.#tableId,
-				`libre-bridge|host-bot|${seat}`,
+				`open-canasta|host-bot|${seat}`,
 			);
 			if (row.holder === null) {
 				const seq = table.rev + 1;
@@ -217,7 +206,6 @@ export class HostEngine {
 				seat,
 				gen: seatRow(table, seat).gen,
 			});
-			this.#features.set(peer, Object.values(APPLICATION_FEATURES));
 			this.#seen.set(seat, this.#deps.clock.monotonic());
 		}
 		this.#markRoster();
@@ -232,7 +220,7 @@ export class HostEngine {
 		const row = seatRow(table, seat);
 		const holder = await deriveHolder(
 			this.#tableId,
-			`libre-bridge|host-bot|${seat}`,
+			`open-canasta|host-bot|${seat}`,
 		);
 		if (enabled) {
 			if (seat !== this.#deps.log.seat && row.holder === null) {
@@ -259,7 +247,6 @@ export class HostEngine {
 				const peer = this.#localPeer(seat);
 				this.#connected.add(peer);
 				this.#bindings.set(peer, { seat, gen: seatRow(table, seat).gen });
-				this.#features.set(peer, Object.values(APPLICATION_FEATURES));
 				this.#seen.set(seat, this.#deps.clock.monotonic());
 			}
 		} else {
@@ -420,7 +407,7 @@ export class HostEngine {
 			auth: this.#deps.auth,
 			seats,
 			peers: peers.filter(
-				({ peer }) => !peer.startsWith("libre-bridge-host-bot:"),
+				({ peer }) => !peer.startsWith("open-canasta-host-bot:"),
 			),
 			bots: [...this.#localBots],
 			autoplay: true,
@@ -895,7 +882,7 @@ export class HostEngine {
 	}
 
 	#localPeer(seat: Seat): string {
-		return `libre-bridge-host-bot:${seat}`;
+		return `open-canasta-host-bot:${seat}`;
 	}
 
 	#localResultKey(peer: string, id: string): string {
@@ -941,7 +928,6 @@ export class HostEngine {
 		if (botPeer !== undefined && this.#bindings.has(botPeer)) {
 			this.#bindings.set(botPeer, { seat, gen });
 			this.#connected.add(botPeer);
-			this.#features.set(botPeer, Object.values(APPLICATION_FEATURES));
 		}
 		this.#seen.set(seat, this.#deps.clock.monotonic());
 		this.#markRoster();

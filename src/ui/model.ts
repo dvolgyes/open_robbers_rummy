@@ -89,7 +89,6 @@ export function checkCreateFields(
 		ok: true,
 		config: {
 			names: names as Record<Seat, string>,
-			scoring: "duplicate",
 		},
 		seat: fields.seat,
 	};

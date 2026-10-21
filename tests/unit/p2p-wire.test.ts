@@ -23,7 +23,6 @@ const POS = { rev: 3, lastAuth: OLD_AUTH };
 const EMPTY = { rev: 0, lastAuth: null };
 const CONFIG = {
 	names: { N: "player1", E: "player3", S: "player2", W: "player4" },
-	scoring: "duplicate",
 };
 const PAYLOAD = { v: 1, roomId: TABLE, type: "chat", text: "hi" };
 const EVENT = { v: 1, roomId: TABLE, type: "event", seq: 4 };
@@ -267,10 +266,10 @@ type Parse =
 	| typeof parseMesh;
 
 const CHANNELS: [string, Parse, Case[]][] = [
-	["lb-ctl", parseCtl, CTL],
-	["lb-log", parseLog, LOG],
-	["lb-call", parseCall, CALL],
-	["lb-mesh", parseMesh, MESH],
+	["oc-ctl", parseCtl, CTL],
+	["oc-log", parseLog, LOG],
+	["oc-call", parseCall, CALL],
+	["oc-mesh", parseMesh, MESH],
 ];
 
 /** A value of another JSON type than `value`. */
@@ -560,7 +559,7 @@ describe("message rules", () => {
 		],
 		["generation 0", { k: "cmd", id: ID, gen: 0, payload: {} }],
 		["an array payload", { k: "cmd", id: ID, gen: 1, payload: [] }],
-	])("lb-ctl rejects %s", (_label, message) => {
+	])("oc-ctl rejects %s", (_label, message) => {
 		malformed(parseCtl, message as Sample);
 	});
 

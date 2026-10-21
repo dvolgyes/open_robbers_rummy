@@ -32,7 +32,6 @@ import { bidding, call, DEAL, play, playing } from "./bridge-fixtures";
 const TABLE_ID = "Table_ID-0123456789abc";
 const CONFIG: RoomConfig = {
 	names: { N: "player1", E: "player3", S: "player2", W: "player4" },
-	scoring: "duplicate",
 };
 const ALL = new Set<Seat>(["N", "E", "S", "W"]);
 const ROSTER: RosterRow[] = (["N", "E", "S", "W"] as const).map((seat) => ({

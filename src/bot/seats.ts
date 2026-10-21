@@ -16,7 +16,7 @@ export function botSeats(config: RoomConfig): Seat[] {
 }
 
 export function botSeatHolder(tableId: string, seat: Seat): Promise<string> {
-	return deriveHolder(tableId, `libre-bridge|host-bot|${seat}`);
+	return deriveHolder(tableId, `open-canasta|host-bot|${seat}`);
 }
 
 export async function botSeatClaims(

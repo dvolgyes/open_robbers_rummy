@@ -46,7 +46,6 @@ describe("parseRoomConfig", () => {
 	it.each([
 		["a missing name", { ...CONFIG, names: { ...CONFIG.names, E: undefined } }],
 		["an empty name", { ...CONFIG, names: { ...CONFIG.names, E: "" } }],
-		["an unimplemented scoring", { ...CONFIG, scoring: "rubber" }],
 	])("rejects %s", (_label, value) => {
 		expect(parseRoomConfig(value)).toBeUndefined();
 	});

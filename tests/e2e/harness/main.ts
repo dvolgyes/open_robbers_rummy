@@ -141,7 +141,6 @@ declare global {
 
 const CONFIG: RoomConfig = {
 	names: { N: "north", E: "east", S: "south", W: "west" },
-	scoring: "duplicate",
 };
 
 const SEATS: readonly Seat[] = ["N", "E", "S", "W"];
@@ -368,7 +367,7 @@ window.lbHarness = {
 			},
 			tableId,
 		);
-		const action = room.makeAction("lb-ctl");
+		const action = room.makeAction("oc-ctl");
 		const nonce = randomNonce();
 		const echoed = new Promise<boolean>((resolve) => {
 			action.onMessage = (data) => {

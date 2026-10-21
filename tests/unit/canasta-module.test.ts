@@ -33,7 +33,7 @@ const module = createCanastaModule(seededRandom(42));
 function context(seat: Seat, present: readonly Seat[] = SEATS): ApplyContext {
 	return {
 		roomId: ROOM,
-		config: { names, scoring: "duplicate" },
+		config: { names },
 		seat,
 		holder: `holder-${seat}`,
 		commandId: "cmd",
@@ -43,7 +43,7 @@ function context(seat: Seat, present: readonly Seat[] = SEATS): ApplyContext {
 }
 
 function started(): JsonObject {
-	const initial = module.initialState(ROOM, { names, scoring: "duplicate" });
+	const initial = module.initialState(ROOM, { names });
 	const result = module.apply(initial, context("N"), startPayload(ROOM));
 	if (!result.ok) throw new Error(result.reason);
 	return result.state;
@@ -63,13 +63,13 @@ function currentSeat(state: JsonObject): Seat {
 
 describe("canasta module: starting and presence", () => {
 	it("creates a valid empty table", () => {
-		const initial = module.initialState(ROOM, { names, scoring: "duplicate" });
+		const initial = module.initialState(ROOM, { names });
 		expect(module.isState(initial, ROOM)).toBe(true);
 		expect(table(initial).match).toBeNull();
 	});
 
 	it("refuses to start while a seat is away, and names the seat", () => {
-		const initial = module.initialState(ROOM, { names, scoring: "duplicate" });
+		const initial = module.initialState(ROOM, { names });
 		const result = module.apply(
 			initial,
 			context("N", ["N", "E", "S"]),
@@ -84,12 +84,12 @@ describe("canasta module: starting and presence", () => {
 
 	it("deals the same hand for the same seed", () => {
 		const first = createCanastaModule(seededRandom(7)).apply(
-			module.initialState(ROOM, { names, scoring: "duplicate" }),
+			module.initialState(ROOM, { names }),
 			context("N"),
 			startPayload(ROOM),
 		);
 		const second = createCanastaModule(seededRandom(7)).apply(
-			module.initialState(ROOM, { names, scoring: "duplicate" }),
+			module.initialState(ROOM, { names }),
 			context("N"),
 			startPayload(ROOM),
 		);

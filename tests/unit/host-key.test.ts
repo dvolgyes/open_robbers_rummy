@@ -21,7 +21,7 @@ describe("host OpenRouter API key", () => {
 		writeHostApiKey(storage, "  fresh-key\n");
 		expect(readHostApiKey(storage)).toBe("fresh-key");
 
-		storage.setItem("libre-bridge.openrouter-api-key", "\tlegacy-key  ");
+		storage.setItem("open-canasta.openrouter-api-key", "\tlegacy-key  ");
 		expect(readHostApiKey(storage)).toBe("legacy-key");
 	});
 

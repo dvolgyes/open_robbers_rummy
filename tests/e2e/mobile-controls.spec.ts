@@ -99,7 +99,7 @@ test("mobile bidding shares the board link and hides Reset", async ({
 		await page.getByRole("button", { name: "Save key" }).click();
 		expect(
 			await page.evaluate(() =>
-				localStorage.getItem("libre-bridge.openrouter-api-key"),
+				localStorage.getItem("open-canasta.openrouter-api-key"),
 			),
 		).toBe("updated-test-key");
 		const boardUrl = new URL(page.url());

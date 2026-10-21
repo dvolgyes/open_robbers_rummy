@@ -18,6 +18,7 @@ import {
 	type StoredCallRecord,
 } from "../../src/call/record";
 import {
+	APPLICATION_FEATURES,
 	actionPayload,
 	claimRequestPayload,
 	claimVotePayload,
@@ -32,7 +33,6 @@ import {
 import { chatModule, chatPayload } from "../../src/game/chat";
 import type { ApplyResult } from "../../src/game/module";
 import {
-	APPLICATION_FEATURES,
 	envelopeEvent,
 	type JsonObject,
 	PROTOCOL_VERSION,

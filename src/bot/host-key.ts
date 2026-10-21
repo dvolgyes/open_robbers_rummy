@@ -1,6 +1,6 @@
 import type { MaybeStorage } from "../session";
 
-const STORAGE_KEY = "libre-bridge.openrouter-api-key";
+const STORAGE_KEY = "open-canasta.openrouter-api-key";
 
 export function normalizeHostApiKey(apiKey: string): string {
 	return apiKey.trim();

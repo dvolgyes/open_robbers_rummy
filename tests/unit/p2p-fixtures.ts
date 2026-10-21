@@ -14,7 +14,6 @@ export const AUTH_2: Authority = { term: 2, tag: `${HOLDER_E}.E`, inc: 1 };
 
 export const CONFIG: RoomConfig = {
 	names: { N: "player1", E: "player3", S: "player2", W: "player4" },
-	scoring: "duplicate",
 };
 
 export function commandId(n: number): string {

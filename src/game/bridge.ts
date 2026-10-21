@@ -21,8 +21,16 @@ import {
 	parseCallRecords,
 } from "../call/record";
 import { isCommandId } from "../ids";
+
+// Bridge-only features. The bridge game is removed with its UI in a later step, and no
+// peer advertises these features now, so undo, claim and reset stay unavailable.
+export const APPLICATION_FEATURES = {
+	bridgeUndo: "bridge-undo-v1",
+	bridgeClaim: "bridge-claim-v1",
+	bridgeReset: "bridge-reset-v1",
+} as const;
+
 import {
-	APPLICATION_FEATURES,
 	isNonNegativeInteger,
 	isObject,
 	isSeat,

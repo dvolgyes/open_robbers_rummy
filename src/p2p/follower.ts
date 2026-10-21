@@ -1,4 +1,4 @@
-import { APPLICATION_FEATURES, type Seat } from "../protocol";
+import type { Seat } from "../protocol";
 import {
 	comparePosition,
 	EMPTY_POSITION,
@@ -367,11 +367,6 @@ export class Follower {
 			k: "hello",
 			b: LINK_VERSION,
 			client: this.#deps.client,
-			features: [
-				APPLICATION_FEATURES.bridgeUndo,
-				APPLICATION_FEATURES.bridgeClaim,
-				APPLICATION_FEATURES.bridgeReset,
-			],
 			...(binding ?? {}),
 			...(log?.table ? { pos: log.position() } : {}),
 		});

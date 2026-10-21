@@ -71,7 +71,7 @@ test("host bots play two consecutive boards from auction through the final trick
 	expect(roomUrl.search).not.toMatch(/api.?key|test-key/i);
 	expect(
 		await page.evaluate(() =>
-			localStorage.getItem("libre-bridge.openrouter-api-key"),
+			localStorage.getItem("open-canasta.openrouter-api-key"),
 		),
 	).toBe("test-key");
 	await expect(page.getByRole("button", { name: "Pause bots" })).toBeVisible();

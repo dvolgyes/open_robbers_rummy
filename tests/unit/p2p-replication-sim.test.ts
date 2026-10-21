@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { randomBelowFrom } from "../../src/bridge/deal";
-import { boardStatus, legalActions } from "../../src/bridge/engine";
+import { legalActions } from "../../src/canasta";
 import {
 	actionPayload,
-	createBridgeModule,
-	dealPayload,
-	parseBridgeState,
-} from "../../src/game/bridge";
+	createCanastaModule,
+	engineSeat,
+	parseCanastaState,
+	startPayload,
+} from "../../src/game/canasta";
 import {
 	type ElectionEffect,
 	type ElectionEvent,
@@ -25,6 +25,7 @@ import {
 } from "../../src/p2p/replication";
 import type { Entry } from "../../src/p2p/wire";
 import type { JsonObject, Seat } from "../../src/protocol";
+import { randomBelowFrom } from "../../src/random";
 import {
 	type Endpoint,
 	FakeMesh,
@@ -35,9 +36,9 @@ import {
 import { CONFIG, commandId, TABLE } from "./p2p-fixtures";
 
 /**
- * Plan §8, P5: four pages play a board over the fake mesh with the real election, replication and bridge rules.
- * The host crashes during the play; another page becomes the host after the absence timeout and the board goes
- * on; the old host reopens on its stored replica, takes its seat back, and the board finishes. Every message
+ * Plan §8, P5: four pages play a hand over the fake mesh with the real election, replication and canasta rules.
+ * The host crashes during the play; another page becomes the host after the absence timeout and the hand goes
+ * on; the old host reopens on its stored replica, takes its seat back, and the hand finishes. Every message
  * passes the wire validators, so a malformed one fails the run.
  */
 
@@ -249,7 +250,7 @@ class Sim {
 	}
 
 	#module() {
-		return createBridgeModule(randomBelowFrom(xorshift(this.#seed + 7)));
+		return createCanastaModule(randomBelowFrom(xorshift(this.#seed + 7)));
 	}
 
 	#newId(): string {
@@ -323,7 +324,7 @@ class Sim {
 		});
 	}
 
-	/** One move when it is this page's turn: N deals; the dealer opens the lowest bid, everyone passes; random cards. */
+	/** One move when it is this page's turn: N starts the match; then the seat to act picks a random legal action. */
 	#play(page: SimPage): void {
 		const command = this.#choose(page);
 		if (!command) return;
@@ -339,29 +340,34 @@ class Sim {
 			return null;
 		if (!replication.engine && !replication.follower.ready) return null;
 		if ((replication.outbox?.items.length ?? 1) > 0) return null;
-		const state = parseBridgeState(table.state, TABLE);
-		if (!state) throw new Error("the table state is not a bridge table");
-		const { board } = state;
+		const state = parseCanastaState(table.state, TABLE);
+		if (!state) throw new Error("the table state is not a canasta table");
 		const seat = page.browser.seat;
-		if (board === null) return seat === "N" ? dealPayload(TABLE, 1) : null;
-		const status = boardStatus(board);
-		if (status.phase === "complete" || status.actor !== seat) return null;
-		const actions = legalActions(board, seat);
-		const action =
-			status.phase === "auction"
-				? actions.find((item) =>
-						board.calls.length === 0
-							? item.type === "call" && item.call !== "P"
-							: item.type === "call" && item.call === "P",
-					)
-				: actions[this.#random() % actions.length];
+		if (!state.match) return seat === "N" ? startPayload(TABLE) : null;
+		const { match } = state;
+		if (match.settled) return null;
+		const actions = legalActions(match.hand, engineSeat(seat));
+		if (actions.length === 0) return null;
+		const action = actions[this.#random() % actions.length];
 		if (!action) throw new Error(`no action for ${seat}`);
-		return actionPayload(TABLE, board, action);
+		return actionPayload(TABLE, match, state.actions, action);
 	}
 }
 
+/** Every card of the deck: in hands, the stock, the pile, the melds and the set-aside red threes. */
 function cardsIn(state: JsonObject): number {
-	return parseBridgeState(state, TABLE)?.board?.cards.length ?? 0;
+	const hand = parseCanastaState(state, TABLE)?.match?.hand;
+	if (!hand) return 0;
+	const onTable = hand.teams.flatMap((team) => [
+		...team.melds.flatMap((meld) => meld.cards),
+		...team.redThrees,
+	]);
+	return (
+		hand.hands.flat().length +
+		hand.stock.length +
+		hand.pile.length +
+		onTable.length
+	);
 }
 
 /** An entry without its place in the log. */
@@ -381,8 +387,9 @@ function placeless(entry: Entry | undefined) {
 
 function finished(page: SimPage): boolean {
 	const state = page.replication.log?.table?.state;
-	const board = state && parseBridgeState(state, TABLE)?.board;
-	return board ? boardStatus(board).phase === "complete" : false;
+	return state
+		? parseCanastaState(state, TABLE)?.match?.settled === true
+		: false;
 }
 
 let restoreDigest: () => void;
@@ -498,9 +505,9 @@ describe("four pages play a board across a host crash", () => {
 			}
 			const ids = reference.entries.map((entry) => entry.id);
 			expect(new Set(ids).size).toBe(ids.length);
-			const state = parseBridgeState(reference.table.state, TABLE);
-			expect(state?.results).toHaveLength(1);
-			expect(state?.board?.cards).toHaveLength(52);
+			const state = parseCanastaState(reference.table.state, TABLE);
+			expect(state?.match?.settled).toBe(true);
+			expect(cardsIn(reference.table.state)).toBe(108);
 			expect(reference.entries.some((entry) => entry.auth.term === 2)).toBe(
 				true,
 			);

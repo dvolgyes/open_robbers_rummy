@@ -30,7 +30,6 @@ import {
 const TABLE_ID = "Table_ID-0123456789abc";
 const CONFIG: RoomConfig = {
 	names: { N: "player1", E: "player3", S: "player2", W: "player4" },
-	scoring: "duplicate",
 };
 const AUTH = { term: 1, tag: "holder-W", inc: 1 };
 const ALL = new Set<Seat>(["N", "E", "S", "W"]);

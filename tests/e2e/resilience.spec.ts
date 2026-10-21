@@ -33,7 +33,7 @@ async function ageStoredTables(page: Page): Promise<number> {
 	return page.evaluate(
 		(aged) =>
 			new Promise<number>((resolve, reject) => {
-				const opened = indexedDB.open("lb-p2p");
+				const opened = indexedDB.open("oc-p2p");
 				opened.onerror = () => reject(opened.error);
 				opened.onsuccess = () => {
 					const db = opened.result;

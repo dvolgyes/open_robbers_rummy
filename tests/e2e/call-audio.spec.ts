@@ -59,7 +59,7 @@ function loggedTypes(page: Page): Promise<string[]> {
 	return page.evaluate(
 		() =>
 			new Promise<string[]>((resolve, reject) => {
-				const opened = indexedDB.open("lb-p2p");
+				const opened = indexedDB.open("oc-p2p");
 				opened.onerror = () => reject(opened.error);
 				opened.onsuccess = () => {
 					const db = opened.result;
