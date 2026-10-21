@@ -1,5 +1,4 @@
 import { callModel, OpenRouter } from "@openrouter/agent";
-import type { Action } from "../bridge/engine";
 import { BOT_MODELS, type BotModel, botModelType } from "../protocol";
 import {
 	DECISIONS_ENDPOINT,
@@ -7,14 +6,12 @@ import {
 	parseDecisionsResponse,
 } from "./decision-model";
 import { normalizeHostApiKey } from "./host-key";
-import type { BridgeDecisionState } from "./strategy";
 import {
 	BOT_FALLBACK_MODEL,
 	BOT_MODEL,
-	type Decision,
 	decisionFormat,
 	decisionOutputTokenLimit,
-	parseDecision,
+	parseChoice,
 	preferredReasoningEffort,
 	reasoningSettings,
 	responseText,
@@ -88,13 +85,13 @@ export class OpenRouterStrategy {
 		};
 	}
 
+	/** Returns the number of the option the model picked; `labels` lists the options in order. */
 	async choose(
-		kind: "call" | "play",
 		prompt: string,
-		legal: readonly Action[],
-		state?: BridgeDecisionState,
-	): Promise<Decision> {
-		if (legal.length === 0) throw new Error("no legal actions were provided");
+		labels: readonly string[],
+		state?: Record<string, unknown>,
+	): Promise<number> {
+		if (labels.length === 0) throw new Error("no legal actions were provided");
 		let modelIndex = 0;
 		let model = this.#settings.modelOrder?.[modelIndex] ?? this.#settings.model;
 		for (let attempt = 0; ; attempt++) {
@@ -102,16 +99,15 @@ export class OpenRouterStrategy {
 				if (botModelType(model) === "decisions")
 					return await this.#requestDecision(
 						model,
-						kind,
 						state ?? { position: prompt },
-						legal,
+						labels,
 					);
 				const result = callModel(
 					this.#client,
 					{
 						model,
 						instructions:
-							"You are a contract bridge player. Your final response must be exactly one JSON object matching the supplied schema. Select one supplied legal choice. Do not include explanations, markdown, or hidden reasoning in the final response.",
+							'You are a canasta player. Your final response must be exactly one JSON object of the form {"choice": N}, where N is the number of one supplied option. Do not include explanations, markdown, or hidden reasoning in the final response.',
 						input: prompt,
 						maxOutputTokens: decisionOutputTokenLimit(model),
 						reasoning: reasoningSettings(
@@ -119,14 +115,13 @@ export class OpenRouterStrategy {
 							preferredReasoningEffort(model),
 						),
 						store: false,
-						text: { format: decisionFormat(kind, legal) },
+						text: { format: decisionFormat(labels.length) },
 					},
 					{ timeoutMs: 45_000, retries: { strategy: "none" } },
 				);
-				return parseDecision(
+				return parseChoice(
 					responseText(await result.getResponse()),
-					kind,
-					legal,
+					labels.length,
 				);
 			} catch (error) {
 				const status = httpStatus(error);
@@ -164,10 +159,9 @@ export class OpenRouterStrategy {
 
 	async #requestDecision(
 		model: string,
-		kind: "call" | "play",
-		state: BridgeDecisionState,
-		legal: readonly Action[],
-	): Promise<Decision> {
+		state: Record<string, unknown>,
+		labels: readonly string[],
+	): Promise<number> {
 		const controller = new AbortController();
 		const timer = setTimeout(() => controller.abort(), 45_000);
 		try {
@@ -178,7 +172,7 @@ export class OpenRouterStrategy {
 					"Content-Type": "application/json",
 				},
 				signal: controller.signal,
-				body: JSON.stringify(decisionsRequestBody(model, kind, state, legal)),
+				body: JSON.stringify(decisionsRequestBody(model, state, labels)),
 			});
 			if (!response.ok) {
 				const error = new Error(
@@ -188,7 +182,7 @@ export class OpenRouterStrategy {
 				error.headers = response.headers;
 				throw error;
 			}
-			return parseDecisionsResponse(await response.json(), legal);
+			return parseDecisionsResponse(await response.json(), labels.length);
 		} finally {
 			clearTimeout(timer);
 		}

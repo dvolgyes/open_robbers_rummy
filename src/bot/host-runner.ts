@@ -1,11 +1,4 @@
-import { legalActions } from "../bridge/engine";
-import {
-	actionPayload,
-	claimVotePayload,
-	parseBridgeState,
-	resetVotePayload,
-	undoVotePayload,
-} from "../game/bridge";
+import { actionPayload, engineSeat, parseCanastaState } from "../game/canasta";
 import type { TableController } from "../p2p/table";
 import { type BotModel, type RoomConfig, SEATS, type Seat } from "../protocol";
 import {
@@ -17,14 +10,13 @@ import {
 import { loadBrowserPromptTemplates } from "./browser-prompts";
 import { normalizeHostApiKey } from "./host-key";
 import { actionPositionKey } from "./position";
-import type { Decision } from "./strategy";
 import {
 	BOT_FALLBACK_MODEL,
 	BOT_MODEL,
-	decisionState,
-	renderBidPrompt,
-	renderPlayPrompt,
+	type Choice,
+	type PromptTemplates,
 } from "./strategy";
+import { chooseTurn, turnRequest } from "./turn";
 
 export interface HostBotSettings {
 	readonly apiKey: string;
@@ -52,9 +44,7 @@ export class HostBotRunner {
 	#requestAbort = new AbortController();
 	readonly #processed = new Set<string>();
 	#unsubscribe: (() => void) | undefined;
-	#templates:
-		| Awaited<ReturnType<typeof loadBrowserPromptTemplates>>
-		| undefined;
+	#templates: PromptTemplates | undefined;
 	#running = false;
 	#rerun = false;
 	#stopped = false;
@@ -188,50 +178,18 @@ export class HostBotRunner {
 		const seats = this.#activeSeats(
 			view.roster?.bots ?? configuredBotSeats(config),
 		);
-		const state = parseBridgeState(view.table.state, this.#controller.tableId);
-		if (!state) return;
+		const state = parseCanastaState(view.table.state, this.#controller.tableId);
+		const match = state?.match;
+		if (!state || !match || match.settled || match.winner !== null) return;
 		for (const seat of seats) {
-			const voteKey =
-				state.claim?.required.includes(seat) &&
-				!state.claim.approved.includes(seat)
-					? `claim:${state.claim.id}:${seat}`
-					: state.undo?.required.includes(seat) &&
-							!state.undo.approved.includes(seat)
-						? `undo:${state.undo.id}:${seat}`
-						: state.reset?.required.includes(seat) &&
-								!state.reset.approved.includes(seat)
-							? `reset:${state.reset.id}:${seat}`
-							: undefined;
-			if (voteKey && !this.#processed.has(voteKey)) {
-				this.#processed.add(voteKey);
-				const payload = state.claim
-					? claimVotePayload(this.#controller.tableId, state.claim.id, false)
-					: state.undo
-						? undoVotePayload(this.#controller.tableId, state.undo.id, true)
-						: resetVotePayload(
-								this.#controller.tableId,
-								state.reset?.id ?? "",
-								true,
-							);
-				await this.#send(seat, payload, view.seat);
-				return;
-			}
-		}
-		if (state.claim || state.undo || state.reset || !state.board) return;
-		for (const seat of seats) {
-			// legalActions assigns dummy's turn to declarer, so only declarer can choose a dummy card.
-			const actions = legalActions(state.board, seat);
-			if (actions.length === 0) continue;
-			const key = `${state.board.number}:${actionPositionKey(state.board)}:${seat}`;
-			if (this.#processed.has(key)) continue;
-			this.#processed.add(key);
-			const kind = actions[0]?.type;
-			if (!kind) return;
+			// Only the seat whose turn it is has legal actions, so other seats are skipped here.
+			if (match.hand.turn !== engineSeat(seat)) continue;
 			this.#templates ??= await loadBrowserPromptTemplates();
-			const prompt =
-				kind === "call"
-					? renderBidPrompt(state.board, seat, actions, this.#templates)
-					: renderPlayPrompt(state.board, seat, actions, this.#templates);
+			const request = turnRequest(match, state.actions, seat, this.#templates);
+			if (!request || this.#processed.has(request.key)) continue;
+			this.#processed.add(request.key);
+			const report = (message: string) =>
+				this.#onStatus(`${config.names[seat]}: ${message}`);
 			const strategy = new BrowserOpenRouterStrategy(
 				this.#settings.apiKey,
 				{
@@ -244,18 +202,13 @@ export class HostBotRunner {
 				this.#requestAbort.signal,
 				() => this.#onError("rate-limit"),
 				this.#onUsageCost,
-				(message) => this.#onStatus(`${config.names[seat]}: ${message}`),
+				report,
 			);
-			let decision: Decision;
+			let choice: Choice;
 			try {
-				decision = await strategy.choose(
-					kind,
-					prompt,
-					actions,
-					decisionState(state.board, seat, kind),
-				);
+				choice = await chooseTurn(strategy, request, report);
 			} catch (error) {
-				this.#processed.delete(key);
+				this.#processed.delete(request.key);
 				throw error;
 			}
 			if (this.#stopped) return;
@@ -263,22 +216,24 @@ export class HostBotRunner {
 			const currentBots = current.roster?.bots ?? configuredBotSeats(config);
 			if (!this.#activeSeats(currentBots).includes(seat)) return;
 			const currentState = current.table
-				? parseBridgeState(current.table.state, this.#controller.tableId)
+				? parseCanastaState(current.table.state, this.#controller.tableId)
 				: undefined;
+			const currentMatch = currentState?.match;
 			if (
-				!currentState?.board ||
-				actionPositionKey(currentState.board) !== actionPositionKey(state.board)
+				!currentState ||
+				!currentMatch ||
+				actionPositionKey(currentMatch.handNo, currentState.actions) !==
+					actionPositionKey(match.handNo, state.actions)
 			)
 				return;
-			const action = actions.find((item) =>
-				decision.type === "call"
-					? item.type === "call" && item.call === decision.call
-					: item.type === "play" && item.card === decision.card,
-			);
-			if (!action) return;
 			await this.#send(
 				seat,
-				actionPayload(this.#controller.tableId, state.board, action),
+				actionPayload(
+					this.#controller.tableId,
+					match,
+					state.actions,
+					choice.action,
+				),
 				view.seat,
 			);
 			return;
@@ -287,11 +242,7 @@ export class HostBotRunner {
 
 	async #send(
 		seat: Seat,
-		payload:
-			| ReturnType<typeof actionPayload>
-			| ReturnType<typeof undoVotePayload>
-			| ReturnType<typeof claimVotePayload>
-			| ReturnType<typeof resetVotePayload>,
+		payload: ReturnType<typeof actionPayload>,
 		hostSeat: Seat | null,
 	): Promise<void> {
 		const result =

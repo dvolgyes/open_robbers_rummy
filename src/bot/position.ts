@@ -1,11 +1,7 @@
-import type { Board } from "../bridge/engine";
-
-/** Stable key for the bidding or play position whose action the bot is considering. */
-export function actionPositionKey(board: Board): string {
-	return `action:${board.number}:${board.calls.join(",")}:${board.cards.join(",")}`;
-}
-
-/** Confirms the board has not changed while the bot selected an action. */
-export function matchesActionPosition(board: Board, key: string): boolean {
-	return actionPositionKey(board) === key;
+/**
+ * Stable key for the position whose action the bot is choosing: the hand and the number of its accepted actions.
+ * A key that has changed when the bot answers means the table moved on, so the answer is dropped.
+ */
+export function actionPositionKey(handNo: number, accepted: number): string {
+	return `action:${handNo}:${accepted}`;
 }

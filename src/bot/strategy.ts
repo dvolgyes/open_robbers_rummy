@@ -1,21 +1,33 @@
 import {
-	type Card,
-	rankOf,
-	SUIT_SYMBOLS,
-	SUITS,
-	suitOf,
-} from "../bridge/cards";
-import {
 	type Action,
-	type Board,
-	boardStatus,
-	type CompletedTrick,
-} from "../bridge/engine";
-import type { Call, Contract } from "../bridge/rules";
-import { SEAT_NAMES, type Seat, seatAfter } from "../protocol";
+	type Card,
+	type Seat as EngineSeat,
+	type HandState,
+	legalActions,
+	type MatchState,
+	type TeamIndex,
+	teamOf,
+	viewFor,
+} from "../canasta";
+import { tableSeat } from "../game/canasta";
+import { SEAT_NAMES, SEATS } from "../protocol";
+import { actionLabel, cardLabel, meldLabel } from "./canasta-text";
+import { rankActions } from "./heuristic";
 
 export const BOT_MODEL = "inception/mercury-3";
 export const BOT_FALLBACK_MODEL = "openai/gpt-6-luna";
+
+/** The most options a model sees. The top of the heuristic ranking is always among them. */
+export const MAX_CHOICES = 40;
+
+const SIDE_NAMES: Readonly<Record<TeamIndex, string>> = {
+	0: "North-South",
+	1: "East-West",
+};
+
+function otherSide(side: TeamIndex): TeamIndex {
+	return side === 0 ? 1 : 0;
+}
 
 export type ReasoningEffort = "low" | "medium" | "none";
 
@@ -46,15 +58,15 @@ export function reasoningSettings(
 }
 
 export interface PromptTemplates {
-	readonly bidding: string;
-	readonly play: string;
+	readonly turn: string;
 }
 
-export type Decision =
-	| { readonly type: "call"; readonly call: string }
-	| { readonly type: "play"; readonly card: Card };
-
-export type BridgeDecisionState = Record<string, unknown>;
+/** One legal action the model may pick, numbered as the model sees it. */
+export interface Choice {
+	readonly index: number;
+	readonly action: Action;
+	readonly label: string;
+}
 
 class MissingDecisionTextError extends Error {
 	constructor(shape: readonly string[]) {
@@ -64,13 +76,6 @@ class MissingDecisionTextError extends Error {
 		this.name = "MissingDecisionTextError";
 	}
 }
-
-const VULNERABILITY: Readonly<Record<Board["vulnerability"], string>> = {
-	none: "None",
-	NS: "North-South vulnerable",
-	EW: "East-West vulnerable",
-	both: "Both vulnerable",
-};
 
 function renderTemplate(
 	template: string,
@@ -90,243 +95,104 @@ function renderTemplate(
 	return rendered;
 }
 
-function handText(cards: readonly Card[]): string {
-	return SUITS.map((suit) => {
-		const ranks = cards
-			.filter((card) => suitOf(card) === suit)
-			.map(rankOf)
-			.join("");
-		return `${SUIT_SYMBOLS[suit]} ${ranks || "—"}`;
-	}).join("  ");
+/**
+ * The legal actions ordered by the heuristic, cut to `MAX_CHOICES`. Numbering starts at 0, and choice 0
+ * is the heuristic's first pick, so it doubles as the fallback when no model answers.
+ */
+export function offeredChoices(hand: HandState, seat: EngineSeat): Choice[] {
+	const view = viewFor(hand, seat);
+	return rankActions(hand, seat, legalActions(hand, seat))
+		.slice(0, MAX_CHOICES)
+		.map((action, index) => ({
+			index,
+			action,
+			label: actionLabel(action, view),
+		}));
 }
 
-function callLabel(call: Call): string {
-	if (call === "P") return "Pass";
-	if (call === "X") return "Double";
-	if (call === "XX") return "Redouble";
-	return `${call[0]}${call.slice(1) === "NT" ? "NT" : SUIT_SYMBOLS[call.slice(1) as keyof typeof SUIT_SYMBOLS]}`;
+export function renderTurnPrompt(
+	match: MatchState,
+	seat: EngineSeat,
+	choices: readonly Choice[],
+	templates: PromptTemplates,
+): string {
+	const view = viewFor(match.hand, seat);
+	const side = teamOf(seat);
+	const other = otherSide(side);
+	const own = view.teams[side];
+	const opponents = view.teams[other];
+	const top = view.pile.at(-1);
+	const redThrees = (cards: readonly Card[]) =>
+		cards.length ? cards.map(cardLabel).join(" ") : "none";
+	const name = tableSeat(seat);
+	return renderTemplate(templates.turn, {
+		SEAT: `${SEAT_NAMES[name]} (${name})`,
+		SIDE: SIDE_NAMES[side],
+		SCORES: `your side ${match.scores[side]}, opponents ${match.scores[other]}`,
+		TARGET: String(view.rules.targetScore),
+		PHASE:
+			view.phase === "draw"
+				? "draw (take the stock or the pile first)"
+				: "play (meld, extend, discard, or go out)",
+		OWN_HAND: view.own.length ? view.own.map(cardLabel).join(" ") : "empty",
+		HAND_COUNTS: SEATS.map(
+			(name, index) => `${SEAT_NAMES[name]} ${view.handCounts[index] ?? 0}`,
+		).join(", "),
+		STOCK: `${view.stockCount} cards`,
+		PILE: top ? `${view.pile.length} cards, top ${cardLabel(top)}` : "empty",
+		OWN_MELDS:
+			own.melds.map((meld) => meldLabel(meld, view)).join("\n") || "none",
+		OWN_RED_THREES: redThrees(own.redThrees),
+		OPPONENT_MELDS:
+			opponents.melds.map((meld) => meldLabel(meld, view)).join("\n") || "none",
+		OPPONENT_RED_THREES: redThrees(opponents.redThrees),
+		TURN_MELD_POINTS: String(view.turnMeldPoints),
+		CHOICES: choices
+			.map((choice) => `${choice.index}: ${choice.label}`)
+			.join("\n"),
+	});
 }
 
-function contractLabel(contract: Contract): string {
-	const strain =
-		contract.strain === "NT" ? "NT" : SUIT_SYMBOLS[contract.strain];
-	return `${contract.level}${strain}${contract.doubling}`;
+/** Builds only the facts this seat may know: its own hand, public piles and melds, and the scores. */
+export function decisionState(
+	match: MatchState,
+	seat: EngineSeat,
+): Record<string, unknown> {
+	const view = viewFor(match.hand, seat);
+	const side = teamOf(seat);
+	const top = view.pile.at(-1);
+	return {
+		hand_number: match.handNo,
+		seat: tableSeat(seat),
+		phase: view.phase,
+		own_cards: view.own.map(cardLabel),
+		stock_cards: view.stockCount,
+		pile_cards: view.pile.length,
+		pile_top: top ? cardLabel(top) : null,
+		scores: {
+			own_side: match.scores[side],
+			opponents: match.scores[otherSide(side)],
+		},
+	};
 }
 
-function cardLabel(card: Card): string {
-	const rank = rankOf(card) === "T" ? "10" : rankOf(card);
-	return `${SUIT_SYMBOLS[suitOf(card)]}${rank}`;
-}
-
-function callsText(board: Board): string {
-	if (board.calls.length === 0) return "No calls yet";
-	return board.calls
-		.map((call, index) => {
-			const seat = seatAfter(board.dealer, index);
-			return `${SEAT_NAMES[seat]}: ${callLabel(call)}`;
-		})
-		.join(" · ");
-}
-
-function trickText(trick: Pick<CompletedTrick, "leader" | "cards">): string {
-	return trick.cards
-		.map((card, index) => {
-			const seat = seatAfter(trick.leader, index);
-			return `${SEAT_NAMES[seat]} ${cardLabel(card)}`;
-		})
-		.join(" · ");
-}
-
-function legalChoices(actions: readonly Action[]): string[] {
-	return actions.map((action) =>
-		action.type === "call" ? action.call : action.card,
-	);
-}
-
-export function decisionFormat(
-	kind: "call" | "play",
-	legal: readonly Action[],
-) {
-	const field = kind === "call" ? "call" : "card";
+export function decisionFormat(count: number) {
 	return {
 		type: "json_schema" as const,
-		name: `bridge_${kind}`,
+		name: "canasta_choice",
 		strict: true,
 		schema: {
 			type: "object",
 			properties: {
-				[field]: {
-					type: "string",
-					enum: legalChoices(legal),
+				choice: {
+					type: "integer",
+					enum: Array.from({ length: count }, (_value, index) => index),
 				},
 			},
-			required: [field],
+			required: ["choice"],
 			additionalProperties: false,
 		},
 	};
-}
-
-export function renderBidPrompt(
-	board: Board,
-	seat: Seat,
-	legal: readonly Action[],
-	templates: PromptTemplates,
-): string {
-	return renderTemplate(templates.bidding, {
-		BOARD: String(board.number),
-		DEALER: `${SEAT_NAMES[board.dealer]} (${board.dealer})`,
-		SEAT: `${SEAT_NAMES[seat]} (${seat})`,
-		VULNERABILITY: VULNERABILITY[board.vulnerability],
-		HAND: handText(board.deal[seat]),
-		AUCTION: callsText(board),
-		LEGAL_BIDS: legalChoices(legal).join(", "),
-	});
-}
-
-export function renderPlayPrompt(
-	board: Board,
-	seat: Seat,
-	legal: readonly Action[],
-	templates: PromptTemplates,
-): string {
-	const status = boardStatus(board);
-	if (status.phase !== "play") throw new Error("the board is not in play");
-	const completed = status.tricks.map(
-		(trick, index) =>
-			`Trick ${index + 1}: ${trickText(trick)}; won by ${SEAT_NAMES[trick.winner]}`,
-	);
-	const current = status.current.cards.length
-		? `Current trick: ${trickText(status.current)}`
-		: "Current trick: empty; you are leading";
-	const dummy = status.dummy;
-	const dummyExposed = board.cards.length > 0;
-	const knownHands = [
-		`Your hand (${SEAT_NAMES[seat]}): ${handText(status.remaining[seat])}`,
-		...(dummy === undefined
-			? []
-			: [
-					dummyExposed
-						? `Dummy (${SEAT_NAMES[dummy]}): ${handText(status.remaining[dummy])}`
-						: `Dummy (${SEAT_NAMES[dummy]}): not exposed yet`,
-				]),
-	];
-	const contract = status.contract;
-	return renderTemplate(templates.play, {
-		BOARD: String(board.number),
-		VULNERABILITY: VULNERABILITY[board.vulnerability],
-		AUCTION: callsText(board),
-		CONTRACT: contractLabel(contract),
-		DECLARER: `${SEAT_NAMES[contract.declarer]} (${contract.declarer})`,
-		DUMMY: dummy === undefined ? "unknown" : `${SEAT_NAMES[dummy]} (${dummy})`,
-		KNOWN_HANDS: knownHands.join("\n"),
-		COMPLETED_TRICKS: completed.length
-			? completed.join("\n")
-			: "No completed tricks",
-		CURRENT_TRICK: current,
-		SEAT: `${SEAT_NAMES[seat]} (${seat})`,
-		TRICKS_NS: String(status.tricksNS),
-		TRICKS_EW: String(status.tricksEW),
-		LEGAL_CARDS: legalChoices(legal).join(", "),
-	});
-}
-
-/** Builds only the board facts that this player is allowed to know. */
-export function decisionState(
-	board: Board,
-	seat: Seat,
-	kind: "call" | "play",
-): BridgeDecisionState {
-	const auction = board.calls.map((call, index) => ({
-		seat: seatAfter(board.dealer, index),
-		call: callLabel(call),
-	}));
-	if (kind === "call") {
-		const hand = board.deal[seat];
-		const shape = SUITS.map(
-			(suit) => hand.filter((card) => suitOf(card) === suit).length,
-		).toSorted((a, b) => b - a);
-		const highCardPoints = hand.reduce((points, card) => {
-			const rank = rankOf(card);
-			return (
-				points +
-				(rank === "A"
-					? 4
-					: rank === "K"
-						? 3
-						: rank === "Q"
-							? 2
-							: rank === "J"
-								? 1
-								: 0)
-			);
-		}, 0);
-		return {
-			board: board.number,
-			dealer: board.dealer,
-			vulnerability: board.vulnerability,
-			seat,
-			hand: Object.fromEntries(
-				SUITS.map((suit) => [
-					suit,
-					hand
-						.filter((card) => suitOf(card) === suit)
-						.map(rankOf)
-						.join(""),
-				]),
-			),
-			high_card_points: highCardPoints,
-			suit_shape_longest_first: shape,
-			auction,
-		};
-	}
-
-	const status = boardStatus(board);
-	if (status.phase !== "play") throw new Error("the board is not in play");
-	const contract = status.contract;
-	const dummy = status.dummy;
-	const dummyVisible = board.cards.length > 0;
-	const trickPlays = (trick: Pick<CompletedTrick, "leader" | "cards">) =>
-		trick.cards.map((card, index) => ({
-			seat: seatAfter(trick.leader, index),
-			card: cardLabel(card),
-		}));
-	return {
-		board: board.number,
-		vulnerability: board.vulnerability,
-		seat,
-		contract: {
-			level: contract.level,
-			strain: contract.strain,
-			doubling: contract.doubling,
-			declarer: contract.declarer,
-		},
-		dummy,
-		hand: status.remaining[seat].map(cardLabel),
-		dummy_hand:
-			dummy === undefined || !dummyVisible
-				? null
-				: status.remaining[dummy].map(cardLabel),
-		auction,
-		completed_tricks: status.tricks.map((trick) => ({
-			plays: trickPlays(trick),
-			winner: trick.winner,
-		})),
-		current_trick: {
-			leader: status.current.leader,
-			plays: trickPlays(status.current),
-		},
-		tricks_won: { NS: status.tricksNS, EW: status.tricksEW },
-	};
-}
-
-export function decisionActionValue(action: Action): string {
-	return action.type === "call" ? action.call : action.card;
-}
-
-export function decisionActionLabel(action: Action): string {
-	return action.type === "call"
-		? callLabel(action.call)
-		: `Play ${cardLabel(action.card)}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -373,12 +239,8 @@ export function responseText(response: unknown): string {
 	return text;
 }
 
-/** Accept only a single JSON field whose value is one of the locally computed legal actions. */
-export function parseDecision(
-	text: string,
-	kind: "call" | "play",
-	legal: readonly Action[],
-): Decision {
+/** Accepts only `{"choice": n}` where n is one of the offered option numbers. */
+export function parseChoice(text: string, count: number): number {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(text);
@@ -387,46 +249,29 @@ export function parseDecision(
 	}
 	if (!isRecord(parsed))
 		throw new Error("OpenRouter decision must be an object");
-	const field = kind === "call" ? "call" : "card";
-	if (Object.keys(parsed).length !== 1 || typeof parsed[field] !== "string")
-		throw new Error(`OpenRouter decision must contain only ${field}`);
-	const value = parsed[field];
-	const candidate = legal.find(
-		(action) =>
-			(kind === "call" && action.type === "call" && action.call === value) ||
-			(kind === "play" && action.type === "play" && action.card === value),
-	);
-	if (!candidate)
-		throw new Error("OpenRouter chose an action that is not legal now");
-	return candidate.type === "call"
-		? { type: "call", call: candidate.call }
-		: { type: "play", card: candidate.card };
+	if (Object.keys(parsed).length !== 1 || !("choice" in parsed))
+		throw new Error("OpenRouter decision must contain only choice");
+	const value = parsed.choice;
+	if (typeof value !== "number" || !Number.isInteger(value))
+		throw new Error("OpenRouter choice must be an integer");
+	if (value < 0 || value >= count)
+		throw new Error("OpenRouter chose an option that was not offered");
+	return value;
 }
 
 export async function chooseWithSchemaRetry(
 	request: (effort: ReasoningEffort) => Promise<unknown>,
-	kind: "call" | "play",
-	legal: readonly Action[],
+	count: number,
 	preferredEffort: ReasoningEffort = "low",
-): Promise<Decision> {
+): Promise<number> {
 	for (let attempt = 0; attempt < 4; attempt++) {
 		try {
 			const effort = attempt === 0 ? preferredEffort : "none";
-			return parseDecision(responseText(await request(effort)), kind, legal);
+			return parseChoice(responseText(await request(effort)), count);
 		} catch (error) {
 			if (!(error instanceof MissingDecisionTextError) || attempt === 3)
 				throw error;
 		}
 	}
 	throw new Error("OpenRouter decision attempts were exhausted");
-}
-
-export function randomDecision(legal: readonly Action[]): Decision {
-	if (legal.length === 0) throw new Error("no legal actions were provided");
-	const index = Math.floor(Math.random() * legal.length);
-	const action = legal[index];
-	if (!action) throw new Error("could not select a legal action");
-	return action.type === "call"
-		? { type: "call", call: action.call }
-		: { type: "play", card: action.card };
 }

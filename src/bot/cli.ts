@@ -1,13 +1,10 @@
 import { RTCPeerConnection as WeriftPeerConnection } from "werift";
-import { legalActions } from "../bridge/engine";
+import type { MatchState } from "../canasta";
 import {
 	actionPayload,
-	bridgeModule,
-	claimVotePayload,
-	parseBridgeState,
-	resetVotePayload,
-	undoVotePayload,
-} from "../game/bridge";
+	canastaModule,
+	parseCanastaState,
+} from "../game/canasta";
 import { newCommandId } from "../ids";
 import { randomNonce } from "../p2p/checks";
 import { readMeshConfig } from "../p2p/config";
@@ -28,14 +25,9 @@ import { type SeatLocks, SeatMemory } from "../session";
 import { parseRoomSetup } from "../ui/bookmark";
 import { OpenRouterStrategy } from "./node-openrouter";
 import { NODE_PROMPT_TEMPLATES } from "./node-prompts";
-import { actionPositionKey, matchesActionPosition } from "./position";
-import {
-	type Decision,
-	decisionState,
-	randomDecision,
-	renderBidPrompt,
-	renderPlayPrompt,
-} from "./strategy";
+import { actionPositionKey } from "./position";
+import type { Choice } from "./strategy";
+import { chooseTurn, type TurnChooser, turnRequest } from "./turn";
 
 interface Options {
 	readonly url: URL;
@@ -145,7 +137,14 @@ async function run(options: Options): Promise<void> {
 				retryDelayMs: setup?.config.botSetup?.retryDelayMs,
 			})
 		: undefined;
-	if (!options.random && strategy === undefined)
+	// --random picks among the offered options without a model, so it needs no key.
+	const chooser: TurnChooser | undefined = options.random
+		? {
+				choose: async (_prompt, labels) =>
+					Math.floor(Math.random() * labels.length),
+			}
+		: strategy;
+	if (chooser === undefined)
 		throw new Error("OPENROUTER_API_KEY is missing from .env");
 	const meshResult = readMeshConfig(process.env);
 	if (!meshResult.ok) throw new Error(meshResult.error);
@@ -177,7 +176,7 @@ async function run(options: Options): Promise<void> {
 		storage,
 		locks,
 		memory,
-		module: bridgeModule,
+		module: canastaModule,
 		hostEligible: false,
 		clock,
 		every: (ms, tick) => {
@@ -223,21 +222,6 @@ async function run(options: Options): Promise<void> {
 	};
 	process.once("SIGINT", onSignal);
 	process.once("SIGTERM", onSignal);
-
-	const submitVote = async (
-		key: string,
-		payload:
-			| ReturnType<typeof undoVotePayload>
-			| ReturnType<typeof claimVotePayload>
-			| ReturnType<typeof resetVotePayload>,
-	): Promise<void> => {
-		if (sentKey === key) return;
-		sentKey = key;
-		sentFailureCount = controller.view().failures.length;
-		const result = await controller.send(payload);
-		if (!result.ok)
-			throw new Error(`could not queue response (${result.code})`);
-	};
 
 	const chooseSeat = async (view = controller.view()): Promise<void> => {
 		if (choosing || requestedSeat !== undefined || view.seat !== null) return;
@@ -285,36 +269,32 @@ async function run(options: Options): Promise<void> {
 	};
 
 	const sendAction = async (
-		state: NonNullable<ReturnType<typeof parseBridgeState>>,
+		match: MatchState,
+		accepted: number,
 		seat: Seat,
-		key: string,
-		decision: Decision,
+		position: string,
+		choice: Choice,
 		view: ReturnType<TableController["view"]>,
 	): Promise<void> => {
-		const board = state.board;
-		const currentBoard = parseBridgeState(
+		const currentState = parseCanastaState(
 			view.table?.state ?? {},
 			identity.tableId,
-		)?.board;
-		if (!board || !currentBoard || !matchesActionPosition(currentBoard, key))
-			return;
-		const legal = legalActions(board, seat);
-		const action = legal.find((item) =>
-			decision.type === "call"
-				? item.type === "call" && item.call === decision.call
-				: item.type === "play" && item.card === decision.card,
 		);
-		if (!action) return;
+		const current = currentState?.match;
+		if (
+			!currentState ||
+			!current ||
+			actionPositionKey(current.handNo, currentState.actions) !== position
+		)
+			return;
 		const result = await controller.send(
-			actionPayload(identity.tableId, board, action),
+			actionPayload(identity.tableId, match, accepted, choice.action),
 		);
 		if (!result.ok)
 			throw new Error(`could not queue game action (${result.code})`);
-		sentKey = key;
+		sentKey = position;
 		sentFailureCount = view.failures.length;
-		console.log(
-			`Sent ${decision.type === "call" ? decision.call : decision.card} for ${seat}.`,
-		);
+		console.log(`Sent ${choice.label} for ${seat}.`);
 	};
 
 	const drive = async (): Promise<void> => {
@@ -327,16 +307,6 @@ async function run(options: Options): Promise<void> {
 				),
 			);
 			return;
-		}
-		if (
-			sentKey?.startsWith("claim:") ||
-			sentKey?.startsWith("undo:") ||
-			sentKey?.startsWith("reset:")
-		) {
-			if (view.failures.length > sentFailureCount) {
-				await stop(new Error("host rejected the bot's request response"));
-				return;
-			}
 		}
 		if (
 			view.status === "expired" ||
@@ -365,80 +335,32 @@ async function run(options: Options): Promise<void> {
 			startupTimer = undefined;
 		}
 		if (!view.ready || !view.table) return;
-		const state = parseBridgeState(view.table.state, identity.tableId);
-		if (!state) return;
+		const state = parseCanastaState(view.table.state, identity.tableId);
+		const match = state?.match;
+		if (!state || !match || match.settled || match.winner !== null) return;
+		if (view.outbox.length > 0) return;
 		const seat = view.seat;
-		if (
-			state.claim?.required.includes(seat) &&
-			!state.claim.approved.includes(seat)
-		) {
-			strategyKey = undefined;
-			await submitVote(
-				`claim:${state.claim.id}`,
-				claimVotePayload(identity.tableId, state.claim.id, false),
-			);
-			return;
-		}
-		if (
-			state.undo?.required.includes(seat) &&
-			!state.undo.approved.includes(seat)
-		) {
-			strategyKey = undefined;
-			await submitVote(
-				`undo:${state.undo.id}`,
-				undoVotePayload(identity.tableId, state.undo.id, true),
-			);
-			return;
-		}
-		if (
-			state.reset?.required.includes(seat) &&
-			!state.reset.approved.includes(seat)
-		) {
-			strategyKey = undefined;
-			await submitVote(
-				`reset:${state.reset.id}`,
-				resetVotePayload(identity.tableId, state.reset.id, true),
-			);
-			return;
-		}
-		if (
-			state.claim ||
-			state.undo ||
-			state.reset ||
-			!state.board ||
-			view.outbox.length > 0
-		)
-			return;
-		if (sentKey?.startsWith("action:")) {
-			if (actionPositionKey(state.board) === sentKey) {
-				if (view.failures.length > sentFailureCount) {
-					await stop(new Error("host rejected the bot's action"));
-				}
-				return;
+		const position = actionPositionKey(match.handNo, state.actions);
+		if (sentKey === position) {
+			if (view.failures.length > sentFailureCount) {
+				await stop(new Error("host rejected the bot's action"));
 			}
+			return;
 		}
-		const actions = legalActions(state.board, seat);
-		if (actions.length === 0) return;
-		const actionKey = actionPositionKey(state.board);
-		if (strategyKey === actionKey) return;
-		strategyKey = actionKey;
-		const kind = actions[0]?.type;
-		if (!kind) return;
-		const prompt =
-			kind === "call"
-				? renderBidPrompt(state.board, seat, actions, NODE_PROMPT_TEMPLATES)
-				: renderPlayPrompt(state.board, seat, actions, NODE_PROMPT_TEMPLATES);
+		if (strategyKey === position) return;
+		strategyKey = position;
 		try {
-			const decision = options.random
-				? randomDecision(actions)
-				: await strategy?.choose(
-						kind,
-						prompt,
-						actions,
-						decisionState(state.board, seat, kind),
-					);
-			if (!decision) throw new Error("bot strategy is not configured");
-			await sendAction(state, seat, actionKey, decision, controller.view());
+			const request = turnRequest(
+				match,
+				state.actions,
+				seat,
+				NODE_PROMPT_TEMPLATES,
+			);
+			if (!request) return;
+			const choice = await chooseTurn(chooser, request, (message) =>
+				console.error(`${seat}: ${message}`),
+			);
+			await sendAction(match, state.actions, seat, position, choice, view);
 		} catch (error) {
 			await stop(new Error(describeFailure(error, [apiKey ?? "", route.key])));
 		}

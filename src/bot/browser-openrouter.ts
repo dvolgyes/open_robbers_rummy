@@ -1,4 +1,3 @@
-import type { Action } from "../bridge/engine";
 import { BOT_MODELS, type BotModel, botModelType } from "../protocol";
 import {
 	DECISIONS_ENDPOINT,
@@ -9,10 +8,9 @@ import { normalizeHostApiKey } from "./host-key";
 import {
 	BOT_FALLBACK_MODEL,
 	BOT_MODEL,
-	type Decision,
 	decisionFormat,
 	decisionOutputTokenLimit,
-	parseDecision,
+	parseChoice,
 	preferredReasoningEffort,
 	reasoningSettings,
 	responseText,
@@ -149,13 +147,13 @@ export class BrowserOpenRouterStrategy {
 		this.#onStatus = onStatus;
 	}
 
+	/** Returns the number of the option the model picked; `labels` lists the options in order. */
 	async choose(
-		kind: "call" | "play",
 		prompt: string,
-		legal: readonly Action[],
+		labels: readonly string[],
 		state?: Record<string, unknown>,
-	): Promise<Decision> {
-		if (legal.length === 0) throw new Error("no legal actions were provided");
+	): Promise<number> {
+		if (labels.length === 0) throw new Error("no legal actions were provided");
 		const modelOrder = this.#settings.modelOrder ?? [
 			this.#settings.model || BOT_MODEL,
 			this.#settings.fallbackModel || BOT_FALLBACK_MODEL,
@@ -169,15 +167,15 @@ export class BrowserOpenRouterStrategy {
 		let model = modelOrder[modelIndex] as BotModel;
 		for (let attempt = 0; ; attempt++) {
 			this.#onStatus(
-				`Asking ${model} for a ${kind === "call" ? "bid" : "card play"} (attempt ${attempt + 1} of ${this.#settings.retries + 1}).`,
+				`Asking ${model} for a turn choice (attempt ${attempt + 1} of ${this.#settings.retries + 1}).`,
 			);
 			try {
-				const response = await this.#request(model, kind, prompt, legal, state);
+				const response = await this.#request(model, prompt, labels, state);
 				const cost = responseCost(response);
 				if (cost !== undefined) this.#onUsageCost(cost);
 				return botModelType(model) === "decisions"
-					? parseDecisionsResponse(response, legal)
-					: parseDecision(responseText(response), kind, legal);
+					? parseDecisionsResponse(response, labels.length)
+					: parseChoice(responseText(response), labels.length);
 			} catch (error) {
 				if (this.#signal.aborted) throw new BotRequestAbortedError();
 				if (error instanceof OpenRouterRequestError && error.status === 402)
@@ -237,9 +235,8 @@ export class BrowserOpenRouterStrategy {
 
 	async #request(
 		model: string,
-		kind: "call" | "play",
 		prompt: string,
-		legal: readonly Action[],
+		labels: readonly string[],
 		state?: Record<string, unknown>,
 	): Promise<unknown> {
 		const timeout = new AbortController();
@@ -260,16 +257,11 @@ export class BrowserOpenRouterStrategy {
 				signal: timeout.signal,
 				body: JSON.stringify(
 					decisions
-						? decisionsRequestBody(
-								model,
-								kind,
-								state ?? { position: prompt },
-								legal,
-							)
+						? decisionsRequestBody(model, state ?? { position: prompt }, labels)
 						: {
 								model,
 								instructions:
-									"You are a contract bridge player. Your final response must be exactly one JSON object matching the supplied schema. Select one supplied legal choice. Do not include explanations, markdown, or hidden reasoning in the final response.",
+									'You are a canasta player. Your final response must be exactly one JSON object of the form {"choice": N}, where N is the number of one supplied option. Do not include explanations, markdown, or hidden reasoning in the final response.',
 								input: prompt,
 								max_output_tokens: decisionOutputTokenLimit(model),
 								reasoning: reasoningSettings(
@@ -278,7 +270,7 @@ export class BrowserOpenRouterStrategy {
 								),
 								store: false,
 								usage: { include: true },
-								text: { format: decisionFormat(kind, legal) },
+								text: { format: decisionFormat(labels.length) },
 							},
 				),
 			});
