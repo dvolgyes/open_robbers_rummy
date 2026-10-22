@@ -263,6 +263,15 @@ function applyTakePile(
 		teams = replaceMeld(teams, team, { ...existing, cards });
 	}
 	const cards = [...taken.rest, ...hand.pile.slice(0, -1)];
+	// One card left can be neither melded nor discarded without a canasta, so such a turn could never end.
+	if (
+		cards.length === 1 &&
+		hand.rules.goOutNeedsCanasta &&
+		!teamAt(teams, team).melds.some((meld) => isCanasta(meld, hand.rules))
+	)
+		return fail(
+			"the pickup would leave one card, which needs a canasta to go out",
+		);
 	const next: HandState = {
 		...hand,
 		hands: withHand(hand.hands, seat, cards),
@@ -411,6 +420,15 @@ function canTakePile(hand: HandState): boolean {
 
 function applyReset(hand: HandState): Step {
 	if (hand.turnActions === 0) return fail("nothing to reset this turn");
+	// With the stock exhausted, the turn started with a forced pickup; taking it back declines the pile, so the hand ends.
+	// Otherwise a pickup that the player cannot complete would leave the turn between pickup and reset forever.
+	if (hand.turnStart.phase === "draw" && hand.turnStart.stock.length === 0) {
+		const ended: HandSnapshot = {
+			...hand.turnStart,
+			outcome: { kind: "stock" },
+		};
+		return succeed({ ...ended, turnStart: ended });
+	}
 	return succeed({ ...hand.turnStart, turnStart: hand.turnStart });
 }
 

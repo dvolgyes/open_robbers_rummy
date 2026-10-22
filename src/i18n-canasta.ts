@@ -863,6 +863,17 @@ const rows: readonly CanastaRow[] = [
 		"jullie kant heeft een canasta nodig om uit te gaan",
 	],
 	[
+		"the pickup would leave one card, which needs a canasta to go out",
+		"nach dem Aufnehmen bliebe eine Karte, und zum Ausmachen braucht ihr eine Canasta",
+		"a felvétel után egy lap maradna, a kiszálláshoz pedig kanaszta kell",
+		"etter opptaket ville ett kort bli igjen, og for å gå ut trengs en canasta",
+		"al tomar el pozo quedaría una carta, y para cerrar hace falta una canasta",
+		"ao pegar o lixo ficaria uma carta, e para bater é preciso uma canastra",
+		"après la prise de la défausse, il resterait une carte, et il faut une canasta pour sortir",
+		"dopo la presa del pozzo resterebbe una carta, e per chiudere serve una canasta",
+		"na het oppakken van de aflegstapel bleef één kaart over, en om uit te gaan is een canasta nodig",
+	],
+	[
 		"the stock is empty",
 		"der Talon ist leer",
 		"a pakli üres",

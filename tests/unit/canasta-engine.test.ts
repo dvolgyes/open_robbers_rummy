@@ -297,6 +297,72 @@ describe("hand flow", () => {
 		expect(ended.hand.outcome).toEqual({ kind: "stock" });
 	});
 
+	it("refuses a pickup that leaves one card without a canasta, so an exhausted stock ends the hand", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const queens = {
+			id: "m1",
+			rank: "Q" as const,
+			team: 1 as const,
+			cards: cardsById(["0-QS", "1-QS", "0-QC"]),
+		};
+		// The pile is only the discarded QH, which extends East-West's queens with no card from East's hand.
+		// East would keep one card, which it can neither meld nor discard without a canasta.
+		const exhausted = scenario(base, {
+			turn: 0,
+			phase: "play",
+			stock: [],
+			hands: [cardsById(["0-QH", "0-4H"]), cardsById(["0-JS"]), [], []],
+			pile: [],
+			teams: [
+				base.teams[0],
+				{ ...base.teams[1], melds: [queens], initialMade: true },
+			],
+		});
+		const discarded = applyAction(exhausted, 0, {
+			type: "discard",
+			card: "0-QH",
+		});
+		if (!discarded.ok) throw new Error(discarded.reason);
+		expect(discarded.hand.outcome).toEqual({ kind: "stock" });
+
+		const atDraw = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			hands: [[], cardsById(["0-JS"]), [], []],
+			pile: cardsById(["0-QH"]),
+			teams: [
+				base.teams[0],
+				{ ...base.teams[1], melds: [queens], initialMade: true },
+			],
+		});
+		expect(
+			applyAction(atDraw, 1, { type: "takePile", cards: [], extend: "m1" }),
+		).toMatchObject({ ok: false });
+	});
+
+	it("ends the hand when a pickup at an exhausted stock is taken back, because the pile is declined", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		// Three fives are 15 points, below the 50 that East-West need, and East cannot meld more: only resetTurn is left.
+		const forced = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			stock: [],
+			hands: [[], cardsById(["0-5H", "1-5H", "0-9C", "0-8D"]), [], []],
+			pile: cardsById(["0-7C", "0-5D"]),
+		});
+		const taken = applyAction(forced, 1, {
+			type: "takePile",
+			cards: ["0-5H", "1-5H"],
+		});
+		if (!taken.ok) throw new Error(taken.reason);
+		expect(legalActions(taken.hand, 1)).toEqual([{ type: "resetTurn" }]);
+		const reset = applyAction(taken.hand, 1, { type: "resetTurn" });
+		if (!reset.ok) throw new Error(reset.reason);
+		expect(reset.hand.outcome).toEqual({ kind: "stock" });
+		expect(reset.hand.pile).toEqual(forced.pile);
+		expect(reset.hand.hands).toEqual(forced.hands);
+	});
+
 	it("lets a side below its minimum discard, but not end the turn with a partial meld", () => {
 		const base = newHand({ teamScores: [1500, 1500], dealer: 0, seed: 1 });
 		// Three fives are 15 points, below the 90 needed at a score of 1500. The hand keeps 9H, so the discard does not go out.

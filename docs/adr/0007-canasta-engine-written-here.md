@@ -43,6 +43,10 @@ Evidence, checked on 2026-10-22:
     It still undoes a pile pickup, because a pickup below the initial minimum must stay retractable.
   - When the stock is exhausted, the next player must take the pile and meld or discard it.
     If that player cannot take the pile, the hand ends.
+    Amended 2026-10-22: a pickup that leaves one card in the hand is refused while the side has no canasta, because that card can be neither melded nor discarded.
+    At an exhausted stock, `resetTurn` after a pickup declines the pile and ends the hand.
+    Before this change, a pickup that the player could not complete left the turn between the pickup and `resetTurn` forever.
+    The residual: a player can decline a pile that matches a meld of the side by taking it and taking it back, although Pagat requires that pickup.
   - A last stock card that is a red three ends the hand when it is drawn, so its drawer may not meld or discard.
 
 ## Consequences
