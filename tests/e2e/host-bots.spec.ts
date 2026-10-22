@@ -100,6 +100,60 @@ test("host bots play a whole hand, and the host deals the next one", async ({
 	expect(requests()).toBeGreaterThan(8);
 });
 
+test("paused bots stay paused after the host reloads, and play again only on resume", async ({
+	page,
+}) => {
+	test.setTimeout(180_000);
+	const requests = await routeBots(page);
+	await page.goto("/");
+	for (const seat of ["N", "E", "S", "W"])
+		await page.locator(`input[name="bot-${seat}"]`).check();
+	await page.locator('input[name="openrouter-key"]').fill("test-key");
+	await page.getByTestId("create").click();
+	await expect(page.getByTestId("table")).toBeVisible();
+	await openDrawer(page);
+	await page.getByRole("button", { name: "Pause bots" }).click();
+	await expect(page.getByRole("button", { name: "Resume bots" })).toBeVisible();
+
+	await page.reload();
+	await expect(page.getByTestId("table")).toHaveAttribute(
+		"data-phase",
+		"play",
+		{
+			timeout: CONNECT_MS,
+		},
+	);
+	await openDrawer(page);
+	await expect(page.getByRole("button", { name: "Resume bots" })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Pause bots" })).toBeHidden();
+	await expect(
+		page.getByTestId("tile-E").locator(".bot-overlay"),
+	).toBeVisible();
+	const pausedAt = await page.getByTestId("table").getAttribute("data-at");
+	const pausedRequests = requests();
+	// A started bot asks OpenRouter within a second; a paused one never does.
+	await page.waitForTimeout(5_000);
+	expect(requests()).toBe(pausedRequests);
+	expect(await page.getByTestId("table").getAttribute("data-at")).toBe(
+		pausedAt,
+	);
+
+	await page.getByRole("button", { name: "Resume bots" }).click();
+	await expect(page.getByRole("button", { name: "Pause bots" })).toBeVisible();
+	await expect
+		.poll(() => requests(), { timeout: 30_000 })
+		.toBeGreaterThan(pausedRequests);
+
+	// Bots that played before a reload play after it.
+	await page.reload();
+	const resumedRequests = requests();
+	await expect
+		.poll(() => requests(), { timeout: CONNECT_MS })
+		.toBeGreaterThan(resumedRequests);
+	await openDrawer(page);
+	await expect(page.getByRole("button", { name: "Pause bots" })).toBeVisible();
+});
+
 test("switching the player whose turn it is to a bot starts it at once; the call goes on", async ({
 	browser,
 	baseURL,

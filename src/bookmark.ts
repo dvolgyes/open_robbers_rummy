@@ -12,6 +12,8 @@ import {
 } from "./protocol";
 
 export const SELECTED_PLAYER_PARAM = "selected_player";
+/** In the host's own URL: its bots are paused, so a reload does not start them. */
+export const BOTS_PAUSED_PARAM = "bots_paused";
 
 /**
  * Query keys of the four seats, named by direction as in `?east=zsdh&west=dvolgyes`. The `host` key names the
@@ -101,6 +103,19 @@ export function botSeatsQuery(search: string, bots: readonly Seat[]): string {
 	const params = new URLSearchParams(search);
 	const selected = new Set(bots);
 	params.set("bot_seats", SEATS.filter((seat) => selected.has(seat)).join(","));
+	return params.toString();
+}
+
+/** Reads whether the host's bots were paused before this page loaded. */
+export function parseBotsPaused(search: string): boolean {
+	return new URLSearchParams(search).get(BOTS_PAUSED_PARAM) === "1";
+}
+
+/** Sets or removes the paused-bots mark while preserving the other values. */
+export function botsPausedQuery(search: string, paused: boolean): string {
+	const params = new URLSearchParams(search);
+	if (paused) params.set(BOTS_PAUSED_PARAM, "1");
+	else params.delete(BOTS_PAUSED_PARAM);
 	return params.toString();
 }
 

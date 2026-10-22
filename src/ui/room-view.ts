@@ -1,6 +1,9 @@
 import {
+	BOTS_PAUSED_PARAM,
 	botSeatsQuery,
+	botsPausedQuery,
 	parseBookmark,
+	parseBotsPaused,
 	SELECTED_PLAYER_PARAM,
 } from "../bookmark";
 import {
@@ -86,6 +89,7 @@ const STATE_TEXT: Readonly<Record<RosterRow["state"], string>> = {
 function roomShareLink(pageUrl: string, key: string): string {
 	const page = new URL(pageUrl);
 	page.searchParams.delete(SELECTED_PLAYER_PARAM);
+	page.searchParams.delete(BOTS_PAUSED_PARAM);
 	return tableLink(page.toString(), key);
 }
 
@@ -178,7 +182,8 @@ export function showRoom(
 	let botAutoAttempted = false;
 	let botRestoreStarted = false;
 	let botRestorePending = false;
-	let botsPaused = false;
+	// A reload keeps paused bots paused: the host's URL carries the pause.
+	let botsPaused = parseBotsPaused(location.search);
 	let botBalancePaused = false;
 	let rateLimitTimer: number | undefined;
 	let botSpendUsd = readBotSpend();
@@ -215,7 +220,7 @@ export function showRoom(
 		delegatedBotSeats.add(targetSeat);
 		if (botRunner) {
 			botRunner.setSeatEnabled(targetSeat, true);
-			botsPaused = false;
+			setBotsPaused(false);
 			botBalancePaused = false;
 			botRunner.resume();
 			botStatus.textContent = deps.t(
@@ -357,7 +362,7 @@ export function showRoom(
 				botRunner?.updateApiKey(normalizedApiKey);
 				if (botBalancePaused) {
 					botBalancePaused = false;
-					botsPaused = false;
+					setBotsPaused(false);
 					botRunner?.resume();
 				}
 				keyDialog.close();
@@ -475,7 +480,7 @@ export function showRoom(
 			if (enabled) {
 				botRunner?.setSeatEnabled(targetSeat, true);
 				if (botRunner) {
-					botsPaused = false;
+					setBotsPaused(false);
 					botBalancePaused = false;
 					botRunner.resume();
 				} else {
@@ -572,6 +577,16 @@ export function showRoom(
 			null,
 			"",
 			`${location.pathname}?${params.toString()}${location.hash}`,
+		);
+	}
+
+	function setBotsPaused(paused: boolean): void {
+		botsPaused = paused;
+		if (parseBotsPaused(location.search) === paused) return;
+		history.replaceState(
+			null,
+			"",
+			`${location.pathname}?${botsPausedQuery(location.search, paused)}${location.hash}`,
 		);
 	}
 
@@ -832,7 +847,7 @@ export function showRoom(
 	const pauseBots = button(deps.t("Pause bots"), () => {
 		if (!botRunner) return;
 		botRunner.pause();
-		botsPaused = true;
+		setBotsPaused(true);
 		botStatus.textContent = deps.t("Bots paused.");
 		render();
 	});
@@ -843,7 +858,7 @@ export function showRoom(
 		}
 		botBalancePaused = false;
 		botRunner.resume();
-		botsPaused = false;
+		setBotsPaused(false);
 		botStatus.textContent = runningBotStatus();
 		render();
 	});
@@ -994,14 +1009,14 @@ export function showRoom(
 					void controller.setBotSeat(delegatedSeat, false);
 				}
 				if (kind === "balance") {
-					botsPaused = true;
+					setBotsPaused(true);
 					botBalancePaused = true;
 					botStatus.textContent = deps.t(
 						"Insufficient OpenRouter balance. Bots are paused until you update the API key or balance.",
 					);
 				} else {
 					botRunner = undefined;
-					botsPaused = false;
+					setBotsPaused(false);
 					botStatus.textContent =
 						detail ??
 						deps.t(
@@ -1028,7 +1043,7 @@ export function showRoom(
 		}
 		botStarting = false;
 		botRunner = runner;
-		botsPaused = false;
+		setBotsPaused(false);
 		botStatus.textContent = runningBotStatus();
 		return true;
 	}
@@ -1175,11 +1190,12 @@ export function showRoom(
 		if (botRunner && !view.hosting) {
 			botRunner.stop();
 			botRunner = undefined;
-			botsPaused = false;
+			setBotsPaused(false);
 			botStatus.textContent = deps.t("Host changed. Bots stopped.");
 		}
 		if (
 			!botAutoAttempted &&
+			!botsPaused &&
 			!botRestorePending &&
 			activeBots.length > 0 &&
 			view.hosting &&
