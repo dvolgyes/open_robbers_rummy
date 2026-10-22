@@ -183,33 +183,40 @@ describe("offered actions", () => {
 		expect(view.lines.map((line) => line.state)).toEqual(["pending"]);
 	});
 
-	it("a pickup that needs hand cards is offered before any card is selected, with the fewest and most natural cards", () => {
-		const match = pairPickupMatch();
-		const view = tableView(inputFor(stateOf(match), turnOf(match)));
-		const wild = new Set(
-			view.own
-				.filter((card) => card.rank === "2" || card.rank === "JK")
-				.map((card) => card.id),
+	it("before any card is selected, one pickup is offered: the one with the fewest wild cards, then the fewest cards", () => {
+		// Three jacks, a 2 and a joker in the hand, and a jack on top of the pile: many pickups are legal.
+		const match = startMatch(7);
+		const turn = match.hand.turn;
+		const side = { melds: [], redThrees: [], initialMade: true };
+		const teams = match.hand.teams;
+		const hand = {
+			...match.hand,
+			teams: teamOf(turn) === 0 ? [side, teams[1]] : [teams[0], side],
+			hands: match.hand.hands.map((cards, index) =>
+				index === turn
+					? cardsOf(["0-JS", "0-JH", "0-JD", "0-2C", "0-JK0", "0-9D", "0-4S"])
+					: cards,
+			),
+			pile: cardsOf(["0-5C", "0-JC"]),
+		} as MatchState["hand"];
+		const view = tableView(
+			inputFor(
+				stateOf({ ...match, hand: { ...hand, turnStart: hand } }),
+				turnOf(match),
+			),
 		);
-		const wilds = (option: ActionOption) =>
-			option.cards.filter((id) => wild.has(id)).length;
 		const pickups = view.options.filter(
 			(option) => option.action.type === "takePile",
 		);
-		const fewest = Math.min(...pickups.map((option) => option.cards.length));
-		const natural = Math.min(
-			...pickups.filter((option) => option.cards.length === fewest).map(wilds),
-		);
+		expect(pickups.length).toBeGreaterThan(3);
 		const shown = optionsFor(view.options, []).filter(
 			(option) => option.action.type === "takePile",
 		);
-		expect(shown.length).toBeGreaterThan(0);
-		for (const option of shown) {
-			expect(option.cards).toHaveLength(fewest);
-			expect(wilds(option)).toBe(natural);
-		}
-		const texts = shown.map((option) => labelText(option.label));
-		expect(new Set(texts).size).toBe(texts.length);
+		expect(shown).toHaveLength(1);
+		expect(shown[0]?.cards).toHaveLength(2);
+		expect(
+			shown[0]?.cards.every((id) => id.startsWith("0-J") && id !== "0-JK0"),
+		).toBe(true);
 	});
 });
 

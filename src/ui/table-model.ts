@@ -435,8 +435,9 @@ function sameIds(a: readonly string[], sortedB: readonly string[]): boolean {
 }
 
 /**
- * The pickups that need no selection: those with the fewest hand cards, and of those the fewest wild cards, one
- * per label. Without them, a player sees no way to take the pile until the selection names the cards of a pickup.
+ * The one pickup that needs no selection: the first with the fewest wild cards, and of those the fewest hand
+ * cards. Without it, a player sees no way to take the pile until the selection names the cards of a pickup; with
+ * all of them, three jacks in the hand already give several. Other pickups come from a selection of their cards.
  */
 function withReadyPickups(
 	options: readonly ActionOption[],
@@ -448,24 +449,21 @@ function withReadyPickups(
 			const card = known.get(id);
 			return card !== undefined && isWild(card);
 		}).length;
-	const pickups = options.filter((option) => option.action.type === "takePile");
-	const fewest = Math.min(...pickups.map((option) => option.cards.length));
-	const natural = Math.min(
-		...pickups.filter((option) => option.cards.length === fewest).map(wilds),
+	const best = options
+		.filter((option) => option.action.type === "takePile")
+		.reduce<ActionOption | undefined>(
+			(found, option) =>
+				found === undefined ||
+				wilds(option) < wilds(found) ||
+				(wilds(option) === wilds(found) &&
+					option.cards.length < found.cards.length)
+					? option
+					: found,
+			undefined,
+		);
+	return options.map((option) =>
+		option === best ? { ...option, ready: true } : option,
 	);
-	const labels = new Set<string>();
-	return options.map((option) => {
-		if (
-			option.action.type !== "takePile" ||
-			option.cards.length !== fewest ||
-			wilds(option) !== natural
-		)
-			return option;
-		const text = labelText(option.label);
-		if (labels.has(text)) return option;
-		labels.add(text);
-		return { ...option, ready: true };
-	});
 }
 
 /**
