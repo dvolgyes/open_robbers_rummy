@@ -77,7 +77,8 @@ The main rules, in short:
   Going out scores 100, or 200 when the player goes out in one turn without an earlier meld.
   Cards still in a hand count against their side.
 
-After a hand ends, the table shows the score for 10 seconds, then the host deals the next hand.
+After a hand ends, a summary in the middle of the screen names the player who went out and shows the score of the hand, item by item, with the match score.
+After 10 seconds, the host deals the next hand.
 The exact rules and the points that differ between published variants are in [ADR 0007](docs/adr/0007-canasta-engine-written-here.md).
 
 You must take one of the four player seats to use the table.

@@ -65,9 +65,12 @@ describe("localization", () => {
 		expect(translator("hu")("Hand {number}", { number: 2 })).toBe(
 			"2. leosztás",
 		);
-		expect(translator("fr")("{side} went out.", { side: "N-S" })).toBe(
-			"N-S est sorti.",
-		);
+		expect(
+			translator("fr")("{name} ({side}) went out.", {
+				name: "Ann",
+				side: "N-S",
+			}),
+		).toBe("Ann (N-S) sort.");
 		for (const locale of ["de", "hu", "no", ...newLocales] as const)
 			expect(
 				translator(locale)("Your turn: draw from the stock, or take the pile."),

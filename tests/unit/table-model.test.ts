@@ -3,6 +3,7 @@ import {
 	applyAction,
 	CLASSIC_RULES,
 	type MatchState,
+	scoreHand,
 	startMatch,
 } from "../../src/canasta";
 import {
@@ -286,6 +287,64 @@ describe("hand over", () => {
 			inputFor(stateOf(ended), turnOf(match), { scoringCountdown: 4 }),
 		);
 		expect(view.scoring?.countdown).toBe(4);
+	});
+
+	/** The match after East went out, with the hand added to the scores, as the host settles it. */
+	function wentOut(concealed: boolean): MatchState {
+		const match = startMatch(7);
+		const hand = {
+			...match.hand,
+			outcome: { kind: "out" as const, seat: engineSeat("E"), concealed },
+		};
+		const [first, second] = scoreHand(hand);
+		return {
+			...match,
+			hand,
+			settled: true,
+			scores: [first.total + 300, second.total + 700],
+		};
+	}
+
+	it("names the player who went out and scores the hand for each side", () => {
+		const match = wentOut(false);
+		const [first, second] = scoreHand(match.hand);
+		const view = tableView(inputFor(stateOf(match), "S"));
+		expect(view.scoring?.outcome).toBe("Ben (E-W) went out.");
+		const rows = new Map(
+			view.scoring?.rows.map((row) => [row.label, row.values]),
+		);
+		expect([...rows.keys()]).toEqual([
+			"Melds",
+			"Canasta bonuses",
+			"Red 3s",
+			"Going out",
+			"Cards in hand",
+			"Hand score",
+			"Match score",
+		]);
+		expect(rows.get("Going out")).toEqual([0, CLASSIC_RULES.outBonus]);
+		expect(rows.get("Cards in hand")).toEqual([
+			first.handPenalty,
+			second.handPenalty,
+		]);
+		expect(rows.get("Hand score")).toEqual([first.total, second.total]);
+		expect(rows.get("Match score")).toEqual(match.scores);
+	});
+
+	it("says when the player went out concealed", () => {
+		const view = tableView(inputFor(stateOf(wentOut(true)), "S"));
+		expect(view.scoring?.outcome).toBe("Ben (E-W) went out concealed.");
+	});
+
+	it("keeps the last hand's score when the match is won, with no countdown", () => {
+		const view = tableView(
+			inputFor(stateOf({ ...wentOut(false), winner: 1 }), "S", {
+				scoringCountdown: 4,
+			}),
+		);
+		expect(view.phase).toBe("complete");
+		expect(view.scoring?.outcome).toBe("Ben (E-W) went out.");
+		expect(view.scoring?.countdown).toBeUndefined();
 	});
 });
 

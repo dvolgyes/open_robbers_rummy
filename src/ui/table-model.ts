@@ -7,9 +7,11 @@ import {
 	isCanasta,
 	isWild,
 	legalActions,
+	type MatchState,
 	type Meld,
 	type Outcome,
 	type Suit,
+	scoreHand,
 	teamOf,
 } from "../canasta";
 import {
@@ -541,13 +543,38 @@ function commandLines(
 		}));
 }
 
-function outcomeText(outcome: Outcome, t: Translate): string {
+function outcomeText(
+	outcome: Outcome,
+	config: RoomConfig,
+	t: Translate,
+): string {
 	if (outcome.kind === "stock")
 		return t("The stock ran out. No side went out.");
-	const side = sideLabel(teamOf(outcome.seat), t);
+	const values = {
+		name: config.names[tableSeat(outcome.seat)],
+		side: sideLabel(teamOf(outcome.seat), t),
+	};
 	return outcome.concealed
-		? t("{side} went out concealed.", { side })
-		: t("{side} went out.", { side });
+		? t("{name} ({side}) went out concealed.", values)
+		: t("{name} ({side}) went out.", values);
+}
+
+/** The score of the finished hand, item by item for each side, then the hand total and the match total. */
+function scoreRows(match: MatchState, t: Translate): readonly ScoreRow[] {
+	const [first, second] = scoreHand(match.hand);
+	const row = (
+		label: string,
+		item: (score: typeof first) => number,
+	): ScoreRow => ({ label: t(label), values: [item(first), item(second)] });
+	return [
+		row("Melds", (score) => score.melds),
+		row("Canasta bonuses", (score) => score.canastaBonus),
+		row("Red 3s", (score) => score.redThrees),
+		row("Going out", (score) => score.outBonus),
+		row("Cards in hand", (score) => score.handPenalty),
+		row("Hand score", (score) => score.total),
+		{ label: t("Match score"), values: match.scores },
+	];
 }
 
 /** The engine's waiting text names the absent players; this translates the names and the sentence. */
@@ -576,11 +603,18 @@ export type TablePhase =
 	| "hand-over"
 	| "complete";
 
+export interface ScoreRow {
+	readonly label: string;
+	/** The value for N-S, then for E-W, in the order of `TableView.sides`. */
+	readonly values: readonly [number, number];
+}
+
 export interface ScoringView {
-	/** How the hand ended, for example "N-S went out.". */
+	/** How the hand ended, for example "Ben (E-W) went out.". */
 	readonly outcome: string;
-	/** Seconds until the host deals the next hand. */
-	readonly countdown: number;
+	readonly rows: readonly ScoreRow[];
+	/** Seconds until the host deals the next hand; undefined once the match is over. */
+	readonly countdown: number | undefined;
 }
 
 export interface TableView {
@@ -733,10 +767,12 @@ export function tableView(input: TableViewInput): TableView {
 			? ""
 			: t("{side} won the match.", { side: sideLabel(match.winner, t) });
 	const scoring =
-		phase === "hand-over" && view.outcome !== null
+		view.outcome !== null && phase !== "play"
 			? {
-					outcome: outcomeText(view.outcome, t),
-					countdown: input.scoringCountdown ?? 10,
+					outcome: outcomeText(view.outcome, config, t),
+					rows: scoreRows(match, t),
+					countdown:
+						phase === "hand-over" ? (input.scoringCountdown ?? 10) : undefined,
 				}
 			: undefined;
 

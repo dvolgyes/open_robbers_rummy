@@ -927,12 +927,63 @@ main[data-screen="table"] > .room {
 	font-weight: 600;
 }
 
-.outcome,
 .winner {
 	font-weight: 700;
 }
 
+/* The hand summary floats in the middle of the screen, also on a phone that scrolled the felt, and the melds stay in
+ * place behind it. */
+.hand-summary {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	z-index: 3;
+	width: max-content;
+	max-width: calc(100% - 1rem);
+	padding: 0.9rem 1.2rem;
+	border-radius: 0.6rem;
+	background: var(--panel);
+	color: var(--fg);
+	box-shadow: 0 0.25rem 1.5rem rgb(0 0 0 / 35%);
+	transform: translate(-50%, -50%);
+}
+
+.hand-summary .outcome {
+	margin: 0 0 0.6rem;
+	font-size: 1.3rem;
+}
+
+.score-table {
+	border-collapse: collapse;
+	font-variant-numeric: tabular-nums;
+}
+
+.score-table th,
+.score-table td {
+	padding: 0.15rem 0.6rem;
+}
+
+.score-table tbody th {
+	font-weight: 400;
+	text-align: start;
+}
+
+.score-table td {
+	text-align: end;
+}
+
+/* The hand score and the match score close the table. */
+.score-table tbody tr:nth-last-child(-n + 2) {
+	border-top: 1px solid var(--muted);
+	font-weight: 700;
+}
+
+.score-table tbody tr:nth-last-child(-n + 2) th {
+	font-weight: 700;
+}
+
 .countdown {
+	margin: 0.6rem 0 0;
 	color: var(--muted);
 	font-size: 0.9rem;
 }

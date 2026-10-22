@@ -130,11 +130,6 @@ export function tableSection(
 		className: "prompt",
 		attrs: { role: "status", "data-testid": "table-prompt" },
 	});
-	const outcomeLine = el("p", { className: "outcome" });
-	const countdownLine = el("p", {
-		className: "countdown",
-		attrs: { role: "status" },
-	});
 	const winnerLine = el("p", { className: "winner" });
 	const commands = el("ul", {
 		className: "commands",
@@ -159,10 +154,27 @@ export function tableSection(
 		"div",
 		{ className: "table-status" },
 		prompt,
-		outcomeLine,
-		countdownLine,
 		winnerLine,
 		commands,
+	);
+
+	// After a hand ends, the summary covers the middle of the felt: who went out, the score of the hand for each
+	// side, and the countdown to the next hand.
+	const outcomeLine = el("h3", { className: "outcome" });
+	const scoreTable = el("table", { className: "score-table" });
+	const countdownLine = el("p", {
+		className: "countdown",
+		attrs: { role: "status" },
+	});
+	const summary = el(
+		"section",
+		{
+			className: "hand-summary",
+			attrs: { "data-testid": "hand-summary", "aria-live": "polite" },
+		},
+		outcomeLine,
+		scoreTable,
+		countdownLine,
 	);
 
 	// Seats around the felt. The viewer's own place is the bottom.
@@ -285,6 +297,7 @@ export function tableSection(
 		centre,
 		places.right,
 		places.bottom,
+		summary,
 	);
 	const element = el(
 		"section",
@@ -810,8 +823,7 @@ export function tableSection(
 		details.textContent = view.details;
 		details.hidden = view.details === "";
 		prompt.textContent = view.prompt;
-		outcomeLine.textContent = view.scoring?.outcome ?? "";
-		outcomeLine.hidden = view.scoring === undefined;
+		renderSummary(view);
 		winnerLine.textContent = view.winner;
 		winnerLine.hidden = view.winner === "";
 		target.textContent = t("Target {score}", { score: view.target });
@@ -857,6 +869,43 @@ export function tableSection(
 		commands.replaceChildren(...view.lines.map((line) => actionItem(line)));
 		commands.hidden = view.lines.length === 0;
 		paintHand();
+	}
+
+	function renderSummary(view: TableView): void {
+		const scoring = view.scoring;
+		summary.hidden = scoring === undefined;
+		if (scoring === undefined) return;
+		outcomeLine.textContent = scoring.outcome;
+		scoreTable.replaceChildren(
+			el(
+				"thead",
+				{},
+				el(
+					"tr",
+					{},
+					el("td"),
+					...view.sides.map((side) =>
+						el(
+							"th",
+							{ attrs: { scope: "col" } },
+							`${side.label} (${side.owner})`,
+						),
+					),
+				),
+			),
+			el(
+				"tbody",
+				{},
+				...scoring.rows.map((row) =>
+					el(
+						"tr",
+						{},
+						el("th", { attrs: { scope: "row" } }, row.label),
+						...row.values.map((value) => el("td", {}, String(value))),
+					),
+				),
+			),
+		);
 	}
 
 	function setCountdown(seconds: number | undefined): void {

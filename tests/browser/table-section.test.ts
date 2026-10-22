@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { Action, MatchState } from "../../src/canasta";
-import { applyAction, startMatch } from "../../src/canasta";
+import { applyAction, scoreHand, startMatch } from "../../src/canasta";
 import { type CanastaState, tableSeat } from "../../src/game/canasta";
 import {
 	catalogKeys,
@@ -290,6 +290,45 @@ describe("table section", () => {
 		expect(getComputedStyle(marked[0] as Element, "::after").content).not.toBe(
 			"none",
 		);
+	});
+
+	it("shows who went out and the hand score over the felt until the next hand", () => {
+		const section = mount([]);
+		const drawn = afterDraw();
+		const summary = () =>
+			section.element.querySelector<HTMLElement>(
+				'[data-testid="hand-summary"]',
+			);
+		section.render(turnView(drawn, 1));
+		expect(summary()?.checkVisibility()).toBe(false);
+
+		const hand = {
+			...drawn.hand,
+			outcome: { kind: "out" as const, seat: 1 as const, concealed: false },
+		};
+		const [first, second] = scoreHand(hand);
+		const ended = {
+			...drawn,
+			hand,
+			settled: true,
+			scores: [first.total, second.total] as const,
+		};
+		section.render(turnView(ended, 2, { seat: "E" }));
+		section.setCountdown(7);
+		const shown = summary();
+		expect(shown?.checkVisibility()).toBe(true);
+		expect(shown?.closest(".felt")).not.toBeNull();
+		expect(shown?.querySelector("h3")?.textContent).toBe("Ben (E-W) went out.");
+		const cells = (row: Element | undefined) =>
+			[...(row?.children ?? [])].map((cell) => cell.textContent);
+		const rows = [...(shown?.querySelectorAll("tr") ?? [])];
+		expect(cells(rows[0])).toEqual(["", "N-S (theirs)", "E-W (ours)"]);
+		expect(rows.map(cells).find((row) => row[0] === "Hand score")).toEqual([
+			"Hand score",
+			String(first.total),
+			String(second.total),
+		]);
+		expect(shown?.textContent).toContain("Next hand in 7 seconds");
 	});
 
 	it("asks only for messages that every language translates", () => {
