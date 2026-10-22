@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
 	applyAction,
 	buildDecks,
+	type Card,
 	CLASSIC_RULES,
 	isBlack3,
 	isWild,
 	type MatchState,
+	type Meld,
 	scoreHand,
 	startMatch,
 	teamOf,
@@ -417,10 +419,7 @@ describe("options for the selected cards", () => {
 	/** After the draw, the seat on turn holds the given cards, a king and a nine, and its side has melded. */
 	function holdingSevens(ids: readonly string[] = sevens): MatchState {
 		const match = afterDraw(7);
-		const deck = buildDecks();
-		const own = [...ids, "0-KS", "0-9D"].flatMap((id) =>
-			deck.filter((card) => card.id === id),
-		);
+		const own = cardsOf([...ids, "0-KS", "0-9D"]);
 		const turn = match.hand.turn;
 		const side = { melds: [], redThrees: [], initialMade: true };
 		const teams = match.hand.teams;
@@ -486,12 +485,138 @@ describe("options for the selected cards", () => {
 	});
 });
 
+describe("why the pile cannot be taken", () => {
+	/** The hand of the screenshot that asked why: no 4, and one deuce. */
+	const noFours = [
+		"0-7H",
+		"0-8D",
+		"0-8S",
+		"0-9D",
+		"0-9S",
+		"0-10S",
+		"0-JH",
+		"0-QC",
+		"0-QS",
+		"0-KS",
+		"0-2C",
+	];
+	const jacks: Meld = {
+		id: "m1",
+		rank: "J",
+		team: 0,
+		cards: cardsOf(["1-JH", "0-JD", "1-JD"]),
+	};
+	/** The seat on turn has not drawn yet; it holds the given cards, and its side has the given melds. */
+	function drawTurn(
+		own: readonly string[],
+		pile: readonly string[],
+		melds: readonly Meld[],
+		initialMade = true,
+	): MatchState {
+		const match = startMatch(7);
+		const turn = match.hand.turn;
+		const team = teamOf(turn);
+		const side = {
+			melds: melds.map((meld) => ({ ...meld, team })),
+			redThrees: [],
+			initialMade,
+		};
+		const teams = match.hand.teams;
+		return {
+			...match,
+			hand: {
+				...match.hand,
+				hands: match.hand.hands.map((cards, index) =>
+					index === turn ? cardsOf(own) : cards,
+				),
+				pile: cardsOf(pile),
+				teams: team === 0 ? [side, teams[1]] : [teams[0], side],
+			},
+		};
+	}
+	const promptOf = (match: MatchState, t?: Translate): string =>
+		tableView(inputFor(stateOf(match), turnOf(match), { t })).prompt;
+
+	it("names the cards that an unfrozen pile needs, when the hand lacks them", () => {
+		const match = drawTurn(noFours, ["0-9H", "0-4C"], [jacks]);
+		expect(promptOf(match)).toBe(
+			"Your turn: draw from the stock. To take the pile, you need two 4s, or a 4 and a wild card.",
+		);
+		expect(promptOf(match, translator("hu"))).toBe(
+			"Te jössz: húzz a pakliból. A dobópakli felvételéhez két 4 lap kell, vagy egy 4 lap és egy joker vagy kettes.",
+		);
+	});
+
+	it("asks for a natural pair when a wild card in the pile freezes it", () => {
+		const own = [...noFours.slice(0, -1), "0-4H", "0-2C"];
+		const match = drawTurn(own, ["0-2D", "0-9H", "0-4C"], [jacks]);
+		expect(promptOf(match)).toBe(
+			"Your turn: draw from the stock. The pile is frozen: to take it, you need two natural 4s.",
+		);
+	});
+
+	it("asks for a natural pair while the side has not melded", () => {
+		const own = [...noFours.slice(0, -1), "0-4H", "0-2C"];
+		const match = drawTurn(own, ["0-9H", "0-4C"], [], false);
+		expect(promptOf(match)).toBe(
+			"Your turn: draw from the stock. Until your side melds, you need two natural 4s to take the pile.",
+		);
+	});
+
+	it("says that a black 3 or a wild card on top blocks the pile", () => {
+		expect(promptOf(drawTurn(noFours, ["0-9H", "0-3S"], [jacks]))).toBe(
+			"Your turn: draw from the stock. A black 3 on top blocks the pile for this turn.",
+		);
+		expect(promptOf(drawTurn(noFours, ["0-9H", "0-JK0"], [jacks]))).toBe(
+			"Your turn: draw from the stock. A wild card on top blocks the pile for this turn.",
+		);
+	});
+
+	it("offers the pile without a hint when the hand can take it", () => {
+		const own = [...noFours.slice(0, -1), "0-4H", "0-2C"];
+		expect(promptOf(drawTurn(own, ["0-9H", "0-4C"], [jacks]))).toBe(
+			"Your turn: draw from the stock, or take the pile.",
+		);
+	});
+
+	it("gives no reason that would be false when the hand has the cards", () => {
+		// Two natural 4s, but taking with them leaves one card without a canasta, so no pickup is legal.
+		const match = drawTurn(["0-4H", "1-4H", "0-KS"], ["0-4C"], [jacks]);
+		expect(
+			tableView(inputFor(stateOf(match), turnOf(match))).options.some(
+				(option) => option.action.type === "takePile",
+			),
+		).toBe(false);
+		expect(promptOf(match)).toBe("Your turn: draw from the stock.");
+	});
+
+	it("does not offer the pile when it is empty", () => {
+		expect(promptOf(drawTurn(noFours, [], [jacks]))).toBe(
+			"Your turn: draw from the stock.",
+		);
+	});
+
+	it("ends the hand at an empty stock when the pile cannot be taken, and says why", () => {
+		const match = drawTurn(noFours, ["0-9H", "0-4C"], [jacks]);
+		const exhausted = { ...match, hand: { ...match.hand, stock: [] } };
+		expect(promptOf(exhausted)).toBe(
+			"Your turn: the stock is empty. End the hand. To take the pile, you need two 4s, or a 4 and a wild card.",
+		);
+	});
+});
+
 /** The match after the seat on turn drew from the stock, so it can meld and discard. */
 function afterDraw(seed: number): MatchState {
 	const match = startMatch(seed);
 	const step = applyAction(match.hand, match.hand.turn, { type: "draw" });
 	if (!step.ok) throw new Error(step.reason);
 	return { ...match, hand: step.hand };
+}
+
+/** The cards with the given ids, in that order. */
+function cardsOf(ids: readonly string[]): Card[] {
+	const deck = buildDecks();
+	return ids.flatMap((id) => deck.filter((card) => card.id === id));
 }
 
 const cardIdsOf = (label: Label): string[] =>

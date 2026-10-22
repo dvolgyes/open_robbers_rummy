@@ -5,7 +5,9 @@ import {
 	type Card,
 	CLASSIC_RULES,
 	type HandView,
+	isBlack3,
 	isCanasta,
+	isRed3,
 	isWild,
 	legalActions,
 	type MatchState,
@@ -732,6 +734,70 @@ function emptyView(
 	};
 }
 
+/** What the viewer on turn can do now; when the pile cannot be taken before the draw, the prompt says why. */
+function turnPrompt(
+	match: MatchState,
+	seat: Seat,
+	view: HandView,
+	t: Translate,
+): string {
+	if (view.phase !== "draw") return t("Your turn: meld, extend, then discard.");
+	const actions = legalActions(match.hand, engineSeat(seat));
+	const canTake = actions.some((action) => action.type === "takePile");
+	if (view.stockCount > 0 && canTake)
+		return t("Your turn: draw from the stock, or take the pile.");
+	if (canTake)
+		return actions.some((action) => action.type === "draw")
+			? t("Your turn: the stock is empty. Take the pile, or end the hand.")
+			: t(
+					"Your turn: the stock is empty, and the pile goes onto your meld: take it.",
+				);
+	const turn =
+		view.stockCount > 0
+			? t("Your turn: draw from the stock.")
+			: t("Your turn: the stock is empty. End the hand.");
+	const hint = pileHint(view, t);
+	return hint === undefined ? turn : `${turn} ${hint}`;
+}
+
+/**
+ * Why the viewer on turn cannot take the pile: its top card blocks it, or the hand lacks the cards that the top
+ * card needs. A hand that holds those cards gets no reason, because another rule refuses the pickup.
+ */
+function pileHint(view: HandView, t: Translate): string | undefined {
+	const top = view.pile.at(-1);
+	if (top === undefined) return undefined;
+	if (isBlack3(top))
+		return t("A black 3 on top blocks the pile for this turn.");
+	if (isWild(top))
+		return t("A wild card on top blocks the pile for this turn.");
+	const rank = top.rank;
+	const naturals = view.own.filter((card) => card.rank === rank).length;
+	if (view.pileFrozen) {
+		if (naturals >= 2) return undefined;
+		return view.pile.some((card) => isWild(card) || isRed3(card))
+			? t("The pile is frozen: to take it, you need two natural {rank}s.", {
+					rank,
+				})
+			: t(
+					"Until your side melds, you need two natural {rank}s to take the pile.",
+					{
+						rank,
+					},
+				);
+	}
+	const wilds = view.own.filter(isWild).length;
+	const melded = view.teams[teamOf(view.turn)].melds.some(
+		(meld) => meld.rank === rank,
+	);
+	if (melded || naturals >= 2 || (naturals >= 1 && wilds >= 1))
+		return undefined;
+	return t(
+		"To take the pile, you need two {rank}s, or a {rank} and a wild card.",
+		{ rank },
+	);
+}
+
 export function tableView(input: TableViewInput): TableView {
 	const { state, seat, config } = input;
 	const t = input.t ?? english;
@@ -786,21 +852,7 @@ export function tableView(input: TableViewInput): TableView {
 	if (dealWait !== undefined) prompt = translateWait(dealWait, t);
 	else if (phase === "complete") prompt = t("The match is over.");
 	else if (phase === "hand-over") prompt = t("The hand is over.");
-	else if (turnSeat === seat)
-		prompt =
-			view.phase !== "draw"
-				? t("Your turn: meld, extend, then discard.")
-				: view.stockCount > 0
-					? t("Your turn: draw from the stock, or take the pile.")
-					: legalActions(match.hand, engineSeat(seat)).some(
-								(action) => action.type === "draw",
-							)
-						? t(
-								"Your turn: the stock is empty. Take the pile, or end the hand.",
-							)
-						: t(
-								"Your turn: the stock is empty, and the pile goes onto your meld: take it.",
-							);
+	else if (turnSeat === seat) prompt = turnPrompt(match, seat, view, t);
 	else prompt = t("Waiting for {name}.", { name: config.names[turnSeat] });
 
 	const top = view.pile.at(-1);
