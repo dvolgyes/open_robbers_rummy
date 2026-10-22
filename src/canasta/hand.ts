@@ -208,7 +208,18 @@ export function legalActions(hand: HandState, seat: Seat): Action[] {
 
 function applyDraw(hand: HandState, seat: Seat): Step {
 	if (hand.phase !== "draw") return fail("this turn has already drawn");
-	if (hand.stock.length === 0) return fail("the stock is empty");
+	// A player who draws from the exhausted stock ends the hand, unless the pile must be taken.
+	if (hand.stock.length === 0) {
+		if (mustTakePile(hand, seat))
+			return fail(
+				"the stock is empty, and the pile goes onto your meld: take it",
+			);
+		const ended: HandSnapshot = {
+			...snapshotOf(hand),
+			outcome: { kind: "stock" },
+		};
+		return succeed({ ...ended, turnStart: ended });
+	}
 	const drawn = drawFromStock(hand.stock, hand.rules.drawCount);
 	const team = teamOf(seat);
 	const cards = [...(hand.hands[seat] ?? []), ...drawn.drawn];
@@ -444,8 +455,8 @@ function goesOutConcealed(hand: HandState, seat: Seat): boolean {
 }
 
 /**
- * Ends the turn. The next player starts with a draw. With the stock exhausted, that player must take the
- * discard pile instead, and the hand ends if they cannot.
+ * Ends the turn. The next player starts with a draw. With the stock exhausted, that player can only take the
+ * discard pile or end the hand, so the hand ends at once if they cannot take it.
  */
 function passTurn(hand: HandState, seat: Seat): HandState {
 	const team = teamOf(seat);
@@ -478,17 +489,23 @@ function canTakePile(hand: HandState): boolean {
 	);
 }
 
+/**
+ * With the stock exhausted, a player must take a pile that is not frozen when its top card goes onto a meld of
+ * the side. Such a pickup can always end the turn: the side has melded, so a discard is legal.
+ */
+function mustTakePile(hand: HandState, seat: Seat): boolean {
+	if (pileFrozenFor(hand, teamOf(seat))) return false;
+	return pickupCandidates(hand, seat).some(
+		(action) =>
+			action.type === "takePile" &&
+			action.extend !== undefined &&
+			applyAction(hand, seat, action).ok,
+	);
+}
+
 function applyReset(hand: HandState): Step {
 	if (hand.turnActions === 0) return fail("nothing to reset this turn");
-	// With the stock exhausted, the turn started with a forced pickup; taking it back declines the pile, so the hand ends.
-	// Otherwise a pickup that the player cannot complete would leave the turn between pickup and reset forever.
-	if (hand.turnStart.phase === "draw" && hand.turnStart.stock.length === 0) {
-		const ended: HandSnapshot = {
-			...hand.turnStart,
-			outcome: { kind: "stock" },
-		};
-		return succeed({ ...ended, turnStart: ended });
-	}
+	// At an exhausted stock, the restored turn start offers the draw that ends the hand, unless the pile must be taken.
 	return succeed({ ...hand.turnStart, turnStart: hand.turnStart });
 }
 

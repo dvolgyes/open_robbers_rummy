@@ -43,6 +43,7 @@ export function actionLabel(action: Action, view: HandView): string {
 	const cards = cardsById(view);
 	switch (action.type) {
 		case "draw":
+			if (view.stockCount === 0) return "End the hand: the stock is empty";
 			return view.rules.drawCount === 1
 				? "Draw a card from the stock"
 				: `Draw ${view.rules.drawCount} cards from the stock`;

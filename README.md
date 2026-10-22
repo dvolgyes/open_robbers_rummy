@@ -74,7 +74,8 @@ The main rules, in short:
 - A pile with a wild card in it is frozen.
   The pile is also frozen for a side that has not melded yet.
   A frozen pile can be taken only with two natural cards from the hand that match its top card.
-- The hand ends when a player goes out, or when the stock runs out and the next player cannot take the pile or takes the pickup back.
+- The hand ends when a player goes out, or when the stock runs out and the next player does not take the pile.
+  At an empty stock, a player must take an unfrozen pile whose top card goes onto a meld of the side.
   Going out scores 100, or 200 when the player goes out in one turn without an earlier meld.
   Cards still in a hand count against their side.
 

@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
 	applyAction,
 	CLASSIC_RULES,
+	isBlack3,
+	isWild,
 	type MatchState,
 	scoreHand,
 	startMatch,
+	teamOf,
 } from "../../src/canasta";
 import {
 	type CanastaState,
@@ -418,6 +421,50 @@ describe("action labels", () => {
 		const view = tableView(inputFor(stateOf(match), turnOf(match), { t: hu }));
 		const draw = view.options.find((option) => option.action.type === "draw");
 		expect(draw && labelText(draw.label)).toBe("Húzz egy lapot a pakliból");
+	});
+
+	it("offers the draw at an exhausted stock as the end of the hand", () => {
+		const match = startMatch(7);
+		const exhausted = { ...match, hand: { ...match.hand, stock: [] } };
+		const view = tableView(inputFor(stateOf(exhausted), turnOf(exhausted)));
+		const draw = view.options.find((option) => option.action.type === "draw");
+		expect(draw && labelText(draw.label)).toBe(
+			"End the hand: the stock is empty",
+		);
+		expect(view.prompt).toBe(
+			"Your turn: the stock is empty. Take the pile, or end the hand.",
+		);
+	});
+
+	it("says that the pile must be taken when the exhausted stock offers no draw", () => {
+		const match = startMatch(7);
+		const top = match.hand.pile.at(-1);
+		if (top === undefined || isWild(top) || isBlack3(top))
+			throw new Error("the pile top of seed 7 cannot be taken");
+		// The viewer's side has a meld of the top card's rank, and the pile is not frozen for it.
+		const team = teamOf(match.hand.turn);
+		const side = {
+			melds: [{ id: "m9", rank: top.rank, team, cards: [top, top, top] }],
+			redThrees: [],
+			initialMade: true,
+		};
+		const teams = match.hand.teams;
+		const forced: MatchState = {
+			...match,
+			hand: {
+				...match.hand,
+				stock: [],
+				pile: [top],
+				teams: team === 0 ? [side, teams[1]] : [teams[0], side],
+			},
+		};
+		const view = tableView(inputFor(stateOf(forced), turnOf(forced)));
+		expect(new Set(view.options.map((option) => option.action.type))).toEqual(
+			new Set(["takePile"]),
+		);
+		expect(view.prompt).toBe(
+			"Your turn: the stock is empty, and the pile goes onto your meld: take it.",
+		);
 	});
 
 	it("shows a discarded card as a card, not as text", () => {

@@ -62,12 +62,14 @@ Evidence, checked on 2026-10-22:
     A discard is refused while the side has partial melds on the table; `resetTurn` takes them back.
     Amended 2026-10-22: `resetTurn` keeps a card drawn from the stock, so a player cannot see the card, take it back, and take the pile instead.
     It still undoes a pile pickup, because a pickup below the initial minimum must stay retractable.
-  - When the stock is exhausted, the next player must take the pile and meld or discard it.
-    If that player cannot take the pile, the hand ends.
+  - When the stock is exhausted, the next player may take the pile, or draw from the empty stock, which ends the hand.
+    The draw is refused when the pile is not frozen for the side and its top card goes onto a meld of the side.
+    Pagat: "a player must take the discard if the pile is not frozen and the discard matches any previous meld of that player's side", and "As soon as a player is entitled to draw from the stock and chooses to do so, but there is no card in the stock, the play ends."
+    If that player cannot take the pile, the hand ends at once.
     Amended 2026-10-22: a pickup that leaves one card in the hand is refused while the side has no canasta, because that card can be neither melded nor discarded.
-    At an exhausted stock, `resetTurn` after a pickup declines the pile and ends the hand.
     Before this change, a pickup that the player could not complete left the turn between the pickup and `resetTurn` forever.
-    The residual: a player can decline a pile that matches a meld of the side by taking it and taking it back, although Pagat requires that pickup.
+    Amended 2026-10-22: before this change, every possible pickup was forced, and `resetTurn` after a pickup ended the hand.
+    Now `resetTurn` returns to the start of the turn, where the player can end the hand only when the pickup is not forced.
   - While the side has no canasta, a meld, an extension, or a pickup that leaves one card in the hand is refused.
     Pagat: "It is against the rules in this case to meld all your cards except one."
     Amended 2026-10-22: before this change, only the pickup was refused, and a player who melded down to one card could only take the turn back.

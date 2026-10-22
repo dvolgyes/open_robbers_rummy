@@ -364,7 +364,7 @@ describe("hand flow", () => {
 		expect(drawn.hand.outcome).toEqual({ kind: "stock" });
 	});
 
-	it("continues an exhausted stock with a forced pile pickup, and ends when none is possible", () => {
+	it("continues an exhausted stock with a pile pickup, ends it at the player's choice, and ends when none is possible", () => {
 		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
 		const exhausted = scenario(base, {
 			turn: 0,
@@ -388,14 +388,17 @@ describe("hand flow", () => {
 		expect(discarded.hand.turn).toBe(1);
 		expect(discarded.hand.phase).toBe("draw");
 		expect(
-			legalActions(discarded.hand, 1).some((action) => action.type === "draw"),
-		).toBe(false);
-		expect(
 			applyAction(discarded.hand, 1, {
 				type: "takePile",
 				cards: ["0-KH", "1-KH"],
 			}).ok,
 		).toBe(true);
+		// The 9 matches no meld of East-West, so East may decline the pile: a draw from the empty stock ends the hand.
+		expect(legalActions(discarded.hand, 1)).toContainEqual({ type: "draw" });
+		const declined = applyAction(discarded.hand, 1, { type: "draw" });
+		if (!declined.ok) throw new Error(declined.reason);
+		expect(declined.hand.outcome).toEqual({ kind: "stock" });
+		expect(declined.hand.hands).toEqual(discarded.hand.hands);
 
 		const stuck = scenario(base, {
 			turn: 0,
@@ -453,7 +456,41 @@ describe("hand flow", () => {
 		).toMatchObject({ ok: false });
 	});
 
-	it("ends the hand when a pickup at an exhausted stock is taken back, because the pile is declined", () => {
+	it("forces the pickup at an exhausted stock when the unfrozen pile goes onto a meld of the side", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const nines: Meld = {
+			id: "m1",
+			rank: "9",
+			team: 1,
+			cards: cardsById(["0-9H", "0-9D", "0-9S"]),
+		};
+		const atDraw = (pile: readonly string[]) =>
+			scenario(base, {
+				turn: 1,
+				phase: "draw",
+				stock: [],
+				hands: [[], cardsById(["0-QD", "0-4S"]), [], []],
+				pile: cardsById(pile),
+				teams: [
+					base.teams[0],
+					{ melds: [nines], redThrees: [], initialMade: true },
+				],
+				nextMeldNo: 2,
+			});
+		const forced = atDraw(["0-6C", "0-9C"]);
+		expect(applyAction(forced, 1, { type: "draw" })).toEqual({
+			ok: false,
+			reason: "the stock is empty, and the pile goes onto your meld: take it",
+		});
+		expect(legalActions(forced, 1)).toEqual([
+			{ type: "takePile", cards: [], extend: "m1" },
+		]);
+		// A wild card freezes the pile, and the side holds no natural pair of 9s, so the hand ends at the draw.
+		const frozen = applyAction(atDraw(["0-2C", "0-9C"]), 1, { type: "draw" });
+		expect(frozen.ok && frozen.hand.outcome).toEqual({ kind: "stock" });
+	});
+
+	it("takes back a pickup at an exhausted stock to the start of the turn, where the player may end the hand", () => {
 		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
 		// Three fives are 15 points, below the 50 that East-West need, and East cannot meld more: only resetTurn is left.
 		const forced = scenario(base, {
@@ -471,9 +508,12 @@ describe("hand flow", () => {
 		expect(legalActions(taken.hand, 1)).toEqual([{ type: "resetTurn" }]);
 		const reset = applyAction(taken.hand, 1, { type: "resetTurn" });
 		if (!reset.ok) throw new Error(reset.reason);
-		expect(reset.hand.outcome).toEqual({ kind: "stock" });
+		expect(reset.hand.outcome).toBeNull();
+		expect(reset.hand.phase).toBe("draw");
 		expect(reset.hand.pile).toEqual(forced.pile);
 		expect(reset.hand.hands).toEqual(forced.hands);
+		const ended = applyAction(reset.hand, 1, { type: "draw" });
+		expect(ended.ok && ended.hand.outcome).toEqual({ kind: "stock" });
 	});
 
 	it("lets a side below its minimum discard, but not end the turn with a partial meld", () => {

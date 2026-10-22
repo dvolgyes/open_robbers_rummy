@@ -332,6 +332,8 @@ function actionLabel(action: Action, view: HandView, t: Translate): Label {
 		});
 	switch (action.type) {
 		case "draw":
+			if (view.stockCount === 0)
+				return labelOf(t("End the hand: the stock is empty"));
 			return view.rules.drawCount === 1
 				? labelOf(t("Draw a card from the stock"))
 				: labelOf(t("Draw {count} cards from the stock"), {
@@ -756,9 +758,19 @@ export function tableView(input: TableViewInput): TableView {
 	else if (phase === "hand-over") prompt = t("The hand is over.");
 	else if (turnSeat === seat)
 		prompt =
-			view.phase === "draw"
-				? t("Your turn: draw from the stock, or take the pile.")
-				: t("Your turn: meld, extend, then discard.");
+			view.phase !== "draw"
+				? t("Your turn: meld, extend, then discard.")
+				: view.stockCount > 0
+					? t("Your turn: draw from the stock, or take the pile.")
+					: legalActions(match.hand, engineSeat(seat)).some(
+								(action) => action.type === "draw",
+							)
+						? t(
+								"Your turn: the stock is empty. Take the pile, or end the hand.",
+							)
+						: t(
+								"Your turn: the stock is empty, and the pile goes onto your meld: take it.",
+							);
 	else prompt = t("Waiting for {name}.", { name: config.names[turnSeat] });
 
 	const top = view.pile.at(-1);

@@ -20,6 +20,12 @@ describe("action labels", () => {
 		);
 	});
 
+	it("names the draw at an exhausted stock as the end of the hand", () => {
+		expect(actionLabel({ type: "draw" }, { ...view, stockCount: 0 })).toBe(
+			"End the hand: the stock is empty",
+		);
+	});
+
 	it("leaves out the hand cards when only the top card goes onto a meld", () => {
 		if (!top) throw new Error("the deal has no pile top");
 		const label = actionLabel(

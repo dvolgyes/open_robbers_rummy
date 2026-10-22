@@ -130,9 +130,11 @@ export function renderTurnPrompt(
 		SCORES: `your side ${match.scores[side]}, opponents ${match.scores[other]}`,
 		TARGET: String(view.rules.targetScore),
 		PHASE:
-			view.phase === "draw"
-				? "draw (take the stock or the pile first)"
-				: "play (meld, extend, discard, or go out)",
+			view.phase !== "draw"
+				? "play (meld, extend, discard, or go out)"
+				: view.stockCount > 0
+					? "draw (take the stock or the pile first)"
+					: "draw (the stock is empty: take the pile, or end the hand)",
 		OWN_HAND: view.own.length ? view.own.map(cardLabel).join(" ") : "empty",
 		HAND_COUNTS: SEATS.map(
 			(name, index) => `${SEAT_NAMES[name]} ${view.handCounts[index] ?? 0}`,
