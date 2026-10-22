@@ -178,18 +178,59 @@ function canEndTurn(
 }
 
 /**
- * The actions a bot may take, best first: the legal actions after which the turn can still end. resetTurn is
- * offered only when nothing else is, so a bot never repeats a turn that it had to take back.
+ * Whether the action adds wild cards to a meld that the side already has, without making it a canasta and
+ * without leaving the seat at most one card to go out with. Before the side's first meld, the wild cards add
+ * points toward the minimum, so they are not counted here.
+ */
+function spendsWildOnMeld(
+	hand: HandState,
+	seat: Seat,
+	action: Action,
+	after: HandState,
+): boolean {
+	const target =
+		action.type === "extend"
+			? { meldId: action.meldId, cards: action.cards }
+			: action.type === "takePile" && action.extend !== undefined
+				? { meldId: action.extend, cards: action.cards }
+				: undefined;
+	const team = teamOf(seat);
+	if (target === undefined || !hand.teams[team]?.initialMade) return false;
+	const { meldId, cards } = target;
+	const own = hand.hands[seat] ?? [];
+	if (!own.some((card) => cards.includes(card.id) && isWild(card)))
+		return false;
+	if (after.outcome !== null || (after.hands[seat]?.length ?? 0) <= 1)
+		return false;
+	const canasta = (state: HandState) => {
+		const meld = state.teams[team]?.melds.find((item) => item.id === meldId);
+		return meld !== undefined && isCanasta(meld, hand.rules);
+	};
+	return canasta(hand) || !canasta(after);
+}
+
+/**
+ * The actions a bot may take, best first: the legal actions after which the turn can still end. A wild card
+ * added to a meld that it does not make a canasta is offered only when nothing else ends the turn, and resetTurn
+ * only when nothing else is legal, so a bot never repeats a turn that it had to take back.
  */
 export function botActions(hand: HandState, seat: Seat): Action[] {
 	const legal = legalActions(hand, seat);
 	const seen = new Map<string, boolean>();
-	const finishing = legal.filter((action) => {
-		if (action.type === "resetTurn") return false;
+	const finishing = legal.flatMap((action) => {
+		if (action.type === "resetTurn") return [];
 		const step = applyAction(hand, seat, action);
-		return step.ok && canEndTurn(step.hand, seat, LOOKAHEAD, seen);
+		return step.ok && canEndTurn(step.hand, seat, LOOKAHEAD, seen)
+			? [{ action, after: step.hand }]
+			: [];
 	});
-	return rankActions(hand, seat, finishing.length > 0 ? finishing : legal);
+	const kept = finishing.filter(
+		({ action, after }) => !spendsWildOnMeld(hand, seat, action, after),
+	);
+	const offered = (kept.length > 0 ? kept : finishing).map(
+		({ action }) => action,
+	);
+	return rankActions(hand, seat, offered.length > 0 ? offered : legal);
 }
 
 /**

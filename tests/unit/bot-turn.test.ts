@@ -140,6 +140,46 @@ describe("heuristic ranking", () => {
 		expect(extend("sevens")).toBeGreaterThan(discard);
 	});
 
+	it("offers a wild card on a meld only when it makes a canasta", () => {
+		const { hand, seat } = holdingWilds();
+		const onMeld = botActions(hand, seat).flatMap((action) =>
+			action.type === "extend" &&
+			action.cards.some((card) => card === "0-2C" || card === "0-JK0")
+				? [action.meldId]
+				: [],
+		);
+		expect(onMeld).toContain("sevens");
+		expect(onMeld).not.toContain("eights");
+	});
+
+	it("offers a wild card on a meld when it leaves one card to go out with", () => {
+		const { hand, seat } = holdingWilds();
+		const deck = buildDecks();
+		const last = deck.filter(
+			(card) => card.id === "0-JK0" || card.id === "0-9D",
+		);
+		// A canasta of sevens lets the side go out.
+		const seven = deck.filter((card) => card.id === "0-7S");
+		const teams = hand.teams.map((side) => ({
+			...side,
+			melds: side.melds.map((meld) =>
+				meld.id === "sevens"
+					? { ...meld, cards: [...meld.cards, ...seven] }
+					: meld,
+			),
+		}));
+		const ending: HandState = {
+			...hand,
+			teams: [teams[0] ?? hand.teams[0], teams[1] ?? hand.teams[1]],
+			hands: hand.hands.map((held, index) => (index === seat ? last : held)),
+		};
+		expect(botActions(ending, seat)).toContainEqual({
+			type: "extend",
+			meldId: "eights",
+			cards: ["0-JK0"],
+		});
+	});
+
 	/** After the draw, the seat on turn holds `ids`; its side has not melded, the minimum is 50, and the pile is empty. */
 	function beforeFirstMeld(ids: readonly string[]): {
 		hand: HandState;
