@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	type Action,
+	actionsWithCards,
 	applyAction,
 	buildDecks,
 	type Card,
@@ -1105,6 +1106,70 @@ describe("hand flow", () => {
 		expect(reset.hand.phase).toBe("draw");
 		expect(reset.hand.pile).toHaveLength(2);
 		expect(reset.hand.hands[1]).toHaveLength(3);
+	});
+});
+
+describe("actions for a selection of cards", () => {
+	const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+	const sevens = ["0-7H", "1-7H", "0-7S", "1-7S", "0-2S"];
+	/** Seat 1 holds four 7s, a deuce and two more cards; its side has melded, with the given melds. */
+	const holding = (phase: "draw" | "play", melds: Meld[]): HandState =>
+		scenario(base, {
+			turn: 1,
+			phase,
+			hands: [[], cardsById([...sevens, "0-KS", "0-9D"]), [], []],
+			pile: cardsById(["0-4C", "0-7D"]),
+			teams: [
+				{ ...base.teams[0], redThrees: [] },
+				{ melds, redThrees: [], initialMade: true },
+			],
+		});
+	const nines: Meld = {
+		id: "m1",
+		rank: "9",
+		team: 1,
+		cards: cardsById(["0-9C", "1-9C", "0-9H"]),
+	};
+	const sevenMeld: Meld = {
+		id: "m2",
+		rank: "7",
+		team: 1,
+		cards: cardsById(["0-7C", "1-7C", "0-7D"]),
+	};
+
+	it("melds five selected cards at once, which the bounded legal actions do not list", () => {
+		const hand = holding("play", [nines]);
+		expect(actionsWithCards(hand, 1, sevens)).toEqual([
+			{ type: "meld", cards: sevens },
+		]);
+		expect(
+			legalActions(hand, 1).some(
+				(action) => action.type === "meld" && action.cards.length === 5,
+			),
+		).toBe(false);
+	});
+
+	it("adds five selected cards to the side's meld of their rank", () => {
+		expect(
+			actionsWithCards(holding("play", [nines, sevenMeld]), 1, sevens),
+		).toEqual([{ type: "extend", meldId: "m2", cards: sevens }]);
+	});
+
+	it("takes the pile with four selected cards, as a new meld or onto the side's meld", () => {
+		const four = sevens.slice(0, 4);
+		expect(actionsWithCards(holding("draw", [nines]), 1, four)).toEqual([
+			{ type: "takePile", cards: four },
+		]);
+		expect(actionsWithCards(holding("draw", [sevenMeld]), 1, four)).toEqual([
+			{ type: "takePile", cards: four, extend: "m2" },
+		]);
+	});
+
+	it("offers nothing for a selection that no action accepts", () => {
+		expect(actionsWithCards(holding("play", []), 1, ["0-7H", "0-KS"])).toEqual(
+			[],
+		);
+		expect(actionsWithCards(holding("play", []), 1, [])).toEqual([]);
 	});
 });
 

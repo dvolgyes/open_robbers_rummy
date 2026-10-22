@@ -15,6 +15,7 @@ import { tableSection } from "../../src/ui/table";
 import {
 	type CardView,
 	type MeldView,
+	optionsFor,
 	type SideView,
 	type TableView,
 	type TableViewInput,
@@ -89,6 +90,7 @@ function mount(acted: Action[], t?: Translate) {
 			exit: () => {},
 			shareUrl: async () => {},
 			act: (action) => acted.push(action),
+			selectionOptions: (view, selected) => optionsFor(view.options, selected),
 			call: {
 				join: () => {},
 				leave: () => {},

@@ -206,6 +206,30 @@ export function legalActions(hand: HandState, seat: Seat): Action[] {
 	return candidates.filter((action) => applyAction(hand, seat, action).ok);
 }
 
+/**
+ * The meld, extension and pickup actions that use exactly the given hand cards and that `applyAction` accepts.
+ * `legalActions` lists only small card sets, so a player who selects more cards finds the actions here.
+ */
+export function actionsWithCards(
+	hand: HandState,
+	seat: Seat,
+	cards: readonly string[],
+): Action[] {
+	if (cards.length === 0) return [];
+	const melds = teamAt(hand.teams, teamOf(seat)).melds;
+	const candidates: Action[] = [
+		{ type: "meld", cards },
+		...melds.map(
+			(meld): Action => ({ type: "extend", meldId: meld.id, cards }),
+		),
+		{ type: "takePile", cards },
+		...melds.map(
+			(meld): Action => ({ type: "takePile", cards, extend: meld.id }),
+		),
+	];
+	return candidates.filter((action) => applyAction(hand, seat, action).ok);
+}
+
 function applyDraw(hand: HandState, seat: Seat): Step {
 	if (hand.phase !== "draw") return fail("this turn has already drawn");
 	// A player who draws from the exhausted stock ends the hand, unless the pile must be taken.

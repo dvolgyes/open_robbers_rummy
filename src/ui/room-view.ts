@@ -70,7 +70,11 @@ import { modelPriorityControl } from "./model-priority";
 import { networkPanel } from "./network";
 import { remoteAudio } from "./remote-audio";
 import { tableSection } from "./table";
-import { tableView } from "./table-model";
+import {
+	selectionOptions,
+	type TableViewInput,
+	tableView,
+} from "./table-model";
 import type { TurnSound } from "./turn-sound";
 
 export interface RoomScreenHandlers extends Navigation {
@@ -434,6 +438,8 @@ export function showRoom(
 	let persisted: boolean | undefined;
 	/** The table as last rendered: an action is sent for the position the player saw. */
 	let shownState: CanastaState | undefined;
+	/** The input of the table view as last built: the selected cards find their actions in it. */
+	let tableInput: TableViewInput | undefined;
 	/** The view models as last rendered. The controller notifies every tick; equal models keep their nodes. */
 	let shownRoom: string | undefined;
 	let shownTable: string | undefined;
@@ -638,6 +644,10 @@ export function showRoom(
 				});
 				render();
 			},
+			selectionOptions: (shown, selected) =>
+				tableInput === undefined
+					? []
+					: selectionOptions(tableInput, shown, selected),
 			setBotSeat(targetSeat, enabled) {
 				manageBotSeat(targetSeat, enabled);
 			},
@@ -1341,7 +1351,7 @@ export function showRoom(
 			records: state?.media,
 			outbox: view.outbox.map((item) => item.payload),
 		});
-		const tableModel = tableView({
+		tableInput = {
 			config,
 			seat,
 			state,
@@ -1355,7 +1365,8 @@ export function showRoom(
 			failures: view.failures,
 			undone: view.undone,
 			t: deps.t,
-		});
+		};
+		const tableModel = tableView(tableInput);
 		const displayBotModel = view.hosting
 			? (botSettings?.model ??
 				config.botSetup?.model ??

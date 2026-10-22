@@ -1,6 +1,7 @@
 import { cardsById } from "../bot/canasta-text";
 import {
 	type Action,
+	actionsWithCards,
 	type Card,
 	CLASSIC_RULES,
 	type HandView,
@@ -390,6 +391,13 @@ function optionOf(view: HandView, action: Action, t: Translate): ActionOption {
 	};
 }
 
+/** An action as a key that does not depend on the order of its cards. */
+function actionKey(action: Action): string {
+	return JSON.stringify(
+		"cards" in action ? { ...action, cards: [...action.cards].sort() } : action,
+	);
+}
+
 function sameIds(a: readonly string[], sortedB: readonly string[]): boolean {
 	const sortedA = [...a].sort();
 	return (
@@ -448,6 +456,28 @@ export function optionsFor(
 			(chosen.length === 0 && option.ready === true) ||
 			sameIds(option.cards, chosen),
 	);
+}
+
+/**
+ * The options that a selection of card ids can send in the given view: `optionsFor` its options, and the meld,
+ * extension or pickup of exactly the selected cards when the options do not list it. The options list only small
+ * card sets, so a meld of five cards or more, up to a canasta from the hand, comes from here.
+ */
+export function selectionOptions(
+	input: TableViewInput,
+	view: TableView,
+	selected: readonly string[],
+): ActionOption[] {
+	const shown = optionsFor(view.options, selected);
+	const match = input.state?.match;
+	if (!view.yourTurn || match === undefined || match === null) return shown;
+	const hand = handViewFor(match, input.seat);
+	const t = input.t ?? english;
+	const listed = new Set(shown.map((option) => actionKey(option.action)));
+	const more = actionsWithCards(match.hand, engineSeat(input.seat), selected)
+		.filter((action) => !listed.has(actionKey(action)))
+		.map((action) => optionOf(hand, action, t));
+	return [...shown, ...more];
 }
 
 // ---------------------------------------------------------------------------------------------------------------

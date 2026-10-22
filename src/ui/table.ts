@@ -19,7 +19,6 @@ import {
 	type Label,
 	labelText,
 	type MeldView,
-	optionsFor,
 	type Position,
 	type SeatView,
 	type SideView,
@@ -31,6 +30,11 @@ export interface TableHandlers {
 	exit(): void;
 	shareUrl(): Promise<void>;
 	act(action: Action): void;
+	/** The options that the selected hand cards can send in the view (`selectionOptions` of the table model). */
+	selectionOptions(
+		view: TableView,
+		selected: readonly string[],
+	): readonly ActionOption[];
 	setBotSeat?(seat: Seat, enabled: boolean): void;
 	requestAutoplay?(enabled: boolean): void;
 	readonly call: CallHandlers;
@@ -362,7 +366,7 @@ export function tableSection(
 		const view = latestView;
 		if (view === undefined) return;
 		const offered: readonly ActionOption[] = view.yourTurn
-			? optionsFor(view.options, [...selected])
+			? handlers.selectionOptions(view, [...selected])
 			: [];
 		const key = JSON.stringify([
 			order,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	applyAction,
+	buildDecks,
 	CLASSIC_RULES,
 	isBlack3,
 	isWild,
@@ -33,6 +34,7 @@ import {
 	labelText,
 	optionsFor,
 	positionOf,
+	selectionOptions,
 	type TableViewInput,
 	tableView,
 } from "../../src/ui/table-model";
@@ -396,6 +398,91 @@ describe("optionsFor", () => {
 		expect(optionsFor(all, [])).toEqual([draw, pickupAB]);
 		expect(optionsFor(all, ["a"])).toEqual([draw]);
 		expect(optionsFor(all, ["a", "b"])).toEqual([draw, pickupAB]);
+	});
+});
+
+describe("options for the selected cards", () => {
+	const sevens = ["0-7H", "1-7H", "0-7S", "1-7S", "0-2S"];
+	const eightSevens = [
+		"0-7H",
+		"1-7H",
+		"0-7S",
+		"1-7S",
+		"0-7D",
+		"1-7D",
+		"0-7C",
+		"1-7C",
+	];
+	const deuces = ["0-2S", "1-2S", "0-2H", "1-2H"];
+	/** After the draw, the seat on turn holds the given cards, a king and a nine, and its side has melded. */
+	function holdingSevens(ids: readonly string[] = sevens): MatchState {
+		const match = afterDraw(7);
+		const deck = buildDecks();
+		const own = [...ids, "0-KS", "0-9D"].flatMap((id) =>
+			deck.filter((card) => card.id === id),
+		);
+		const turn = match.hand.turn;
+		const side = { melds: [], redThrees: [], initialMade: true };
+		const teams = match.hand.teams;
+		return {
+			...match,
+			hand: {
+				...match.hand,
+				hands: match.hand.hands.map((cards, index) =>
+					index === turn ? own : cards,
+				),
+				teams: teamOf(turn) === 0 ? [side, teams[1]] : [teams[0], side],
+			},
+		};
+	}
+	const melds = (options: readonly ActionOption[]) =>
+		options.filter((option) => option.action.type === "meld");
+	/** The meld options of the selection, for the seat on turn or for the given seat. */
+	function meldsFor(
+		match: MatchState,
+		selected: readonly string[],
+		seat: Seat = turnOf(match),
+	): ActionOption[] {
+		const input = inputFor(stateOf(match, 1), seat);
+		return melds(selectionOptions(input, tableView(input), selected));
+	}
+
+	it("offers a meld of five selected cards, which the listed options leave out", () => {
+		const match = holdingSevens();
+		const view = tableView(inputFor(stateOf(match, 1), turnOf(match)));
+		expect(
+			melds(view.options).some((option) => option.cards.length === 5),
+		).toBe(false);
+		const offered = meldsFor(match, sevens);
+		expect(offered.map((option) => option.action)).toEqual([
+			{ type: "meld", cards: sevens },
+		]);
+		expect(cardIdsOf(offered[0]?.label ?? [])).toEqual(sevens);
+	});
+
+	it("offers a canasta of eleven cards from the hand: eight naturals and three wild cards", () => {
+		const canasta = [...eightSevens, ...deuces.slice(0, 3)];
+		const match = holdingSevens([...eightSevens, ...deuces]);
+		expect(meldsFor(match, canasta).map((option) => option.action)).toEqual([
+			{ type: "meld", cards: canasta },
+		]);
+	});
+
+	it("offers no meld with four wild cards, because a meld holds at most three", () => {
+		const twelve = [...eightSevens, ...deuces];
+		expect(meldsFor(holdingSevens(twelve), twelve)).toEqual([]);
+	});
+
+	it("offers a listed meld once, whatever the order of the selection", () => {
+		const four = ["1-7S", "0-7H", "0-7S", "1-7H"];
+		expect(meldsFor(holdingSevens(), four)).toHaveLength(1);
+	});
+
+	it("offers nothing for the selection when it is not the viewer's turn", () => {
+		const match = holdingSevens();
+		const other = turnOf(match) === "N" ? "E" : "N";
+		const input = inputFor(stateOf(match, 1), other);
+		expect(selectionOptions(input, tableView(input), sevens)).toEqual([]);
 	});
 });
 

@@ -10,6 +10,7 @@ export {
 } from "./cards";
 export {
 	type Action,
+	actionsWithCards,
 	applyAction,
 	type HandState,
 	legalActions,
