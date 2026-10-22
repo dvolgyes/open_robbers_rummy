@@ -34,6 +34,13 @@ Evidence, checked on 2026-10-22:
     Discarding it blocks the next player from taking the pile.
   - A pile that contains a wild card is frozen, and a frozen pile cannot be extended.
     A side that has not made its initial meld is also blocked from the pile, so it can take the pile only with two natural cards from its hand.
+    Amended 2026-10-22: a frozen pile can go onto a meld of the side when the player adds a natural pair of that rank from the hand.
+    Pagat says that this meld "could be the same rank as an existing meld belonging to your partnership, in which case the melds are then merged".
+    Before this change, the engine refused every frozen pickup onto a meld.
+  - A side has at most one meld of each rank.
+    Pagat: "It is not allowed for one partnership to have two separate melds of the same rank."
+    A new meld or a pickup of a rank that the side already melded is refused, and the same cards are offered as an extension of that meld.
+    Added 2026-10-22; before, the engine let a side lay a second meld of the same rank.
   - An unfrozen pile can be taken with a natural pair, with one natural card and one wild card, or by adding the top card to a meld of the side.
   - Points for the initial meld count the cards from the hand and the top pile card.
     The rest of the pile does not count, even when it is melded in the same turn.

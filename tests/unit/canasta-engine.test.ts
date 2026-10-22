@@ -437,7 +437,7 @@ describe("hand flow", () => {
 		expect(cardTotal(taken.hand)).toBe(cardTotal(hand));
 	});
 
-	it("does not let a frozen pile extend an existing meld", () => {
+	it("lets a frozen pile join an existing meld only with a natural pair from the hand", () => {
 		const base = newHand({ teamScores: [1500, 0], dealer: 0, seed: 1 });
 		const existing = {
 			id: "m1",
@@ -449,18 +449,132 @@ describe("hand flow", () => {
 		const hand = scenario(base, {
 			turn: 1,
 			phase: "draw",
-			hands: [[], cardsById(["0-7H", "0-KS"]), [], []],
+			hands: [[], cardsById(["0-7H", "1-7H", "0-KS", "0-9H"]), [], []],
 			pile: cardsById(["0-2C", "0-7D"]),
 			teams: [
 				base.teams[0],
 				{ ...base.teams[1], melds: [existing], initialMade: true },
 			],
 		});
+		const frozenRefusal = {
+			ok: false,
+			reason: "a frozen pile needs two natural cards from your hand",
+		};
+		expect(
+			applyAction(hand, 1, { type: "takePile", cards: [], extend: "m1" }),
+		).toMatchObject(frozenRefusal);
 		expect(
 			applyAction(hand, 1, { type: "takePile", cards: ["0-7H"], extend: "m1" }),
-		).toMatchObject({
+		).toMatchObject(frozenRefusal);
+		// Pagat: the pair and the top card "could be the same rank as an existing meld ... the melds are then merged".
+		const taken = applyAction(hand, 1, {
+			type: "takePile",
+			cards: ["0-7H", "1-7H"],
+			extend: "m1",
+		});
+		if (!taken.ok) throw new Error(taken.reason);
+		expect(taken.hand.teams[1].melds).toHaveLength(1);
+		expect(taken.hand.teams[1].melds[0]?.cards).toHaveLength(6);
+	});
+
+	describe("one meld of each rank for a side", () => {
+		const sevens = {
+			id: "m1",
+			rank: "7" as const,
+			team: 1 as const,
+			cards: cardsById(["0-7S", "1-7S", "0-7C"]),
+		};
+		const withSevens = (
+			patch: Partial<Pick<HandState, "hands" | "pile" | "phase">>,
+		): HandState => {
+			const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+			return scenario(base, {
+				turn: 1,
+				teams: [
+					base.teams[0],
+					{ ...base.teams[1], melds: [sevens], initialMade: true },
+				],
+				...patch,
+			});
+		};
+		const refusal = {
 			ok: false,
-			reason: "a frozen pile cannot extend an existing meld",
+			reason: "the side already has a meld of this rank; add the cards to it",
+		};
+
+		it("refuses a second meld of a rank that the side has melded, and adds the cards to the meld", () => {
+			const hand = withSevens({
+				phase: "play",
+				hands: [
+					[],
+					cardsById(["0-7H", "1-7H", "0-7D", "0-KS", "0-9H"]),
+					[],
+					[],
+				],
+			});
+			const cards = ["0-7H", "1-7H", "0-7D"];
+			expect(applyAction(hand, 1, { type: "meld", cards })).toMatchObject(
+				refusal,
+			);
+			const legal = legalActions(hand, 1);
+			expect(legal).not.toContainEqual({ type: "meld", cards });
+			expect(legal).toContainEqual({ type: "extend", meldId: "m1", cards });
+			const extended = applyAction(hand, 1, {
+				type: "extend",
+				meldId: "m1",
+				cards,
+			});
+			if (!extended.ok) throw new Error(extended.reason);
+			expect(extended.hand.teams[1].melds).toHaveLength(1);
+			expect(extended.hand.teams[1].melds[0]?.cards).toHaveLength(6);
+		});
+
+		it("refuses a second meld of that rank in the same turn as the first", () => {
+			const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+			const hand = scenario(base, {
+				turn: 1,
+				phase: "play",
+				hands: [
+					[],
+					cardsById(["0-KH", "1-KH", "0-KS", "1-KS", "0-KD", "1-KD", "0-9H"]),
+					[],
+					[],
+				],
+			});
+			const first = applyAction(hand, 1, {
+				type: "meld",
+				cards: ["0-KH", "1-KH", "0-KS"],
+			});
+			if (!first.ok) throw new Error(first.reason);
+			expect(
+				applyAction(first.hand, 1, {
+					type: "meld",
+					cards: ["1-KS", "0-KD", "1-KD"],
+				}),
+			).toMatchObject(refusal);
+		});
+
+		it("takes the pile with a pair onto the side's meld of that rank, not into a second meld", () => {
+			const hand = withSevens({
+				phase: "draw",
+				hands: [[], cardsById(["0-7H", "1-7H", "0-KS", "0-9H"]), [], []],
+				pile: cardsById(["0-9C", "0-7D"]),
+			});
+			const cards = ["0-7H", "1-7H"];
+			expect(applyAction(hand, 1, { type: "takePile", cards })).toMatchObject(
+				refusal,
+			);
+			const legal = legalActions(hand, 1);
+			expect(legal).not.toContainEqual({ type: "takePile", cards });
+			expect(legal).toContainEqual({ type: "takePile", cards, extend: "m1" });
+			const taken = applyAction(hand, 1, {
+				type: "takePile",
+				cards,
+				extend: "m1",
+			});
+			if (!taken.ok) throw new Error(taken.reason);
+			expect(taken.hand.teams[1].melds).toHaveLength(1);
+			expect(taken.hand.teams[1].melds[0]?.cards).toHaveLength(6);
 		});
 	});
 

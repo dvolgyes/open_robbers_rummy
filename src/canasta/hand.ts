@@ -236,9 +236,8 @@ function applyTakePile(
 		return fail("the top card of the pile cannot be picked up");
 	const team = teamOf(seat);
 	// A pile with a wild card is frozen, and so is the pile of a side that has not made its initial meld.
+	// A frozen pile can still go onto a meld of the side, but only with the natural pair that this check asks for.
 	const frozen = hand.pile.some(isWild) || !initialSatisfied(hand, team);
-	if (frozen && extendId !== undefined)
-		return fail("a frozen pile cannot extend an existing meld");
 	const taken = takeFromHand(hand.hands[seat] ?? [], ids);
 	if (!taken.ok) return taken;
 	if (frozen && (taken.picked.length < 2 || taken.picked.some(isWild)))
@@ -249,6 +248,7 @@ function applyTakePile(
 	if (extendId === undefined) {
 		const check = validateMeld(pileMeld, hand.rules);
 		if (!check.ok) return fail(check.reason);
+		if (hasMeldOfRank(teams, team, check.rank)) return fail(SECOND_MELD);
 		const meld: Meld = {
 			id: `m${nextMeldNo}`,
 			rank: check.rank,
@@ -302,6 +302,7 @@ function applyMeld(hand: HandState, seat: Seat, ids: readonly string[]): Step {
 	const check = validateMeld(taken.picked, hand.rules);
 	if (!check.ok) return fail(check.reason);
 	const team = teamOf(seat);
+	if (hasMeldOfRank(hand.teams, team, check.rank)) return fail(SECOND_MELD);
 	const meld: Meld = {
 		id: `m${hand.nextMeldNo}`,
 		rank: check.rank,
@@ -482,6 +483,14 @@ function takeFromHand(
 	};
 }
 
+const SECOND_MELD =
+	"the side already has a meld of this rank; add the cards to it";
+
+/** A side has at most one meld of each rank; cards of that rank join it through `extend`. */
+function hasMeldOfRank(teams: Teams, team: TeamIndex, rank: string): boolean {
+	return teamAt(teams, team).melds.some((meld) => meld.rank === rank);
+}
+
 function findTeamMeld(
 	teams: Teams,
 	team: TeamIndex,
@@ -560,7 +569,8 @@ function extendCandidates(hand: HandState, seat: Seat): Action[] {
 		const pool = cards.filter(
 			(card) => card.rank === meld.rank || isWild(card),
 		);
-		for (const subset of subsetsUpTo(pool, 2)) {
+		// Up to the size of a meld candidate, because cards of a melded rank can only join the meld.
+		for (const subset of subsetsUpTo(pool, 4)) {
 			if (subset.length >= 1)
 				actions.push({
 					type: "extend",

@@ -28,7 +28,7 @@ export interface HandView {
 	readonly revealed: readonly (readonly Card[])[] | null;
 	readonly stockCount: number;
 	readonly pile: readonly Card[];
-	/** The viewer's side cannot take the pile to extend a meld: the pile holds a wild card, or the side has no initial meld yet. */
+	/** The viewer's side can take the pile only with a natural pair from the hand: the pile holds a wild card, or the side has no initial meld yet. */
 	readonly pileFrozen: boolean;
 	readonly teams: readonly [TeamState, TeamState];
 }

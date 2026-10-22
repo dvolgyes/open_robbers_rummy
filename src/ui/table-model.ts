@@ -276,7 +276,7 @@ export interface PileView {
 	/** The top card of the discard pile; undefined when the pile is empty. */
 	readonly top: CardView | undefined;
 	readonly count: number;
-	/** The viewer's side cannot take the pile to extend a meld. */
+	/** The viewer's side can take the pile only with a natural pair from the hand. */
 	readonly frozen: boolean;
 }
 
