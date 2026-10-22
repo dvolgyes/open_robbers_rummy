@@ -15,6 +15,8 @@ export interface CanastaRules {
 	readonly naturalCanastaBonus: number;
 	readonly mixedCanastaBonus: number;
 	readonly redThreeBonus: number;
+	/** Added to the red three score when one side holds all four; it is subtracted when the side has not melded. */
+	readonly allRedThreesBonus: number;
 	readonly outBonus: number;
 	readonly concealedOutBonus: number;
 	/** A side may go out only after it holds a canasta. */
@@ -27,20 +29,22 @@ export interface CanastaRules {
 export const CLASSIC_RULES: CanastaRules = {
 	targetScore: 5000,
 	handSize: 11,
-	drawCount: 2,
+	drawCount: 1,
 	maxWildsPerMeld: 3,
 	canastaSize: 7,
 	naturalCanastaBonus: 500,
 	mixedCanastaBonus: 300,
 	redThreeBonus: 100,
+	allRedThreesBonus: 400,
 	outBonus: 100,
 	concealedOutBonus: 100,
 	goOutNeedsCanasta: true,
 	initialMeld: [
-		{ fromScore: 0, minimum: 15 },
-		{ fromScore: 1500, minimum: 50 },
-		{ fromScore: 3000, minimum: 90 },
-		{ fromScore: 5000, minimum: 120 },
+		// A negative score needs 15, which any valid meld reaches.
+		{ fromScore: Number.MIN_SAFE_INTEGER, minimum: 15 },
+		{ fromScore: 0, minimum: 50 },
+		{ fromScore: 1500, minimum: 90 },
+		{ fromScore: 3000, minimum: 120 },
 	],
 };
 

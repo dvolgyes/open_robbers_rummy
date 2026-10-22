@@ -28,9 +28,10 @@ function scoreTeam(hand: HandState, team: TeamIndex): TeamScore {
 		0,
 	);
 	const redCount = state.redThrees.length;
-	const redThrees = state.initialMade
-		? redCount * hand.rules.redThreeBonus
-		: -redCount * hand.rules.redThreeBonus;
+	const redValue =
+		redCount * hand.rules.redThreeBonus +
+		(redCount === 4 ? hand.rules.allRedThreesBonus : 0);
+	const redThrees = state.initialMade ? redValue : -redValue;
 	const outBonus =
 		hand.outcome?.kind === "out" && teamOf(hand.outcome.seat) === team
 			? hand.rules.outBonus +

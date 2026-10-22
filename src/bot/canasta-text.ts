@@ -43,16 +43,22 @@ export function actionLabel(action: Action, view: HandView): string {
 	const cards = cardsById(view);
 	switch (action.type) {
 		case "draw":
-			return `Draw ${view.rules.drawCount} cards from the stock`;
+			return view.rules.drawCount === 1
+				? "Draw a card from the stock"
+				: `Draw ${view.rules.drawCount} cards from the stock`;
 		case "takePile": {
 			const top = view.pile.at(-1);
-			const using = labelsOf(action.cards, cards).join(" ");
+			// Onto an existing meld the top card can go alone, with no hand card.
+			const using =
+				action.cards.length === 0
+					? ""
+					: ` with ${labelsOf(action.cards, cards).join(" ")}`;
 			const topText = top ? cardLabel(top) : "";
 			const target =
 				action.extend === undefined
 					? "as a new meld"
 					: `added to meld ${action.extend}`;
-			return `Take the pile (top ${topText}) with ${using}, ${target}`;
+			return `Take the pile (top ${topText})${using}, ${target}`;
 		}
 		case "meld":
 			return `Lay down a meld of ${labelsOf(action.cards, cards).join(" ")}`;

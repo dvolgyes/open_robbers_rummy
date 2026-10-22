@@ -37,7 +37,7 @@ export interface HandSnapshot {
 	/** The top card is the last element. */
 	readonly pile: readonly Card[];
 	readonly teams: Teams;
-	/** Card points from the current player's hand placed in melds this turn. */
+	/** Card points toward the initial meld this turn: the cards from the current player's hand and the top pile card. */
 	readonly turnMeldPoints: number;
 	readonly turnActions: number;
 	readonly nextMeldNo: number;
@@ -263,7 +263,8 @@ function applyTakePile(
 		pile: [],
 		teams,
 		nextMeldNo,
-		turnMeldPoints: hand.turnMeldPoints + meldPoints(taken.picked),
+		// The top card counts toward the initial meld; the rest of the pile does not.
+		turnMeldPoints: hand.turnMeldPoints + meldPoints(pileMeld),
 		phase: "play",
 		turnActions: hand.turnActions + 1,
 	};
@@ -291,7 +292,7 @@ function applyMeld(hand: HandState, seat: Seat, ids: readonly string[]): Step {
 			melds: [...teamAt(hand.teams, team).melds, meld],
 		}),
 		nextMeldNo: hand.nextMeldNo + 1,
-		turnMeldPoints: hand.turnMeldPoints + meldPoints(taken.picked),
+		turnMeldPoints: hand.turnMeldPoints + handMeldPoints(hand, taken.picked),
 		turnActions: hand.turnActions + 1,
 	};
 	return afterMove(next, seat);
@@ -317,7 +318,7 @@ function applyExtend(
 		...hand,
 		hands: withHand(hand.hands, seat, taken.rest),
 		teams: replaceMeld(hand.teams, team, { ...existing, cards }),
-		turnMeldPoints: hand.turnMeldPoints + meldPoints(taken.picked),
+		turnMeldPoints: hand.turnMeldPoints + handMeldPoints(hand, taken.picked),
 		turnActions: hand.turnActions + 1,
 	};
 	return afterMove(next, seat);
@@ -407,13 +408,19 @@ function applyReset(hand: HandState): Step {
 	return succeed({ ...hand.turnStart, turnStart: hand.turnStart });
 }
 
-/** A side's first meld: the points from its current player's hand this turn meet the threshold for its score. */
+/** A side's first meld: the top pile card taken and the points from its current player's hand this turn meet the threshold for its score. */
 export function initialSatisfied(hand: HandState, team: TeamIndex): boolean {
 	if (teamAt(hand.teams, team).initialMade) return true;
 	return (
 		hand.turnMeldPoints >=
 		initialMeldMinimum(hand.rules.initialMeld, hand.teamScores[team] ?? 0)
 	);
+}
+
+/** Card points that count toward the initial meld: cards that were in the pile at the start of the turn do not. */
+function handMeldPoints(hand: HandState, cards: readonly Card[]): number {
+	const fromPile = new Set(hand.turnStart.pile.map((card) => card.id));
+	return meldPoints(cards.filter((card) => !fromPile.has(card.id)));
 }
 
 function snapshotOf(hand: HandState): HandSnapshot {

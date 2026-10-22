@@ -23,21 +23,25 @@ Evidence, checked on 2026-10-22:
   It may be read as a reference for rule questions only, and no code is taken from it.
 - Represent the hand as plain immutable data.
   `applyAction` is the only authority: `legalActions` enumerates candidates and keeps only those that `applyAction` accepts.
-- Follow the classic four-player partnership rules, as stated on Pagat (https://www.pagat.com/rummy/canasta.html, checked 2026-10-22), with these points:
+- Follow the classic four-player partnership rules, as stated on Pagat (https://www.pagat.com/rummy/canasta.html, checked 2026-10-22), with these points.
+  Pagat states each of them for the classic game:
+  - A player draws one card from the stock, or takes the whole discard pile.
+  - The initial meld needs 15 points at a negative score, 50 from 0, 90 from 1500, and 120 from 3000.
   - A red three is set aside when dealt or drawn.
     It adds 100 points if the side has made its initial meld, and subtracts 100 otherwise.
-    Pagat does not state the subtraction; the rule comes from other sources and is not yet confirmed.
+    A side with all four red threes scores 800, or -800 without a meld.
   - A black three may be discarded at any time.
     Discarding it blocks the next player from taking the pile.
   - A pile that contains a wild card is frozen, and a frozen pile cannot be extended.
     A side that has not made its initial meld is also blocked from the pile, so it can take the pile only with two natural cards from its hand.
-  - Points for the initial meld count only cards taken from the hand, not the pile card.
+  - An unfrozen pile can be taken with a natural pair, with one natural card and one wild card, or by adding the top card to a meld of the side.
+  - Points for the initial meld count the cards from the hand and the top pile card.
+    The rest of the pile does not count, even when it is melded in the same turn.
   - The initial meld must be laid in the turn in which it is made, at or above the minimum for the side's score.
     A discard is refused while the side has partial melds on the table; `resetTurn` takes them back.
   - When the stock is exhausted, the next player must take the pile and meld or discard it.
     If that player cannot take the pile, the hand ends.
   - A last stock card that is a red three ends the hand when it is drawn, so its drawer may not meld or discard.
-    Two sources agree on this reading, but Pagat does not state it, so it is not yet confirmed.
 
 ## Consequences
 
@@ -45,6 +49,7 @@ Evidence, checked on 2026-10-22:
   Every rule is tested in `tests/unit/canasta-engine.test.ts`, including a random-play run of 100 hands that checks card conservation and termination.
 - Rule variants are a code change, not a configuration change, until the rules are made options.
   The rules that differ between published variants are listed above, so a reviewer can compare them with the ruleset the players expect.
+  American (modern) canasta differs in several of them: it draws two cards, takes the pile only with a natural pair, and does not count the pickup cards toward the initial meld.
 - A defect in the rules is fixed here, with no upstream to wait for.
 - A later change to the rules that alters how a hand is scored changes past results.
   Stored matches must record the rules version before that happens.

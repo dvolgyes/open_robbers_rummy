@@ -116,13 +116,13 @@ describe("meld validation", () => {
 describe("initial meld thresholds", () => {
 	it.each([
 		[-50, 15],
-		[0, 15],
-		[1499, 15],
-		[1500, 50],
-		[2999, 50],
-		[3000, 90],
-		[4999, 90],
-		[5000, 120],
+		[-5, 15],
+		[0, 50],
+		[1495, 50],
+		[1500, 90],
+		[2995, 90],
+		[3000, 120],
+		[4995, 120],
 	])("a score of %i needs %i points", (score, minimum) => {
 		expect(initialMeldMinimum(CLASSIC_RULES.initialMeld, score)).toBe(minimum);
 	});
@@ -150,6 +150,17 @@ describe("hand flow", () => {
 		expect(
 			applyAction(hand, 1, { type: "discard", card: someCard }),
 		).toMatchObject({ ok: false });
+	});
+
+	it("draws one card from the stock", () => {
+		const hand = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const drawn = applyAction(hand, 1, { type: "draw" });
+		if (!drawn.ok) throw new Error(drawn.reason);
+		const before = hand.hands[1]?.length ?? 0;
+		const redThrees =
+			drawn.hand.teams[1].redThrees.length - hand.teams[1].redThrees.length;
+		expect(drawn.hand.hands[1]?.length).toBe(before + 1 - redThrees);
+		expect(hand.stock.length - drawn.hand.stock.length).toBe(1 + redThrees);
 	});
 
 	it("rejects an action from the wrong seat", () => {
@@ -288,7 +299,7 @@ describe("hand flow", () => {
 
 	it("lets a side below its minimum discard, but not end the turn with a partial meld", () => {
 		const base = newHand({ teamScores: [1500, 1500], dealer: 0, seed: 1 });
-		// Three fives are 15 points, below the 50 needed at a score of 1500. The hand keeps 9H, so the discard does not go out.
+		// Three fives are 15 points, below the 90 needed at a score of 1500. The hand keeps 9H, so the discard does not go out.
 		const hand = scenario(base, {
 			turn: 1,
 			phase: "play",
@@ -313,6 +324,31 @@ describe("hand flow", () => {
 		expect(reset.hand.hands[1]).toHaveLength(5);
 	});
 
+	it("does not count the rest of the pile toward the initial meld", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			hands: [[], cardsById(["0-7H", "1-7H", "0-KS"]), [], []],
+			pile: cardsById(["0-AC", "1-AC", "0-AD", "0-7D"]),
+		});
+		const taken = applyAction(hand, 1, {
+			type: "takePile",
+			cards: ["0-7H", "1-7H"],
+		});
+		if (!taken.ok) throw new Error(taken.reason);
+		const aces = applyAction(taken.hand, 1, {
+			type: "meld",
+			cards: ["0-AC", "1-AC", "0-AD"],
+		});
+		if (!aces.ok) throw new Error(aces.reason);
+		// The aces came from the pile, so the side still has 15 of the 50 it needs and cannot end the turn.
+		expect(aces.hand.turnMeldPoints).toBe(15);
+		expect(
+			applyAction(aces.hand, 1, { type: "discard", card: "0-KS" }),
+		).toMatchObject({ ok: false });
+	});
+
 	it("takes the pile with a natural pair and melds the top card", () => {
 		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
 		const hand = scenario(base, {
@@ -329,8 +365,8 @@ describe("hand flow", () => {
 		expect(taken.hand.pile).toHaveLength(0);
 		expect(taken.hand.teams[1].melds).toHaveLength(1);
 		expect(taken.hand.teams[1].melds[0]?.cards).toHaveLength(3);
-		// The three sevens are worth 15, but only the two cards from the hand count toward the initial meld.
-		expect(taken.hand.turnMeldPoints).toBe(10);
+		// The top card counts toward the initial meld with the two cards from the hand.
+		expect(taken.hand.turnMeldPoints).toBe(15);
 		expect(cardTotal(taken.hand)).toBe(cardTotal(hand));
 	});
 
@@ -414,6 +450,29 @@ describe("scoring", () => {
 		expect(first.outBonus).toBe(
 			CLASSIC_RULES.outBonus + CLASSIC_RULES.concealedOutBonus,
 		);
+	});
+
+	it("doubles the red three score when one side holds all four: 800 with a meld, -800 without", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const reds = cardsById(["0-3H", "0-3D", "1-3H", "1-3D"]);
+		const withReds = (initialMade: boolean): HandState => ({
+			...base,
+			hands: [[], [], [], []],
+			teams: [
+				{ ...base.teams[0], melds: [], redThrees: reds, initialMade },
+				{ ...base.teams[1], melds: [], redThrees: [] },
+			],
+		});
+		expect(scoreHand(withReds(true))[0].redThrees).toBe(800);
+		expect(scoreHand(withReds(false))[0].redThrees).toBe(-800);
+		const three = {
+			...withReds(true),
+			teams: [
+				{ ...withReds(true).teams[0], redThrees: reds.slice(0, 3) },
+				base.teams[1],
+			] as const,
+		};
+		expect(scoreHand(three)[0].redThrees).toBe(300);
 	});
 });
 
