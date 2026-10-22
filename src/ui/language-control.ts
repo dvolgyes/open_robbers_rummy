@@ -1,7 +1,7 @@
 import type { AppDeps } from "./deps";
 import { el } from "./dom";
 
-const LOCALE_STORAGE_KEY = "open_canasta.locale";
+const LOCALE_STORAGE_KEY = "open_robbers_rummy.locale";
 
 /** The language picker. A change stores the choice in this browser and reloads the page in that language. */
 export function languageControl(deps: AppDeps): HTMLElement {

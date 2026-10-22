@@ -1,14 +1,16 @@
 import {
-	BOT_MODELS,
-	type BotModel,
 	type BotSetup,
-	DEFAULT_BOT_SETUP,
 	isSeat,
+	isTablePreset,
+	MAX_JOKERS,
 	MAX_NAME_LENGTH,
-	parseBotSetup,
+	MIN_JOKERS,
+	MIN_PLAYERS,
 	type RoomConfig,
 	SEATS,
 	type Seat,
+	seatsOf,
+	type TableSetup,
 } from "./protocol";
 
 export const SELECTED_PLAYER_PARAM = "selected_player";
@@ -16,21 +18,27 @@ export const SELECTED_PLAYER_PARAM = "selected_player";
 export const BOTS_PAUSED_PARAM = "bots_paused";
 
 /**
- * Query keys of the four seats, named by direction as in `?east=zsdh&west=dvolgyes`. The `host` key names the
- * seat of the creator. The query never carries the table key: that stays in the fragment.
+ * Query keys of the six seats, as in `?p1=zsdh&p2=dvolgyes`. The `host` key names the seat of the creator. The query
+ * never carries the table key: that stays in the fragment.
  */
 export const SEAT_PARAM: Readonly<Record<Seat, string>> = {
-	N: "north",
-	E: "east",
-	S: "south",
-	W: "west",
+	"1": "p1",
+	"2": "p2",
+	"3": "p3",
+	"4": "p4",
+	"5": "p5",
+	"6": "p6",
 };
+
+const RULE_PARAMS = ["rules", "jokers", "assist", "bot_seats", "host"] as const;
 
 export interface Bookmark {
 	/** Prefilled names; a seat is absent when its value is missing, empty, or too long. */
 	readonly names: Partial<Record<Seat, string>>;
 	/** The seat the creator takes; absent when the value is missing or unknown. */
 	readonly host?: Seat;
+	/** Prefilled table rules; a value is absent when it is missing or invalid. */
+	readonly table: Partial<TableSetup>;
 	readonly botSetup?: BotSetup;
 }
 
@@ -41,7 +49,8 @@ export interface RoomSetup {
 
 /**
  * Reads a bookmark from a query string. The values come from the address bar, so they are untrusted: each name is
- * trimmed and length-checked, and each seat must be one of the four. Anything else is ignored, not an error.
+ * trimmed and length-checked, each seat must be one of the six, and each rule value must be valid. Anything else is
+ * ignored, not an error.
  */
 export function parseBookmark(search: string): Bookmark {
 	const params = new URLSearchParams(search);
@@ -51,35 +60,86 @@ export function parseBookmark(search: string): Bookmark {
 		if (name !== "" && Array.from(name).length <= MAX_NAME_LENGTH)
 			names[seat] = name;
 	}
-	const host = SEATS.find((seat) => SEAT_PARAM[seat] === params.get("host"));
-	const botSetup = parseBotSetupParams(params);
+	const host = params.get("host");
+	const botSetup = parseBotSeats(params.get("bot_seats"));
 	return {
 		names,
-		...(host === undefined ? {} : { host }),
+		...(isSeat(host) ? { host } : {}),
+		table: parseTableParams(params),
 		...(botSetup === undefined ? {} : { botSetup }),
 	};
 }
 
-/** Reads the complete setup needed to start a room from a shared link. */
+/**
+ * Reads the complete setup needed to start a room from a shared link. It fails closed: a seat gap, fewer than two
+ * players, a host or bot outside the table, a missing or invalid rule value, or a repeated key gives `undefined`.
+ */
 export function parseRoomSetup(search: string): RoomSetup | undefined {
+	const params = new URLSearchParams(search);
+	if (
+		[...RULE_PARAMS, ...SEATS.map((seat) => SEAT_PARAM[seat])].some(
+			(name) => params.getAll(name).length > 1,
+		)
+	)
+		return undefined;
 	const bookmark = parseBookmark(search);
-	if (bookmark.host === undefined) return undefined;
-	const names = {} as Record<Seat, string>;
+	const names: Partial<Record<Seat, string>> = {};
+	let gap = false;
 	for (const seat of SEATS) {
 		const name = bookmark.names[seat];
-		if (name === undefined) return undefined;
-		names[seat] = name;
+		if (name === undefined) {
+			if (params.has(SEAT_PARAM[seat])) return undefined;
+			gap = true;
+		} else if (gap) return undefined;
+		else names[seat] = name;
 	}
+	const seats = seatsOf({ names });
+	const { preset, jokers, assist } = bookmark.table;
+	const host = bookmark.host;
+	if (
+		seats.length < MIN_PLAYERS ||
+		host === undefined ||
+		!seats.includes(host) ||
+		preset === undefined ||
+		jokers === undefined ||
+		assist === undefined
+	)
+		return undefined;
 	const botSetup = bookmark.botSetup;
-	const params = new URLSearchParams(search);
-	if (hasBotSetupParams(params) && bookmark.botSetup === undefined)
+	if (params.has("bot_seats") && botSetup === undefined) return undefined;
+	if (
+		botSetup !== undefined &&
+		!botSetup.seats.every((seat) => seats.includes(seat))
+	)
 		return undefined;
 	return {
 		config: {
 			names,
+			table: { preset, jokers, assist },
 			...(botSetup === undefined ? {} : { botSetup }),
 		},
-		host: bookmark.host,
+		host,
+	};
+}
+
+/** The bot seats of a `bot_seats` value such as `2,5`; undefined when absent or invalid. */
+function parseBotSeats(value: string | null): BotSetup | undefined {
+	if (value === null) return undefined;
+	const seats = value === "" ? [] : value.split(",");
+	if (!seats.every(isSeat) || new Set(seats).size !== seats.length)
+		return undefined;
+	return { seats: SEATS.filter((seat) => seats.includes(seat)) };
+}
+
+function parseTableParams(params: URLSearchParams): Partial<TableSetup> {
+	const preset = params.get("rules");
+	const jokersText = params.get("jokers") ?? "";
+	const jokers = /^\d$/.test(jokersText) ? Number(jokersText) : Number.NaN;
+	const assist = params.get("assist");
+	return {
+		...(isTablePreset(preset) ? { preset } : {}),
+		...(jokers >= MIN_JOKERS && jokers <= MAX_JOKERS ? { jokers } : {}),
+		...(assist === "1" || assist === "0" ? { assist: assist === "1" } : {}),
 	};
 }
 
@@ -119,95 +179,19 @@ export function botsPausedQuery(search: string, paused: boolean): string {
 	return params.toString();
 }
 
-/** The query of a bookmark for a table: the four names and the creator's seat. */
-export function bookmarkQuery(
-	names: Readonly<Record<Seat, string>>,
-	host: Seat,
-	botSetup?: BotSetup,
-): string {
-	const pairs = SEATS.map((seat): [string, string] => [
+/** The query of a bookmark for a table: the names, the creator's seat, the table rules and the bot seats. */
+export function bookmarkQuery(config: RoomConfig, host: Seat): string {
+	const pairs = seatsOf(config).map((seat): [string, string] => [
 		SEAT_PARAM[seat],
-		names[seat],
+		config.names[seat] ?? "",
 	]);
-	pairs.push(["host", SEAT_PARAM[host]]);
-	if (botSetup !== undefined) {
-		pairs.push(
-			["bot_seats", botSetup.seats.join(",")],
-			["bot_model", botSetup.model],
-			["bot_fallback", botSetup.fallbackModel],
-			["bot_retries", String(botSetup.retries)],
-			["bot_delay_ms", String(botSetup.retryDelayMs)],
-		);
-		if (botSetup.modelOrder !== undefined)
-			pairs.push(["bot_models", botSetup.modelOrder.join(",")]);
-	}
+	pairs.push(
+		["host", host],
+		["rules", config.table.preset],
+		["jokers", String(config.table.jokers)],
+		["assist", config.table.assist ? "1" : "0"],
+	);
+	if (config.botSetup !== undefined)
+		pairs.push(["bot_seats", config.botSetup.seats.join(",")]);
 	return new URLSearchParams(pairs).toString();
-}
-
-const BOT_SETUP_PARAMS = [
-	"bot_seats",
-	"bot_model",
-	"bot_fallback",
-	"bot_models",
-	"bot_retries",
-	"bot_delay_ms",
-] as const;
-
-function hasBotSetupParams(params: URLSearchParams): boolean {
-	return BOT_SETUP_PARAMS.some((name) => params.has(name));
-}
-
-function parseBotSetupParams(params: URLSearchParams): BotSetup | undefined {
-	if (!hasBotSetupParams(params)) return undefined;
-	if (BOT_SETUP_PARAMS.some((name) => params.getAll(name).length > 1))
-		return undefined;
-	const seatsText = params.get("bot_seats");
-	const seats =
-		seatsText === null || seatsText === ""
-			? []
-			: seatsText.split(",").map((value) => value.toUpperCase());
-	const seatList = SEATS.filter((seat) => seats.includes(seat));
-	if (seatList.length !== seats.length) return undefined;
-	const retries = parseIntegerParam(
-		params.get("bot_retries"),
-		DEFAULT_BOT_SETUP.retries,
-	);
-	const retryDelayMs = parseIntegerParam(
-		params.get("bot_delay_ms"),
-		DEFAULT_BOT_SETUP.retryDelayMs,
-	);
-	if (retries === undefined || retryDelayMs === undefined) return undefined;
-	const modelOrder = params.has("bot_models")
-		? parseModelOrder(params.get("bot_models"))
-		: undefined;
-	if (params.has("bot_models") && modelOrder === undefined) return undefined;
-	return parseBotSetup({
-		seats: seatList,
-		model: params.get("bot_model") ?? DEFAULT_BOT_SETUP.model,
-		fallbackModel:
-			params.get("bot_fallback") ?? DEFAULT_BOT_SETUP.fallbackModel,
-		...(modelOrder === undefined ? {} : { modelOrder }),
-		retries,
-		retryDelayMs,
-	});
-}
-
-function parseModelOrder(value: string | null): BotModel[] | undefined {
-	if (value === null) return undefined;
-	const models = value.split(",");
-	return models.length >= 2 &&
-		models.length <= BOT_MODELS.length &&
-		new Set(models).size === models.length
-		? (models as BotModel[])
-		: undefined;
-}
-
-function parseIntegerParam(
-	value: string | null,
-	fallback: number,
-): number | undefined {
-	if (value === null) return fallback;
-	if (!/^\d+$/.test(value)) return undefined;
-	const parsed = Number(value);
-	return Number.isSafeInteger(parsed) ? parsed : undefined;
 }

@@ -53,7 +53,7 @@ describe("parseRoute", () => {
 	it("reads the table link that it writes", () => {
 		expect(parseRoute(tableFragment(KEY))).toEqual({ kind: "table", key: KEY });
 		const link = tableLink("https://example.org/canasta/?x=1#old", KEY);
-		expect(link).toBe(`https://example.org/canasta/?x=1#v=p2p-v1&k=${KEY}`);
+		expect(link).toBe(`https://example.org/canasta/?x=1#v=p2p-v2&k=${KEY}`);
 		expect(parseRoute(new URL(link).hash)).toEqual({ kind: "table", key: KEY });
 	});
 
@@ -73,12 +73,19 @@ describe("parseRoute", () => {
 		});
 	});
 
+	it("reports a canasta table link (p2p-v1) as another version", () => {
+		expect(parseRoute(`#v=p2p-v1&k=${KEY}`)).toEqual({
+			kind: "incompatible",
+			version: "p2p-v1",
+		});
+	});
+
 	it.each([
-		["no key", "#v=p2p-v1"],
-		["a short key", "#v=p2p-v1&k=abc"],
-		["a non-canonical key", `#v=p2p-v1&k=${KEY.slice(0, 42)}t`],
-		["two keys", `#v=p2p-v1&k=${KEY}&k=${KEY}`],
-		["two versions", `#v=p2p-v1&v=p2p-v1&k=${KEY}`],
+		["no key", "#v=p2p-v2"],
+		["a short key", "#v=p2p-v2&k=abc"],
+		["a non-canonical key", `#v=p2p-v2&k=${KEY.slice(0, 42)}t`],
+		["two keys", `#v=p2p-v2&k=${KEY}&k=${KEY}`],
+		["two versions", `#v=p2p-v2&v=p2p-v2&k=${KEY}`],
 		["a version with markup", `#v=%3Cb%3E&k=${KEY}`],
 		["an unknown fragment", "#hello"],
 	])("rejects %s", (_label, hash) => {

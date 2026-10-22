@@ -19,14 +19,17 @@ import type {
 	SeatHolder,
 } from "../p2p/wire";
 import {
+	DEFAULT_TABLE_SETUP,
 	isObject,
-	isSeat,
 	MAX_NAME_LENGTH,
+	MIN_PLAYERS,
 	type RoomConfig,
 	SEAT_NAMES,
 	SEATS,
 	type Seat,
 	seatLabel,
+	seatsOf,
+	type TableSetup,
 } from "../protocol";
 
 /** Pure view model of the table screens: the DOM layer only renders what these functions return. */
@@ -45,16 +48,22 @@ export const TEXT = {
 // Create form
 
 export const DEFAULT_NAMES: Readonly<Record<Seat, string>> = {
-	N: "player1",
-	S: "player2",
-	E: "player3",
-	W: "player4",
+	"1": "player1",
+	"2": "player2",
+	"3": "player3",
+	"4": "player4",
+	"5": "player5",
+	"6": "player6",
 };
 
 export interface CreateFields {
+	/** One name field per seat; only the first `count` are in play. */
 	readonly names: Readonly<Record<Seat, string>>;
+	/** The number of players, from `MIN_PLAYERS` to six. */
+	readonly count: number;
 	/** The creator's own seat; its browser hosts first. */
 	readonly seat: string;
+	readonly table: TableSetup;
 }
 
 export type CreateCheck =
@@ -66,36 +75,40 @@ export function checkCreateFields(
 	fields: CreateFields,
 	t: Translate = english,
 ): CreateCheck {
+	if (
+		!Number.isSafeInteger(fields.count) ||
+		fields.count < MIN_PLAYERS ||
+		fields.count > SEATS.length
+	)
+		return { ok: false, errors: [t("Choose from two to six players.")] };
+	const inPlay = SEATS.slice(0, fields.count);
 	const errors: string[] = [];
 	const names: Partial<Record<Seat, string>> = {};
-	for (const seat of SEATS) {
+	for (const seat of inPlay) {
 		const name = fields.names[seat].trim();
 		const length = Array.from(name).length;
 		if (length === 0)
-			errors.push(t("{seat}: enter a name.", { seat: SEAT_NAMES[seat] }));
+			errors.push(t("{seat}: enter a name.", { seat: t(SEAT_NAMES[seat]) }));
 		else if (length > MAX_NAME_LENGTH)
 			errors.push(
 				t("{seat}: use at most {max} characters.", {
 					max: MAX_NAME_LENGTH,
-					seat: SEAT_NAMES[seat],
+					seat: t(SEAT_NAMES[seat]),
 				}),
 			);
 		names[seat] = name;
 	}
-	if (!isSeat(fields.seat)) errors.push(t("Choose your seat."));
-	if (errors.length > 0 || !isSeat(fields.seat)) return { ok: false, errors };
-	return {
-		ok: true,
-		config: {
-			names: names as Record<Seat, string>,
-		},
-		seat: fields.seat,
-	};
+	const seat = inPlay.find((item) => item === fields.seat);
+	if (seat === undefined) errors.push(t("Choose your seat."));
+	if (errors.length > 0 || seat === undefined) return { ok: false, errors };
+	return { ok: true, config: { names, table: fields.table }, seat };
 }
 
 export const DEFAULT_CREATE_FIELDS: CreateFields = {
 	names: DEFAULT_NAMES,
-	seat: "W",
+	count: 4,
+	seat: "1",
+	table: DEFAULT_TABLE_SETUP,
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -376,10 +389,12 @@ export function lobbyScreen(input: LobbyInput): LobbyScreen {
 							label: seatLabel(lobby.config, row.seat),
 						}))
 				: setupConfig !== undefined
-					? SEATS.filter((seat) => !elsewhere.has(seat)).map((seat) => ({
-							seat,
-							label: seatLabel(setupConfig, seat),
-						}))
+					? seatsOf(setupConfig)
+							.filter((seat) => !elsewhere.has(seat))
+							.map((seat) => ({
+								seat,
+								label: seatLabel(setupConfig, seat),
+							}))
 					: undefined,
 	};
 }
@@ -556,7 +571,7 @@ export function presentSeats(
 
 export function roomView(input: RoomViewInput): RoomView {
 	return {
-		roster: SEATS.map((rowSeat) => rosterRow(input, rowSeat)),
+		roster: seatsOf(input.config).map((rowSeat) => rosterRow(input, rowSeat)),
 		transcript: transcriptLines(input),
 		pending: pendingLines(input),
 		send: sendState(input),
@@ -581,7 +596,7 @@ function transcriptLines(input: RoomViewInput): TranscriptLine[] {
 	const lines: TranscriptLine[] = [];
 	for (const entry of input.entries) {
 		if (entry.kind !== "cmd" || !isChatEvent(entry.event)) continue;
-		const others = SEATS.filter((seat) => seat !== entry.seat);
+		const others = seatsOf(input.config).filter((seat) => seat !== entry.seat);
 		const receivedBy = others.filter(
 			(seat) => (input.acked[seat] ?? 0) >= entry.seq,
 		).length;

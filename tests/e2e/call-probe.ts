@@ -494,18 +494,18 @@ export async function timeWhen(
 }
 
 export const SEAT_NAMES: Readonly<Record<SeatKey, string>> = {
-	N: "North",
-	E: "East",
-	S: "South",
-	W: "West",
+	"1": "Player 1",
+	"2": "Player 2",
+	"3": "Player 3",
+	"4": "Player 4",
 };
 
 /** The name on the tile of a seated player: the seat letter and the player name that createRoom gives. */
 export const TILE_NAMES: Readonly<Record<SeatKey, string>> = {
-	N: "N - player1",
-	E: "E - player3",
-	S: "S - player2",
-	W: "W - player4",
+	"1": "N - player1",
+	"2": "E - player3",
+	"3": "S - player2",
+	"4": "W - player4",
 };
 
 export const panel = (page: Page): Locator => page.getByTestId("call-panel");

@@ -42,49 +42,49 @@ describe("call records", () => {
 	it("round-trips a record through its command payload, with the holder the host gives", () => {
 		const applied = applyCallRecord(
 			{},
-			"E",
+			"2",
 			ME,
 			callRecordPayload(TABLE, record(7, true)),
 		);
 		expect(applied).toEqual({
 			ok: true,
 			record: stored(7, ME, true),
-			records: { E: stored(7, ME, true) },
+			records: { "2": stored(7, ME, true) },
 		});
 		expect(parseCallRecords(applied.ok && applied.records)).toEqual({
-			E: stored(7, ME, true),
+			"2": stored(7, ME, true),
 		});
 	});
 
 	it("keeps another seat's record when one seat changes", () => {
 		const applied = applyCallRecord(
-			{ N: stored(9, OTHER) },
-			"E",
+			{ "1": stored(9, OTHER) },
+			"2",
 			ME,
 			callRecordPayload(TABLE, record(1)),
 		);
 		expect(applied.ok && applied.records).toEqual({
-			N: stored(9, OTHER),
-			E: stored(1, ME),
+			"1": stored(9, OTHER),
+			"2": stored(1, ME),
 		});
 	});
 
 	it("needs a higher version than the stored one, whoever stored it", () => {
 		expect(
 			applyCallRecord(
-				{ E: stored(3, OTHER) },
-				"E",
+				{ "2": stored(3, OTHER) },
+				"2",
 				ME,
 				callRecordPayload(TABLE, record(3)),
 			),
 		).toEqual({ ok: false, reason: "a newer call status is stored" });
 		const applied = applyCallRecord(
-			{ E: stored(3, OTHER) },
-			"E",
+			{ "2": stored(3, OTHER) },
+			"2",
 			ME,
 			callRecordPayload(TABLE, record(4)),
 		);
-		expect(applied.ok && applied.records.E).toEqual(stored(4, ME));
+		expect(applied.ok && applied.records["2"]).toEqual(stored(4, ME));
 	});
 
 	it("refuses a payload with a missing switch, a fractional version or another form, and an empty holder", () => {
@@ -95,22 +95,24 @@ describe("call records", () => {
 			{ ...payload, version: 1.5 },
 			{ ...payload, form: "phone" },
 		]) {
-			expect(applyCallRecord({}, "S", ME, bad)).toEqual({
+			expect(applyCallRecord({}, "3", ME, bad)).toEqual({
 				ok: false,
 				reason: "not a valid call status",
 			});
 		}
-		expect(applyCallRecord({}, "S", "", payload)).toEqual({
+		expect(applyCallRecord({}, "3", "", payload)).toEqual({
 			ok: false,
 			reason: "not a valid call status",
 		});
 	});
 
 	it("refuses stored records with a key that is not a seat, a record without a holder, and a value that is not an object", () => {
-		expect(parseCallRecords({ N: stored(1), host: stored(1) })).toBeUndefined();
-		expect(parseCallRecords({ N: record(1) })).toBeUndefined();
 		expect(
-			parseCallRecords({ N: { ...stored(1), holder: "x".repeat(65) } }),
+			parseCallRecords({ "1": stored(1), host: stored(1) }),
+		).toBeUndefined();
+		expect(parseCallRecords({ "1": record(1) })).toBeUndefined();
+		expect(
+			parseCallRecords({ "1": { ...stored(1), holder: "x".repeat(65) } }),
 		).toBeUndefined();
 		expect(parseCallRecords([stored(1)])).toBeUndefined();
 		expect(parseCallRecords(null)).toBeUndefined();

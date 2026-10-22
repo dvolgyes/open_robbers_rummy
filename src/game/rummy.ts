@@ -14,14 +14,13 @@ import {
 	SEAT_NAMES,
 	SEATS,
 	type Seat,
+	seatsOf,
 } from "../protocol";
 import { cryptoRandomBelow, type RandomBelow } from "../random";
 import {
 	type Action,
 	applyAction as applyHandAction,
 	buildDeck,
-	DEFAULT_JOKERS,
-	DEFAULT_PRESET,
 	type Seat as EngineSeat,
 	type HandState,
 	type HandView,
@@ -89,14 +88,13 @@ export interface ResetRequest {
 	readonly approved: readonly Seat[];
 }
 
-/** The seats that play at this table, in turn order. */
-export function playingSeats(config: RoomConfig): Seat[] {
-	return SEATS.filter((seat) => config.names[seat] !== undefined);
-}
-
 /** The table's rules; every peer reads them from the room configuration. */
-export function rulesOf(_config: RoomConfig): RummyRules {
-	return rulesFor(DEFAULT_PRESET, DEFAULT_JOKERS, true);
+export function rulesOf(config: RoomConfig): RummyRules {
+	return rulesFor(
+		config.table.preset,
+		config.table.jokers,
+		config.table.assist,
+	);
 }
 
 /** Engine seats are numbered from 0 in the order of `SEATS`. */
@@ -364,7 +362,7 @@ function applyStart(
 	if (table.match !== null)
 		return reject("the game is over; ask for a new game");
 	if (table.reset) return RESET_WAITING;
-	const seats = playingSeats(context.config);
+	const seats = seatsOf(context.config);
 	const waiting = absence(seats, context.present);
 	if (waiting) return waiting;
 	const players = seats.length;
@@ -407,7 +405,7 @@ function applyTableAction(
 	if (!action) return reject("not a valid action");
 	const applied = applyHandAction(match.hand, engineSeat(context.seat), action);
 	if (!applied.ok) return reject(applied.reason);
-	const waiting = absence(playingSeats(context.config), context.present);
+	const waiting = absence(seatsOf(context.config), context.present);
 	if (waiting) return waiting;
 	return accept(
 		{
@@ -442,7 +440,7 @@ function applyResetRequest(
 	const present = [...new Set(context.present)];
 	if (!present.includes(context.seat))
 		return reject("your seat is not present at the table");
-	const required = playingSeats(context.config).filter(
+	const required = seatsOf(context.config).filter(
 		(seat) => seat !== context.seat && present.includes(seat),
 	);
 	if (required.length === 0)
@@ -567,7 +565,7 @@ export function createRummyModule(randomBelow: RandomBelow): GameModule {
 				return reject("unsupported protocol version");
 			if (payload.roomId !== context.roomId)
 				return reject("command is for another room");
-			if (!playingSeats(context.config).includes(context.seat))
+			if (!seatsOf(context.config).includes(context.seat))
 				return reject("your seat does not play at this table");
 			switch (payload.type) {
 				case "chat":

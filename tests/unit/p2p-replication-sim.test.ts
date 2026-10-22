@@ -42,11 +42,14 @@ import { CONFIG, commandId, TABLE } from "./p2p-fixtures";
  * passes the wire validators, so a malformed one fails the run.
  */
 
+/** One browser per seat; the sim plays four seats, so seats 5 and 6 are never opened. */
 const CLIENTS: Readonly<Record<Seat, string>> = {
-	N: "clientN-0123456789abcd",
-	E: "clientE-0123456789abcd",
-	S: "clientS-0123456789abcd",
-	W: "clientW-0123456789abcd",
+	"1": "clientN-0123456789abcd",
+	"2": "clientE-0123456789abcd",
+	"3": "clientS-0123456789abcd",
+	"4": "clientW-0123456789abcd",
+	"5": "client5-0123456789abcd",
+	"6": "client6-0123456789abcd",
 };
 
 function xorshift(seed: number): () => number {
@@ -114,14 +117,14 @@ class Sim {
 
 	/** The creator at N writes term 1 and hosts it at once. */
 	async create(): Promise<SimPage> {
-		const browser = await this.browser("N");
-		const log = new LocalLog(browser.storage, TABLE, "N");
-		const auth = { term: 1, tag: makeTag(browser.holder, "N"), inc: 1 };
+		const browser = await this.browser("1");
+		const log = new LocalLog(browser.storage, TABLE, "1");
+		const auth = { term: 1, tag: makeTag(browser.holder, "1"), inc: 1 };
 		const module = this.#module();
 		const written = await log.write(() =>
 			creationCommit({
 				tableId: TABLE,
-				seat: "N",
+				seat: "1",
 				holder: browser.holder,
 				config: CONFIG,
 				state: module.initialState(TABLE, CONFIG),
@@ -397,7 +400,7 @@ afterEach(() => restoreDigest());
 
 interface Scenario {
 	/** The entry whose broadcast the crash follows: the first one after 20 cards from N itself, or from another seat. */
-	readonly from: "N" | "other";
+	readonly from: "1" | "other";
 	/** 11 ms lets the entry arrive (the mesh delay is 10 ms); 0 ms loses it with the host. */
 	readonly crashDelay: number;
 	readonly seed: number;
@@ -407,7 +410,7 @@ describe("four pages play a board across a host crash", () => {
 	it("routes autoplay through the followed host and correlates its reply", async () => {
 		const sim = new Sim(41);
 		const north = await sim.create();
-		const east = await sim.visit("E", "eastauto");
+		const east = await sim.visit("2", "eastauto");
 		sim.mesh.connectAll();
 		await sim.mesh.until(() => east.replication.follower.ready, 10_000);
 		const handled: { seat: Seat; enabled: boolean }[] = [];
@@ -420,25 +423,25 @@ describe("four pages play a board across a host crash", () => {
 			result = status;
 		});
 		await sim.mesh.until(() => result !== null, 10_000);
-		expect(handled).toEqual([{ seat: "E", enabled: true }]);
+		expect(handled).toEqual([{ seat: "2", enabled: true }]);
 		expect(result).toBe("enabled");
 	});
 
 	it.each<Scenario>([
 		{ from: "other", crashDelay: 11, seed: 1 },
-		{ from: "N", crashDelay: 11, seed: 2 },
+		{ from: "1", crashDelay: 11, seed: 2 },
 		{ from: "other", crashDelay: 0, seed: 3 },
 		{ from: "other", crashDelay: 0, seed: 4 },
-		{ from: "N", crashDelay: 0, seed: 5 },
-		{ from: "N", crashDelay: 0, seed: 6 },
+		{ from: "1", crashDelay: 0, seed: 5 },
+		{ from: "1", crashDelay: 0, seed: 6 },
 	])(
 		"the host crashes $crashDelay ms after an entry from $from (seed $seed)",
 		async ({ from, crashDelay, seed }) => {
 			const sim = new Sim(seed);
 			const north = await sim.create();
-			await sim.visit("E", "east");
-			await sim.visit("S", "south");
-			await sim.visit("W", "west");
+			await sim.visit("2", "east");
+			await sim.visit("3", "south");
+			await sim.visit("4", "west");
 			sim.mesh.connectAll();
 
 			let lost = null as Entry | null;
@@ -446,19 +449,19 @@ describe("four pages play a board across a host crash", () => {
 				if (lost || sender !== north.peer || message.k !== "entry") return;
 				if (
 					cardsIn(message.state) < 20 ||
-					(message.e.seat === "N") !== (from === "N")
+					(message.e.seat === "1") !== (from === "1")
 				)
 					return;
 				lost = message.e;
-				sim.mesh.after(crashDelay, () => sim.crash("N"));
+				sim.mesh.after(crashDelay, () => sim.crash("1"));
 			};
 			await sim.mesh.until(() => lost !== null && !north.alive, 120_000);
 			const crashed = lost;
 			if (!crashed) throw new Error("the host did not crash");
 			expect(sim.pages.map((page) => page.browser.seat)).toEqual([
-				"E",
-				"S",
-				"W",
+				"2",
+				"3",
+				"4",
 			]);
 
 			await sim.mesh.until(
@@ -470,7 +473,7 @@ describe("four pages play a board across a host crash", () => {
 					),
 				60_000,
 			);
-			const reopened = await sim.reopen("N", "north2");
+			const reopened = await sim.reopen("1", "north2");
 			await sim.mesh.until(() => {
 				const pages = sim.pages;
 				if (pages.length !== 4 || !pages.every(finished)) return false;
@@ -487,10 +490,10 @@ describe("four pages play a board across a host crash", () => {
 				(page) => page.election.mode.kind === "hosting",
 			);
 			expect(hosts).toHaveLength(1);
-			expect(hosts[0]?.browser.seat).not.toBe("N");
+			expect(hosts[0]?.browser.seat).not.toBe("1");
 			expect(reopened.replication.follower.ready).toBe(true);
 			const ownRow = reopened.replication.log?.table?.seats.find(
-				(row) => row.seat === "N",
+				(row) => row.seat === "1",
 			);
 			expect(ownRow?.gen).toBe(1);
 
@@ -527,16 +530,16 @@ describe("four pages play a board across a host crash", () => {
 				const resent = reference.entries.find(
 					(entry) => entry.id === crashed.id,
 				);
-				if (from === "N") {
+				if (from === "1") {
 					expect(resent).toBeUndefined();
-					expect(undone).toEqual([["N", [crashed.id]]]);
+					expect(undone).toEqual([["1", [crashed.id]]]);
 				} else {
-					// R4: every game action needs all four seats, so the new host keeps the action waiting until North is
+					// R4: every game action needs all four seats, so the new host keeps the action waiting until Player 1 is
 					// back. Rebinding the same holder and generation adds no seat entry; the delayed action takes the next
 					// log position.
 					const back = reference.entries.find(
 						(entry) =>
-							entry.kind === "seat" && entry.seat === "N" && entry.gen === 2,
+							entry.kind === "seat" && entry.seat === "1" && entry.gen === 2,
 					);
 					expect(resent?.auth.term).toBe(2);
 					expect(back).toBeUndefined();

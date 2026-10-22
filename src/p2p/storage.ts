@@ -294,7 +294,7 @@ export class MemoryStorage implements TableStorage {
 // ---------------------------------------------------------------------------------------------------------------
 // IndexedDB
 
-const DB_NAME = "oc-p2p";
+const DB_NAME = "orr-p2p";
 const DB_VERSION = 1;
 const TABLES = "tables";
 const ENTRIES = "entries";

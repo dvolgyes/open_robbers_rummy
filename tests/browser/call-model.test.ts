@@ -51,7 +51,7 @@ function remote(
 	};
 }
 
-/** North's view: by default outside the call, holding its seat, on a desktop. */
+/** Player 1's view: by default outside the call, holding its seat, on a desktop. */
 function callView(extra: Partial<CallView> = {}): CallView {
 	return {
 		status: "outside",
@@ -63,7 +63,7 @@ function callView(extra: Partial<CallView> = {}): CallView {
 		mic: "off",
 		camera: "off",
 		problem: undefined,
-		remotes: [remote("E", "unknown"), remote("S", "unknown")],
+		remotes: [remote("2", "unknown"), remote("3", "unknown")],
 		...extra,
 	};
 }
@@ -188,8 +188,8 @@ describe("call controls (handover §6, §7)", () => {
 				requested: BOTH_WAYS,
 				camera: "pending",
 				remotes: [
-					remote("E", "connected", { video: camera() }),
-					remote("S", "connected"),
+					remote("2", "connected", { video: camera() }),
+					remote("3", "connected"),
 				],
 			}),
 		);
@@ -205,7 +205,9 @@ describe("call controls (handover §6, §7)", () => {
 			"pending",
 			"on",
 		]);
-		expect(view.note).toBe("Asking for the camera… Connected to East, South.");
+		expect(view.note).toBe(
+			"Asking for the camera… Connected to Player 2, Player 3.",
+		);
 	});
 
 	it("a tab without its seat cannot join and shows disabled controls without a warning", () => {
@@ -222,7 +224,7 @@ describe("call controls (handover §6, §7)", () => {
 		const listening = inCall({
 			requested: { inCall: true, ...presetById("listen").switches },
 			mic: "off",
-			remotes: [remote("E", "connected", { audio: track("audio") })],
+			remotes: [remote("2", "connected", { audio: track("audio") })],
 		});
 		const view = controls(listening);
 		expect(view.inCall).toBe(true);
@@ -241,7 +243,7 @@ describe("call controls (handover §6, §7)", () => {
 			"off",
 		]);
 
-		const silent = controls(inCall({ remotes: [remote("E", "connected")] }));
+		const silent = controls(inCall({ remotes: [remote("2", "connected")] }));
 		expect(silent.switches[1]?.actual).toBe("off");
 	});
 
@@ -249,17 +251,17 @@ describe("call controls (handover §6, §7)", () => {
 		const view = controls(
 			inCall({
 				remotes: [
-					remote("E", "connected"),
-					remote("S", "unavailable"),
-					remote("W", "reconnecting"),
+					remote("2", "connected"),
+					remote("3", "unavailable"),
+					remote("4", "reconnecting"),
 				],
 			}),
 		);
 		expect(view.note).toBe(
-			"No direct connection to South. Connecting to West. Connected to East.",
+			"No direct connection to Player 3. Connecting to Player 4. Connected to Player 2.",
 		);
 		const alone = controls(
-			inCall({ remotes: [remote("E", "out"), remote("S", "out")] }),
+			inCall({ remotes: [remote("2", "out"), remote("3", "out")] }),
 		);
 		expect(alone.note).toBe("In the call; waiting for others to join.");
 	});
@@ -372,7 +374,7 @@ describe("remote call status (handover §7)", () => {
 		remoteCallStatus(seat, view);
 
 	it("shows no status while the local user is outside the call", () => {
-		expect(status(remote("E", "unknown"), callView())).toEqual({
+		expect(status(remote("2", "unknown"), callView())).toEqual({
 			text: undefined,
 			connected: false,
 			retry: false,
@@ -383,7 +385,7 @@ describe("remote call status (handover §7)", () => {
 		const texts = (
 			["waiting", "out", "connecting", "reconnecting", "unavailable"] as const
 		).map((state) => {
-			const result = status(remote("E", state));
+			const result = status(remote("2", state));
 			return [result.text, result.connected, result.retry];
 		});
 		expect(texts).toEqual([
@@ -396,18 +398,18 @@ describe("remote call status (handover §7)", () => {
 	});
 
 	it("a connected seat says why no audio arrives", () => {
-		expect(status(remote("E", "connected"))).toEqual({
+		expect(status(remote("2", "connected"))).toEqual({
 			text: "Audio only",
 			connected: true,
 			retry: false,
 		});
 		expect(
-			status(remote("E", "connected", { peerSendsAudio: false })).text,
+			status(remote("2", "connected", { peerSendsAudio: false })).text,
 		).toBe("Mic off");
 		const deaf = inCall({
 			requested: { ...AUDIO_ONLY, receive: { audio: false, video: false } },
 		});
-		expect(status(remote("E", "connected"), deaf).text).toBe(
+		expect(status(remote("2", "connected"), deaf).text).toBe(
 			"Audio reception off",
 		);
 	});
@@ -415,12 +417,12 @@ describe("remote call status (handover §7)", () => {
 	it("a seat with a picture names only its audio state", () => {
 		const watching = inCall({ requested: BOTH_WAYS });
 		const seen = { video: camera(), peerSendsVideo: true };
-		expect(status(remote("E", "connected", seen), watching).text).toBe(
+		expect(status(remote("2", "connected", seen), watching).text).toBe(
 			"Audio + video",
 		);
 		expect(
 			status(
-				remote("E", "connected", { ...seen, peerSendsAudio: false }),
+				remote("2", "connected", { ...seen, peerSendsAudio: false }),
 				watching,
 			).text,
 		).toBe("Mic off");
@@ -428,7 +430,7 @@ describe("remote call status (handover §7)", () => {
 
 	it("a seat whose camera this side does not receive says Video reception off", () => {
 		const blind = inCall({ requested: AUDIO_ONLY });
-		const sender = remote("E", "connected", { peerSendsVideo: true });
+		const sender = remote("2", "connected", { peerSendsVideo: true });
 		expect(status(sender, blind).text).toBe("Video reception off");
 		const deafAndBlind = inCall({
 			requested: {
@@ -441,7 +443,7 @@ describe("remote call status (handover §7)", () => {
 			"Video reception off; audio reception off",
 		);
 		// A seat without a camera is audio only, whatever this side receives.
-		expect(status(remote("E", "connected"), blind).text).toBe("Audio only");
+		expect(status(remote("2", "connected"), blind).text).toBe("Audio only");
 	});
 
 	it("a compact viewer has no video choice, so a camera sender is audio only there", () => {
@@ -451,7 +453,7 @@ describe("remote call status (handover §7)", () => {
 			mic: "on",
 		});
 		expect(
-			status(remote("E", "connected", { peerSendsVideo: true }), phone).text,
+			status(remote("2", "connected", { peerSendsVideo: true }), phone).text,
 		).toBe("Audio only");
 	});
 });

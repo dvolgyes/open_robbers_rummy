@@ -17,7 +17,6 @@ import {
 	engineSeat,
 	handViewFor,
 	parseRummyState,
-	playingSeats,
 	type RummyState,
 	resetCancelPayload,
 	resetRequestPayload,
@@ -29,8 +28,10 @@ import type { TableController, TableStatus } from "../p2p/table";
 import {
 	type JsonObject,
 	type RoomConfig,
+	SEAT_NAMES,
 	SEATS,
 	type Seat,
+	seatsOf,
 } from "../protocol";
 import { CallMemory } from "./call-memory";
 import type { CallDisplay, RemoteCallPresence } from "./call-model";
@@ -1002,10 +1003,12 @@ export function showRoom(
 		resetReject.hidden = resetApprove.hidden;
 		resetCancel.hidden = pendingReset?.requester !== seat;
 		if (pendingReset) {
-			const requester = `${config.names[pendingReset.requester]} (${deps.t(pendingReset.requester)})`;
+			const requester = `${config.names[pendingReset.requester]} (${deps.t(SEAT_NAMES[pendingReset.requester])})`;
 			const waitingFor = pendingReset.required
 				.filter((player) => !pendingReset.approved.includes(player))
-				.map((player) => `${config.names[player]} (${deps.t(player)})`);
+				.map(
+					(player) => `${config.names[player]} (${deps.t(SEAT_NAMES[player])})`,
+				);
 			resetStatus.textContent =
 				pendingReset.requester === seat
 					? deps.t("Waiting for {players} to approve the reset.", {
@@ -1057,7 +1060,7 @@ export function showRoom(
 		currentTurnKey = yourTurn
 			? `${tableModel.handNo}:${tableModel.at}:${seat}`
 			: undefined;
-		document.title = `${yourTurn ? "TURN - " : ""}Open Robber's Rummy: ${config.names[seat]} (${deps.t(seat)})`;
+		document.title = `${yourTurn ? "TURN - " : ""}Open Robber's Rummy: ${config.names[seat]} (${deps.t(SEAT_NAMES[seat])})`;
 		checkTurnAlert();
 		// The lobby uses the table layout, so it looks like the game; only the game controls differ while waiting.
 		root.dataset.screen = "table";
@@ -1077,7 +1080,7 @@ export function showRoom(
 			state.reset !== null
 				? undefined
 				: state.match === null
-					? playingSeats(config).every((player) => present.has(player))
+					? seatsOf(config).every((player) => present.has(player))
 						? {
 								key: `start:${state.matches}`,
 								payload: startPayload(tableId),

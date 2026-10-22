@@ -9,8 +9,8 @@ import {
 	sameAuthority,
 } from "../../src/p2p/authority";
 
-const LOW_TAG = "AAAAAAAAAAAAAAAA.N";
-const HIGH_TAG = "BBBBBBBBBBBBBBBB.E";
+const LOW_TAG = "AAAAAAAAAAAAAAAA.1";
+const HIGH_TAG = "BBBBBBBBBBBBBBBB.2";
 
 function auth(term: number, tag: string, inc = 1): Authority {
 	return { term, tag, inc };
@@ -76,7 +76,7 @@ describe("parseAuthority and parsePosition", () => {
 		["term above 2^31 - 1", { term: 2 ** 31, tag: LOW_TAG, inc: 1 }],
 		["a fractional term", { term: 1.5, tag: LOW_TAG, inc: 1 }],
 		["incarnation 0", { term: 1, tag: LOW_TAG, inc: 0 }],
-		["a bad tag", { term: 1, tag: "x.N", inc: 1 }],
+		["a bad tag", { term: 1, tag: "x.1", inc: 1 }],
 		["a missing tag", { term: 1, inc: 1 }],
 		["null", null],
 	])("parseAuthority rejects %s", (_label, value) => {

@@ -11,16 +11,16 @@ const B = "ZZZZZZZZZZZZZZZZZZZZ";
 describe("pair names", () => {
 	it("are the same from both pages of a pair", () => {
 		expect(peerRendezvous(A, B)).toBe(peerRendezvous(B, A));
-		expect(seatRendezvous("S", "E")).toBe(seatRendezvous("E", "S"));
+		expect(seatRendezvous("3", "2")).toBe(seatRendezvous("2", "3"));
 	});
 
 	it("keep peer pairs and seat pairs apart", () => {
 		expect(peerRendezvous(A, B)).toBe(`peer|${A}|${B}`);
-		expect(seatRendezvous("W", "N")).toBe("seat|N|W");
+		expect(seatRendezvous("4", "1")).toBe("seat|1|4");
 	});
 
 	it("differ for another pair", () => {
-		expect(seatRendezvous("N", "E")).not.toBe(seatRendezvous("N", "S"));
+		expect(seatRendezvous("1", "2")).not.toBe(seatRendezvous("1", "3"));
 	});
 });
 

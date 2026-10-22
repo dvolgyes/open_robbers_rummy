@@ -17,10 +17,10 @@ const PEER_W = "peerWest00123456789a";
 const VISITOR = "visitor0123456789abc";
 
 const BINDINGS: readonly Binding[] = [
-	{ peer: PEER_N, seat: "N", gen: 3 },
-	{ peer: PEER_E, seat: "E", gen: 1 },
-	{ peer: PEER_S, seat: "S", gen: 2 },
-	{ peer: PEER_W, seat: "W", gen: 5 },
+	{ peer: PEER_N, seat: "1", gen: 3 },
+	{ peer: PEER_E, seat: "2", gen: 1 },
+	{ peer: PEER_S, seat: "3", gen: 2 },
+	{ peer: PEER_W, seat: "4", gen: 5 },
 ];
 
 const JOIN: CallMessage = {
@@ -44,32 +44,32 @@ describe("call targets", () => {
 		const targets = callTargets(
 			BINDINGS,
 			[PEER_N, PEER_E, PEER_S, VISITOR],
-			"N",
+			"1",
 			null,
 		);
 		expect(targets).toEqual([
-			{ peer: PEER_E, seat: "E", gen: 1 },
-			{ peer: PEER_S, seat: "S", gen: 2 },
+			{ peer: PEER_E, seat: "2", gen: 1 },
+			{ peer: PEER_S, seat: "3", gen: 2 },
 		]);
 	});
 
 	it("sends an addressed message only to the peer of that seat", () => {
 		const all = [PEER_N, PEER_E, PEER_S, PEER_W];
-		expect(callTargets(BINDINGS, all, "N", "W")).toEqual([
-			{ peer: PEER_W, seat: "W", gen: 5 },
+		expect(callTargets(BINDINGS, all, "1", "4")).toEqual([
+			{ peer: PEER_W, seat: "4", gen: 5 },
 		]);
-		expect(callTargets(BINDINGS, [PEER_N, PEER_E], "N", "W")).toEqual([]);
-		expect(callTargets(BINDINGS, all, "N", "N")).toEqual([]);
+		expect(callTargets(BINDINGS, [PEER_N, PEER_E], "1", "4")).toEqual([]);
+		expect(callTargets(BINDINGS, all, "1", "1")).toEqual([]);
 	});
 });
 
 describe("inbound call frames", () => {
 	it("takes the sender seat from the roster and builds an envelope for the addressed inbox", () => {
-		const inbound = inboundCall(TABLE, BINDINGS, PEER_E, frame("N", 3, 1));
-		const inbox = { roomId: TABLE, seat: "N" as const, generation: 3 };
+		const inbound = inboundCall(TABLE, BINDINGS, PEER_E, frame("1", 3, 1));
+		const inbox = { roomId: TABLE, seat: "1" as const, generation: 3 };
 		expect(inbound?.topic).toBe(inboxTopic(inbox));
 		expect(parseEnvelope(inbound?.envelope, inbox)).toEqual({
-			from: "E",
+			from: "2",
 			fromGen: 1,
 			message: JOIN,
 		});
@@ -77,23 +77,23 @@ describe("inbound call frames", () => {
 
 	it("drops a frame from an unbound peer or with another sender generation", () => {
 		expect(
-			inboundCall(TABLE, BINDINGS, VISITOR, frame("N", 3, 1)),
+			inboundCall(TABLE, BINDINGS, VISITOR, frame("1", 3, 1)),
 		).toBeUndefined();
 		expect(
-			inboundCall(TABLE, BINDINGS, PEER_E, frame("N", 3, 2)),
+			inboundCall(TABLE, BINDINGS, PEER_E, frame("1", 3, 2)),
 		).toBeUndefined();
 	});
 
 	it("addresses a frame with an old receiver generation to that old inbox, not to the current one", () => {
-		const inbound = inboundCall(TABLE, BINDINGS, PEER_E, frame("N", 2, 1));
-		const current = { roomId: TABLE, seat: "N" as const, generation: 3 };
+		const inbound = inboundCall(TABLE, BINDINGS, PEER_E, frame("1", 2, 1));
+		const current = { roomId: TABLE, seat: "1" as const, generation: 3 };
 		expect(inbound?.topic).not.toBe(inboxTopic(current));
 		expect(parseEnvelope(inbound?.envelope, current)).toBeUndefined();
 	});
 
 	it("never lets a frame name its own seat as the sender", () => {
-		const fromNorth = inboundCall(TABLE, BINDINGS, PEER_N, frame("N", 3, 3));
-		const inbox = { roomId: TABLE, seat: "N" as const, generation: 3 };
+		const fromNorth = inboundCall(TABLE, BINDINGS, PEER_N, frame("1", 3, 3));
+		const inbox = { roomId: TABLE, seat: "1" as const, generation: 3 };
 		expect(parseEnvelope(fromNorth?.envelope, inbox)).toBeUndefined();
 	});
 });
@@ -101,8 +101,9 @@ describe("inbound call frames", () => {
 function snapshot(online: readonly Seat[]): CallRoomSnapshot {
 	return {
 		roomId: TABLE,
-		self: { seat: "N", generation: 3 },
-		holders: { N: 3, E: 1, S: 2 },
+		self: { seat: "1", generation: 3 },
+		seats: ["1", "2", "3"],
+		holders: { "1": 3, "2": 1, "3": 2 },
 		online: new Set(online),
 	};
 }
@@ -110,13 +111,13 @@ function snapshot(online: readonly Seat[]): CallRoomSnapshot {
 describe("seats that come back online", () => {
 	it("names held seats that are online now and were not before, except this seat", () => {
 		expect(
-			returnedSeats(snapshot(["E"]), snapshot(["N", "E", "S"]), "N"),
-		).toEqual(["S"]);
-		expect(returnedSeats(snapshot([]), snapshot(["N"]), "N")).toEqual([]);
+			returnedSeats(snapshot(["2"]), snapshot(["1", "2", "3"]), "1"),
+		).toEqual(["3"]);
+		expect(returnedSeats(snapshot([]), snapshot(["1"]), "1")).toEqual([]);
 	});
 
 	it("names nothing before the first snapshot, nor a seat without a holder", () => {
-		expect(returnedSeats(undefined, snapshot(["E", "S"]), "N")).toEqual([]);
-		expect(returnedSeats(snapshot([]), snapshot(["W"]), "N")).toEqual([]);
+		expect(returnedSeats(undefined, snapshot(["2", "3"]), "1")).toEqual([]);
+		expect(returnedSeats(snapshot([]), snapshot(["4"]), "1")).toEqual([]);
 	});
 });

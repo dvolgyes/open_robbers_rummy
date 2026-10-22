@@ -14,7 +14,7 @@ import type { Seat } from "../../src/protocol";
 import type { Result } from "../../src/result";
 import { ROOM_ID } from "./fixtures";
 
-const INBOX: InboxIdentity = { roomId: ROOM_ID, seat: "N", generation: 3 };
+const INBOX: InboxIdentity = { roomId: ROOM_ID, seat: "1", generation: 3 };
 const SESSION = "0f8e2c1a-1b2c-4d3e-8f90-a1b2c3d4e5f6";
 const OTHER_SESSION = "11111111-2222-4333-8444-555555555555";
 const PREFS = {
@@ -156,7 +156,7 @@ describe("call signaling: sending", () => {
 
 	it("sends in call order with one request in flight", async () => {
 		signaling.send(null, announce("join"));
-		signaling.send("E", OFFER);
+		signaling.send("2", OFFER);
 		signaling.send(null, LEAVE);
 		expect(transport.sends).toHaveLength(1);
 		expect(transport.sends[0]?.signal).toEqual({
@@ -166,7 +166,7 @@ describe("call signaling: sending", () => {
 		});
 		expect((await transport.answer()).message.type).toBe("join");
 		expect(transport.sends).toHaveLength(1);
-		expect((await transport.answer()).to).toBe("E");
+		expect((await transport.answer()).to).toBe("2");
 		expect((await transport.answer()).message.type).toBe("leave");
 		expect(transport.sends).toHaveLength(0);
 	});
@@ -174,10 +174,10 @@ describe("call signaling: sending", () => {
 	it("replaces a queued prefs to the same target in place", async () => {
 		signaling.send(null, announce("prefs", 1));
 		signaling.send(null, announce("prefs", 2));
-		signaling.send("E", announce("prefs", 3));
+		signaling.send("2", announce("prefs", 3));
 		signaling.send(null, announce("resync", 4));
 		signaling.send(null, announce("prefs", 5));
-		signaling.send("E", announce("prefs", 6));
+		signaling.send("2", announce("prefs", 6));
 		const sent: string[] = [];
 		while (transport.sends.length > 0) {
 			const signal = await transport.answer();
@@ -189,14 +189,14 @@ describe("call signaling: sending", () => {
 		expect(sent).toEqual([
 			"prefs:all:1",
 			"prefs:all:5",
-			"prefs:E:6",
+			"prefs:2:6",
 			"resync:all:4",
 		]);
 	});
 
 	it("retries a transient failure first, with backoff, then continues in order", async () => {
 		signaling.send(null, announce("join"));
-		signaling.send("E", OFFER);
+		signaling.send("2", OFFER);
 		await transport.answer({ ok: false, code: "network" });
 		await vi.advanceTimersByTimeAsync(999);
 		expect(transport.sends).toHaveLength(0);
@@ -232,7 +232,7 @@ describe("call signaling: sending", () => {
 		expect(() =>
 			signaling.send(null, { ...announce("join"), form: "tablet" } as never),
 		).toThrow("invalid outgoing call message");
-		expect(() => signaling.send("N", announce("join"))).toThrow(
+		expect(() => signaling.send("1", announce("join"))).toThrow(
 			"cannot address its sender",
 		);
 		expect(() => signaling.send(null, OFFER)).toThrow("must name its target");
@@ -247,7 +247,7 @@ describe("call signaling: end of the seat", () => {
 			const transport = new FakeTransport();
 			const { signaling, record } = open(transport);
 			signaling.send(null, announce("join"));
-			signaling.send("E", OFFER);
+			signaling.send("2", OFFER);
 			await transport.answer({ ok: false, code });
 			expect(record.ends).toEqual([code]);
 			expect(transport.current.removed).toBe(true);
@@ -265,7 +265,7 @@ describe("call signaling: close", () => {
 		const transport = new FakeTransport();
 		const { signaling } = open(transport);
 		signaling.send(null, announce("join"));
-		signaling.send("E", OFFER);
+		signaling.send("2", OFFER);
 		const closed = signaling.close(LEAVE);
 		expect(transport.current.removed).toBe(true);
 		expect(transport.sends).toHaveLength(1);
@@ -285,7 +285,7 @@ describe("call signaling: close", () => {
 		await signaling.close();
 		signaling.send(null, announce("join"));
 		transport.current.onStatus("lost");
-		transport.current.onPayload(envelope("E"));
+		transport.current.onPayload(envelope("2"));
 		await vi.advanceTimersByTimeAsync(60_000);
 		expect(transport.sends).toHaveLength(0);
 		expect(transport.subscriptions).toHaveLength(1);
@@ -297,24 +297,24 @@ describe("call signaling: receiving", () => {
 	it("subscribes to its own inbox and delivers valid envelopes", () => {
 		const transport = new FakeTransport();
 		const { record } = open(transport);
-		expect(transport.current.topic).toBe(`call:${ROOM_ID}:N:3`);
+		expect(transport.current.topic).toBe(`call:${ROOM_ID}:1:3`);
 		expect(record.statuses).toEqual(["joining"]);
 		transport.current.onStatus("open");
 		expect(record.statuses).toEqual(["joining", "subscribed"]);
-		transport.current.onPayload(envelope("E"));
+		transport.current.onPayload(envelope("2"));
 		expect(record.envelopes).toEqual([
-			{ from: "E", fromGen: 1, message: announce("join") },
+			{ from: "2", fromGen: 1, message: announce("join") },
 		]);
 	});
 
 	it("ignores malformed, misaddressed and oversized envelopes", () => {
 		const transport = new FakeTransport();
 		const { record } = open(transport);
-		transport.current.onPayload(envelope("E", { toGen: 2 }));
-		transport.current.onPayload(envelope("N"));
-		transport.current.onPayload(envelope("E", { message: { type: "join" } }));
+		transport.current.onPayload(envelope("2", { toGen: 2 }));
+		transport.current.onPayload(envelope("1"));
+		transport.current.onPayload(envelope("2", { message: { type: "join" } }));
 		transport.current.onPayload(
-			envelope("E", { padding: "x".repeat(64 * 1024) }),
+			envelope("2", { padding: "x".repeat(64 * 1024) }),
 		);
 		transport.current.onPayload("not an envelope");
 		expect(record.envelopes).toHaveLength(0);
@@ -324,16 +324,16 @@ describe("call signaling: receiving", () => {
 		const transport = new FakeTransport();
 		const { record } = open(transport);
 		for (let i = 0; i <= FLOOD_LIMIT; i++) {
-			transport.current.onPayload(envelope("E"));
+			transport.current.onPayload(envelope("2"));
 		}
 		expect(record.envelopes).toHaveLength(FLOOD_LIMIT);
-		transport.current.onPayload(envelope("S"));
+		transport.current.onPayload(envelope("3"));
 		expect(record.envelopes).toHaveLength(FLOOD_LIMIT + 1);
 		await vi.advanceTimersByTimeAsync(FLOOD_WINDOW_MS - 1);
-		transport.current.onPayload(envelope("E"));
+		transport.current.onPayload(envelope("2"));
 		expect(record.envelopes).toHaveLength(FLOOD_LIMIT + 1);
 		await vi.advanceTimersByTimeAsync(1);
-		transport.current.onPayload(envelope("E"));
+		transport.current.onPayload(envelope("2"));
 		expect(record.envelopes).toHaveLength(FLOOD_LIMIT + 2);
 	});
 });
@@ -348,7 +348,7 @@ describe("call signaling: reconnect", () => {
 		expect(record.statuses.at(-1)).toBe("lost");
 		// A transport may report `lost` twice; the repeat during the removal must not start a second inbox.
 		first.onStatus("lost");
-		first.onPayload(envelope("E"));
+		first.onPayload(envelope("2"));
 		expect(record.statuses.filter((s) => s === "lost")).toHaveLength(1);
 		await vi.advanceTimersByTimeAsync(999);
 		expect(transport.subscriptions).toHaveLength(1);
@@ -358,7 +358,7 @@ describe("call signaling: reconnect", () => {
 
 		// The removed channel's late callbacks change nothing.
 		first.onStatus("lost");
-		first.onPayload(envelope("E"));
+		first.onPayload(envelope("2"));
 		expect(record.envelopes).toHaveLength(0);
 		expect(record.statuses.at(-1)).toBe("joining");
 

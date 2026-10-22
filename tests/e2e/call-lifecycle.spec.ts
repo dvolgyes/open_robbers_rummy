@@ -42,7 +42,7 @@ import {
 
 /**
  * Call lifecycle, adversarial and partial-failure rows (call/layout plan C7), on one P2P table through the public
- * trackers. West, North and East are app players that may use the microphone (a generated tone). South is first a
+ * trackers. Player 4, Player 1 and Player 2 are app players that may use the microphone (a generated tone). Player 3 is first a
  * modified client: a harness page (tests/e2e/harness) that holds the seat and sends raw call frames past call
  * signaling. A frame goes to every connected page, so the probe's count of arriving call frames is the positive
  * control: it shows that a frame reached the browser, so "nothing changed" is a real outcome.
@@ -50,8 +50,8 @@ import {
 test.describe.configure({ mode: "serial" });
 
 const HARNESS = "http://localhost:4174/";
-const SEATS = ["W", "N", "E", "S"] as const satisfies readonly SeatKey[];
-const IN_CALL = ["W", "N", "E"] as const satisfies readonly SeatKey[];
+const SEATS = ["4", "1", "2", "3"] as const satisfies readonly SeatKey[];
+const IN_CALL = ["4", "1", "2"] as const satisfies readonly SeatKey[];
 
 /** The ICE timeout (20 s) plus the time to set up the links; `expect.timeout` is shorter. */
 const UNAVAILABLE_WITHIN_MS = 25_000;
@@ -63,7 +63,7 @@ interface HarnessPage {
 	readonly page: Page;
 }
 
-const players = {} as Record<"W" | "N" | "E", Player>;
+const players = {} as Record<"4" | "1" | "2", Player>;
 const tab = {} as Record<SeatKey, Page>;
 let newcomer: Player;
 let south: HarnessPage;
@@ -152,7 +152,7 @@ function raw(
 	);
 }
 
-/** Each seat's generation, as South's harness page knows them. */
+/** Each seat's generation, as Player 3's harness page knows them. */
 async function generations(): Promise<Record<SeatKey, number>> {
 	const { holders } = await callView(south.page);
 	const generation = (seat: SeatKey): number => {
@@ -161,10 +161,10 @@ async function generations(): Promise<Record<SeatKey, number>> {
 		return value;
 	};
 	return {
-		W: generation("W"),
-		N: generation("N"),
-		E: generation("E"),
-		S: generation("S"),
+		"4": generation("4"),
+		"1": generation("1"),
+		"2": generation("2"),
+		"3": generation("3"),
 	};
 }
 
@@ -229,7 +229,7 @@ async function callScene(
 	return scene;
 }
 
-/** A call announcement that would put South in the call with audio, if it were valid. */
+/** A call announcement that would put Player 3 in the call with audio, if it were valid. */
 const ANNOUNCE = {
 	prefs: {
 		inCall: true,
@@ -308,12 +308,12 @@ test.afterAll(async () => {
 	await visitor?.context.close();
 });
 
-test("1: West, North and East join with audio; South's seat is held by a modified client outside the call", async ({
+test("1: Player 4, Player 1 and Player 2 join with audio; Player 3's seat is held by a modified client outside the call", async ({
 	browser,
 }) => {
-	tab.W = await openPage(players.W, "./");
-	link = await createRoom(tab.W);
-	for (const seat of ["N", "E"] as const) {
+	tab["4"] = await openPage(players["4"], "./");
+	link = await createRoom(tab["4"]);
+	for (const seat of ["1", "2"] as const) {
 		tab[seat] = await openPage(players[seat], link);
 		await pick(tab[seat], seat);
 	}
@@ -321,14 +321,14 @@ test("1: West, North and East join with audio; South's seat is held by a modifie
 	if (!key) throw new Error("the table link has no key");
 	tableKey = key;
 	south = await openHarness(browser);
-	await takeSeat(south.page, "S");
+	await takeSeat(south.page, "3");
 	// The tiles come with the first hand, which the hosting page deals once all four seats are present.
 	for (const seat of IN_CALL)
 		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play");
 	for (const seat of IN_CALL) await joinWith(tab[seat], "Audio only");
 	await expectConnected(IN_CALL);
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "S")).toHaveText(
+		await expect(caption(tab[seat], "3")).toHaveText(
 			"S - player2 · Not in call",
 		);
 });
@@ -365,35 +365,35 @@ test("2: frames from a page without a seat, or for another generation, of an unk
 		{
 			what: "a page without a seat",
 			from: page.page,
-			fromGen: gen.S,
+			fromGen: gen["3"],
 			toLater: 0,
 			message: join,
 		},
 		{
 			what: "a later sender generation",
 			from: south.page,
-			fromGen: gen.S + 1,
+			fromGen: gen["3"] + 1,
 			toLater: 0,
 			message: join,
 		},
 		{
 			what: "a later receiver generation",
 			from: south.page,
-			fromGen: gen.S,
+			fromGen: gen["3"],
 			toLater: 1,
 			message: join,
 		},
 		{
 			what: "an unknown type",
 			from: south.page,
-			fromGen: gen.S,
+			fromGen: gen["3"],
 			toLater: 0,
 			message: { type: "hello", session: session() },
 		},
 		{
 			what: "an offer without a target session",
 			from: south.page,
-			fromGen: gen.S,
+			fromGen: gen["3"],
 			toLater: 0,
 			message: {
 				type: "offer",
@@ -415,13 +415,13 @@ test("2: frames from a page without a seat, or for another generation, of an unk
 			);
 
 	await expectArrived(before, refused.length * IN_CALL.length);
-	await tab.W.waitForTimeout(2_000);
+	await tab["4"].waitForTimeout(2_000);
 	expect(await callScene(IN_CALL)).toEqual(scene);
 	await page.context.close();
 	visitor = undefined;
 });
 
-test("3: malformed or misaddressed frames from South's own seat reach the browsers and change nothing", async () => {
+test("3: malformed or misaddressed frames from Player 3's own seat reach the browsers and change nothing", async () => {
 	const gen = await generations();
 	const scene = await callScene(IN_CALL);
 	const before = await receivedBy(IN_CALL);
@@ -461,7 +461,7 @@ test("3: malformed or misaddressed frames from South's own seat reach the browse
 	const toOne: [string, SeatKey, unknown][] = [
 		[
 			"ice without candidates",
-			"W",
+			"4",
 			{
 				type: "ice",
 				session: session(),
@@ -470,11 +470,11 @@ test("3: malformed or misaddressed frames from South's own seat reach the browse
 				candidates: [],
 			},
 		],
-		["an offer to a session that does not exist", "W", description("offer")],
-		["an answer to a session that does not exist", "N", description("answer")],
+		["an offer to a session that does not exist", "4", description("offer")],
+		["an answer to a session that does not exist", "1", description("answer")],
 		[
 			"ice to a session that does not exist",
-			"E",
+			"2",
 			{
 				type: "ice",
 				session: session(),
@@ -486,30 +486,30 @@ test("3: malformed or misaddressed frames from South's own seat reach the browse
 	];
 	for (const [, message] of toAll)
 		for (const seat of IN_CALL)
-			await raw(south.page, seat, gen[seat], gen.S, message);
+			await raw(south.page, seat, gen[seat], gen["3"], message);
 	for (const [, to, message] of toOne)
-		await raw(south.page, to, gen[to], gen.S, message);
+		await raw(south.page, to, gen[to], gen["3"], message);
 
 	await expectArrived(before, toAll.length * IN_CALL.length + toOne.length);
-	await tab.W.waitForTimeout(1_500);
+	await tab["4"].waitForTimeout(1_500);
 	expect(await callScene(IN_CALL)).toEqual(scene);
 });
 
-test("4: a valid join from South opens links; after South goes and its seat is released, the new holder stays outside despite the old holder's stored status", async () => {
+test("4: a valid join from Player 3 opens links; after Player 3 goes and its seat is released, the new holder stays outside despite the old holder's stored status", async () => {
 	test.setTimeout(240_000);
 	const peers = {
-		N: (await counts(tab.N)).peers,
-		E: (await counts(tab.E)).peers,
+		"1": (await counts(tab["1"])).peers,
+		"2": (await counts(tab["2"])).peers,
 	};
-	// The positive control: South's own join through call signaling reaches each in-call seat. North and East
-	// make the first offer to South (the earlier seat offers); West waits for South's offer.
+	// The positive control: Player 3's own join through call signaling reaches each in-call seat. Player 1 and Player 2
+	// make the first offer to Player 3 (the earlier seat offers); Player 4 waits for Player 3's offer.
 	await south.page.evaluate(() => (window.ocHarness as Harness).callOpen());
 	await south.page.evaluate(() => (window.ocHarness as Harness).callSend(null));
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "S")).not.toHaveText(
+		await expect(caption(tab[seat], "3")).not.toHaveText(
 			"S - player2 · Not in call",
 		);
-	for (const seat of ["N", "E"] as const)
+	for (const seat of ["1", "2"] as const)
 		await expect
 			.poll(async () => (await counts(tab[seat])).peers)
 			.toBe(peers[seat] + 1);
@@ -520,7 +520,7 @@ test("4: a valid join from South opens links; after South goes and its seat is r
 			);
 			return [...new Set(received.map((message) => message.from))].sort();
 		})
-		.toEqual(["E", "N", "W"]);
+		.toEqual(["2", "1", "4"]);
 
 	// The old holder's stored status is in the call, with audio.
 	const stored: SubmitResult = await south.page.evaluate(() =>
@@ -532,59 +532,59 @@ test("4: a valid join from South opens links; after South goes and its seat is r
 			const records: CallRecords = await south.page.evaluate(() =>
 				(window.ocHarness as Harness).media(),
 			);
-			return records.S?.prefs.inCall;
+			return records["3"]?.prefs.inCall;
 		})
 		.toBe(true);
 
 	await south.context.close();
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "S")).toHaveText(
+		await expect(caption(tab[seat], "3")).toHaveText(
 			"S - player2 · Not in call",
 			{
 				timeout: GONE_MS,
 			},
 		);
-	for (const seat of ["N", "E"] as const)
+	for (const seat of ["1", "2"] as const)
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(2);
-	await expect(rosterSeat(tab.W, "S")).toHaveAttribute(
+	await expect(rosterSeat(tab["4"], "3")).toHaveAttribute(
 		"data-state",
 		"offline",
 		{
 			timeout: GONE_MS,
 		},
 	);
-	await openDrawer(tab.W);
-	await tab.W.getByTestId("release-S").click();
-	await tab.W.getByTestId("confirm-release-S").click();
-	await expect(rosterSeat(tab.W, "S")).toHaveAttribute("data-state", "free");
+	await openDrawer(tab["4"]);
+	await tab["4"].getByTestId("release-3").click();
+	await tab["4"].getByTestId("confirm-release-3").click();
+	await expect(rosterSeat(tab["4"], "3")).toHaveAttribute("data-state", "free");
 
-	tab.S = await openPage(newcomer, link);
-	await pick(tab.S, "S");
+	tab["3"] = await openPage(newcomer, link);
+	await pick(tab["3"], "3");
 	// The stored status belongs to the previous holder: no call, no capture, no call frame.
-	await tab.S.waitForTimeout(3_000);
-	await expect(panel(tab.S)).toHaveAttribute("data-status", "outside");
-	await expect(joinButton(tab.S)).toBeEnabled();
-	expect(await counts(tab.S)).toMatchObject({
+	await tab["3"].waitForTimeout(3_000);
+	await expect(panel(tab["3"])).toHaveAttribute("data-status", "outside");
+	await expect(joinButton(tab["3"])).toBeEnabled();
+	expect(await counts(tab["3"])).toMatchObject({
 		peers: 0,
 		captures: 0,
 		liveTracks: 0,
 		callSent: 0,
 	});
-	expect(await requestsFor(tab.S, "audio")).toBe(0);
+	expect(await requestsFor(tab["3"], "audio")).toBe(0);
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "S")).toHaveText(
+		await expect(caption(tab[seat], "3")).toHaveText(
 			"S - player2 · Not in call",
 		);
 
-	await joinWith(tab.S, "Audio only");
+	await joinWith(tab["3"], "Audio only");
 	await expectConnected(SEATS);
 });
 
 test("5: when one player leaves, the other three pairs keep their sound", async () => {
-	await leaveButton(tab.S).click();
+	await leaveButton(tab["3"]).click();
 	for (const seat of IN_CALL) {
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(2);
-		await expect(caption(tab[seat], "S")).toHaveText(
+		await expect(caption(tab[seat], "3")).toHaveText(
 			"S - player2 · Not in call",
 		);
 	}
@@ -597,20 +597,20 @@ test("5: when one player leaves, the other three pairs keep their sound", async 
 });
 
 test("6: leaving the room during the call ends the tracks and the links; back in the room, the player rejoins with the stored status", async () => {
-	await tab.E.evaluate(() => {
+	await tab["2"].evaluate(() => {
 		location.hash = "";
 	});
-	await expect(tab.E.getByTestId("create")).toBeVisible();
-	await expect(table(tab.E)).toHaveCount(0);
-	await expect(panel(tab.E)).toHaveCount(0);
+	await expect(tab["2"].getByTestId("create")).toBeVisible();
+	await expect(table(tab["2"])).toHaveCount(0);
+	await expect(panel(tab["2"])).toHaveCount(0);
 	await expect
 		.poll(async () => {
-			const { openPeers, liveTracks } = await counts(tab.E);
+			const { openPeers, liveTracks } = await counts(tab["2"]);
 			return { openPeers, liveTracks };
 		})
 		.toEqual({ openPeers: 0, liveTracks: 0 });
-	for (const seat of ["W", "N"] as const) {
-		await expect(caption(tab[seat], "E")).toHaveText(
+	for (const seat of ["4", "1"] as const) {
+		await expect(caption(tab[seat], "2")).toHaveText(
 			"E - player3 · Not in call",
 			{
 				timeout: GONE_MS,
@@ -619,54 +619,54 @@ test("6: leaving the room during the call ends the tracks and the links; back in
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(1);
 	}
 
-	await tab.E.evaluate((hash) => {
+	await tab["2"].evaluate((hash) => {
 		location.hash = hash;
 	}, new URL(link).hash);
-	await expectSeat(tab.E, "E", {
+	await expectSeat(tab["2"], "2", {
 		timeout: CONNECT_MS,
 	});
-	// East joined with audio in test 1 and did not leave the call, so its stored status brings it back.
-	await expect(leaveButton(tab.E)).toBeVisible({ timeout: CONNECT_MS });
+	// Player 2 joined with audio in test 1 and did not leave the call, so its stored status brings it back.
+	await expect(leaveButton(tab["2"])).toBeVisible({ timeout: CONNECT_MS });
 	await expectConnected(IN_CALL);
 });
 
 test("7: a browser limited to relays gets Retry for each of its pairs, the other pairs connect, and its player still plays", async () => {
 	test.setTimeout(240_000);
-	await leaveButton(tab.N).click();
-	await expect(joinButton(tab.N)).toBeVisible();
-	for (const seat of ["W", "E"] as const)
-		await expect(caption(tab[seat], "N")).toHaveText(
+	await leaveButton(tab["1"]).click();
+	await expect(joinButton(tab["1"])).toBeVisible();
+	for (const seat of ["4", "2"] as const)
+		await expect(caption(tab[seat], "1")).toHaveText(
 			"N - player1 · Not in call",
 		);
-	await setCallRelayOnly(tab.N, true);
-	await joinWith(tab.S, "Audio only");
-	const others = ["W", "E", "S"] as const;
+	await setCallRelayOnly(tab["1"], true);
+	await joinWith(tab["3"], "Audio only");
+	const others = ["4", "2", "3"] as const;
 	await expectConnected(others);
 
-	await joinWith(tab.N, "Audio only");
+	await joinWith(tab["1"], "Audio only");
 	await expect
-		.poll(() => callTransportPolicies(tab.N))
+		.poll(() => callTransportPolicies(tab["1"]))
 		.toEqual(["relay", "relay", "relay"]);
 	for (const seat of others) {
 		await expect(
-			tab.N.getByTestId(`call-retry-${seat}`),
-			`North offers Retry for ${seat}`,
+			tab["1"].getByTestId(`call-retry-${seat}`),
+			`Player 1 offers Retry for ${seat}`,
 		).toBeVisible({ timeout: UNAVAILABLE_WITHIN_MS });
-		await expect(caption(tab.N, seat)).toHaveText(
+		await expect(caption(tab["1"], seat)).toHaveText(
 			`${TILE_NAMES[seat]} · Direct connection unavailable`,
 		);
-		await expect(caption(tab[seat], "N")).toHaveText(
+		await expect(caption(tab[seat], "1")).toHaveText(
 			"N - player1 · Direct connection unavailable",
 			{ timeout: UNAVAILABLE_WITHIN_MS },
 		);
 	}
-	expect(await connectedTo(tab.N)).toEqual([]);
+	expect(await connectedTo(tab["1"])).toEqual([]);
 	for (const seat of others)
 		expect(await connectedTo(tab[seat])).toEqual(
 			names(...others.filter((other) => other !== seat)),
 		);
 
-	// Hand 1 (dealt in test 1): each seat takes one turn, and North acts over its relay-only links.
+	// Hand 1 (dealt in test 1): each seat takes one turn, and Player 1 acts over its relay-only links.
 	await expectAt(0);
 	for (const [index, seat] of (await turnOrder(tab)).entries()) {
 		await expectAt(index * 2);
@@ -685,7 +685,7 @@ test("8: no page and no console message shows an address", async () => {
 		"0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0.local",
 	])
 		expect(hasAddress(sample), "a sample address is found").toBe(true);
-	for (const sample of ["12:30:45", "1♣ by North", "v1.2.3", "Note::"])
+	for (const sample of ["12:30:45", "1♣ by Player 1", "v1.2.3", "Note::"])
 		expect(hasAddress(sample), "a sample without an address").toBe(false);
 
 	for (const [what, page] of Object.entries(tab))

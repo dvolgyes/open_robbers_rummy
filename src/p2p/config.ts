@@ -7,7 +7,7 @@ import { parseStunUrls, rtcConfiguration } from "../call/ice";
  */
 
 /** Unversioned, so pages of different versions meet and report the mismatch. */
-export const APP_ID = "open-canasta";
+export const APP_ID = "open-robbers-rummy";
 
 /** The three trackers that answered in every spike trial (spikes/p2p-discovery). */
 export const DEFAULT_TRACKER_URLS: readonly string[] = [

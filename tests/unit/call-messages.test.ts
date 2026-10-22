@@ -72,20 +72,20 @@ describe("isSession", () => {
 
 describe("inboxTopic", () => {
 	it("builds the topic that the receive policy expects", () => {
-		expect(inboxTopic({ roomId: ROOM, seat: "E", generation: 7 })).toBe(
-			`call:${ROOM}:E:7`,
+		expect(inboxTopic({ roomId: ROOM, seat: "2", generation: 7 })).toBe(
+			`call:${ROOM}:2:7`,
 		);
 		expect(
-			inboxTopic({ roomId: ROOM, seat: "N", generation: MAX_GENERATION }),
-		).toBe(`call:${ROOM}:N:999999999`);
+			inboxTopic({ roomId: ROOM, seat: "1", generation: MAX_GENERATION }),
+		).toBe(`call:${ROOM}:1:999999999`);
 	});
 
 	it.each([
-		{ roomId: "short", seat: "N", generation: 1 },
+		{ roomId: "short", seat: "1", generation: 1 },
 		{ roomId: ROOM, seat: "X", generation: 1 },
-		{ roomId: ROOM, seat: "N", generation: 0 },
-		{ roomId: ROOM, seat: "N", generation: MAX_GENERATION + 1 },
-		{ roomId: ROOM, seat: "N", generation: 1.5 },
+		{ roomId: ROOM, seat: "1", generation: 0 },
+		{ roomId: ROOM, seat: "1", generation: MAX_GENERATION + 1 },
+		{ roomId: ROOM, seat: "1", generation: 1.5 },
 	])("throws on an invalid identity %o", (inbox) => {
 		expect(() => inboxTopic(inbox as InboxIdentity)).toThrow(
 			"invalid call inbox identity",
@@ -251,11 +251,11 @@ describe("parseCallMessage: ICE batches", () => {
 });
 
 describe("parseEnvelope", () => {
-	const inbox: InboxIdentity = { roomId: ROOM, seat: "N", generation: 4 };
+	const inbox: InboxIdentity = { roomId: ROOM, seat: "1", generation: 4 };
 	const envelope = (extra: Record<string, unknown> = {}) => ({
 		v: 1,
 		roomId: ROOM,
-		from: "E",
+		from: "2",
 		fromGen: 2,
 		toGen: 4,
 		id: "3e0c5f7a-0000-4000-8000-000000000000",
@@ -265,7 +265,7 @@ describe("parseEnvelope", () => {
 
 	it("accepts the database envelope and ignores the added id", () => {
 		expect(parseEnvelope(envelope(), inbox)).toEqual({
-			from: "E",
+			from: "2",
 			fromGen: 2,
 			message: { type: "join", session: SESSION_A, ...ANNOUNCEMENT },
 		});
@@ -275,7 +275,7 @@ describe("parseEnvelope", () => {
 		["another version", { v: 2 }],
 		["another room", { roomId: "vutsrqponmlkjihgfedcba" }],
 		["an older generation of this seat", { toGen: 3 }],
-		["a sender at this seat", { from: "N" }],
+		["a sender at this seat", { from: "1" }],
 		["an invalid sender", { from: "X" }],
 		["sender generation 0", { fromGen: 0 }],
 		["a sender generation over the limit", { fromGen: MAX_GENERATION + 1 }],

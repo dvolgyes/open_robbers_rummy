@@ -39,7 +39,7 @@ let east: Player;
 let newcomer: Player;
 /** The tab that currently holds each seat. */
 const tab = {} as Record<SeatKey, Page>;
-/** The browser that currently holds each seat; the newcomer takes North over in row 5c. */
+/** The browser that currently holds each seat; the newcomer takes Player 1 over in row 5c. */
 const holder = {} as Record<SeatKey, Player>;
 let link = "";
 const expected: string[] = [];
@@ -51,10 +51,10 @@ async function expectAllTranscripts(): Promise<void> {
 
 /** Every tab names the same host. Returns its seat. */
 async function commonHost(): Promise<SeatKey> {
-	const seat = await hostRows(tab.W).getAttribute("data-seat", {
+	const seat = await hostRows(tab["4"]).getAttribute("data-seat", {
 		timeout: CONNECT_MS,
 	});
-	if (seat !== "W" && seat !== "N" && seat !== "E" && seat !== "S")
+	if (seat !== "4" && seat !== "1" && seat !== "2" && seat !== "3")
 		throw new Error(`no host seat: ${seat}`);
 	for (const page of Object.values(tab))
 		await expect(hostRows(page)).toHaveAttribute("data-seat", seat, {
@@ -75,7 +75,7 @@ test.beforeAll(async ({ browser, baseURL }) => {
 	south = await open("south");
 	east = await open("east");
 	newcomer = await open("newcomer");
-	Object.assign(holder, { W: west, N: north, S: south, E: east });
+	Object.assign(holder, { "4": west, "1": north, "3": south, "2": east });
 });
 
 // biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object pattern as the first parameter.
@@ -87,21 +87,21 @@ test.afterAll(async () => {
 	for (const player of players) await player.close();
 });
 
-test("1: the creator gets one table link and hosts from West", async () => {
-	tab.W = await west.page("./");
-	link = await createRoom(tab.W);
-	const roster = tab.W.getByTestId("roster");
+test("1: the creator gets one table link and hosts from Player 4", async () => {
+	tab["4"] = await west.page("./");
+	link = await createRoom(tab["4"]);
+	const roster = tab["4"].getByTestId("roster");
 	await expect(roster.locator('li[data-state="online"]')).toHaveCount(1);
 	await expect(roster.locator('li[data-state="free"]')).toHaveCount(3);
-	await expect(hostRows(tab.W)).toHaveAttribute("data-seat", "W");
+	await expect(hostRows(tab["4"])).toHaveAttribute("data-seat", "4");
 	// A message needs no other player: the host orders it at once.
-	await expect(tab.W.getByTestId("send")).toBeEnabled();
+	await expect(tab["4"].getByTestId("send")).toBeEnabled();
 });
 
-test("2: three browsers take North, South and East from the same link; the lobby offers only free seats", async () => {
+test("2: three browsers take Player 1, Player 3 and Player 2 from the same link; the lobby offers only free seats", async () => {
 	for (const [player, seat, offered] of [
-		[north, "N", ["N", "E", "S"]],
-		[south, "S", ["E", "S"]],
+		[north, "1", ["1", "2", "3"]],
+		[south, "3", ["2", "3"]],
 	] as const) {
 		const page = await player.page(link);
 		await expect(
@@ -113,9 +113,9 @@ test("2: three browsers take North, South and East from the same link; the lobby
 		await pick(page, seat);
 		tab[seat] = page;
 	}
-	// East is the last free seat, so its page takes it without a lobby.
-	tab.E = await east.page(link);
-	await expectSeat(tab.E, "E", {
+	// Player 2 is the last free seat, so its page takes it without a lobby.
+	tab["2"] = await east.page(link);
+	await expectSeat(tab["2"], "2", {
 		timeout: CONNECT_MS,
 	});
 	for (const page of Object.values(tab)) {
@@ -130,9 +130,9 @@ test("2: three browsers take North, South and East from the same link; the lobby
 });
 
 test("3: a test message and three replies arrive in one order everywhere", async () => {
-	await sendDraft(tab.W);
-	expected.push(MESSAGE.W);
-	for (const seat of ["N", "S", "E"] as const) {
+	await sendDraft(tab["4"]);
+	expected.push(MESSAGE["4"]);
+	for (const seat of ["1", "3", "2"] as const) {
 		await expect(lines(tab[seat])).toHaveCount(expected.length);
 		await sendDraft(tab[seat]);
 		expected.push(MESSAGE[seat]);
@@ -147,12 +147,14 @@ test("3: a test message and three replies arrive in one order everywhere", async
 });
 
 test("4: a guest reload restores the seat and the transcript", async () => {
-	await tab.S.reload();
-	await expectSeat(tab.S, "S", {
+	await tab["3"].reload();
+	await expectSeat(tab["3"], "3", {
 		timeout: CONNECT_MS,
 	});
-	await expect(texts(tab.S)).toHaveText(expected);
-	await expect(tab.S.getByTestId("banner")).toBeHidden({ timeout: CONNECT_MS });
+	await expect(texts(tab["3"])).toHaveText(expected);
+	await expect(tab["3"].getByTestId("banner")).toBeHidden({
+		timeout: CONNECT_MS,
+	});
 });
 
 test("5a: a held seat is not offered to another browser", async () => {
@@ -165,40 +167,40 @@ test("5a: a held seat is not offered to another browser", async () => {
 });
 
 test("5b: a second tab cannot take an active seat from the first tab", async () => {
-	const old = tab.S;
+	const old = tab["3"];
 	const page = await south.page(link);
 	await expect(page.getByText("All seats are taken.")).toBeVisible({
 		timeout: CONNECT_MS,
 	});
-	await expect(page.locator('[data-testid="take-back-S"]')).toHaveCount(0);
-	await expectSeat(old, "S");
+	await expect(page.locator('[data-testid="take-back-3"]')).toHaveCount(0);
+	await expectSeat(old, "3");
 	await expect(old.getByTestId("send")).toBeEnabled();
 	await expect(old.getByTestId("draft")).toBeEnabled();
 	await page.close();
 });
 
 test("5c: another player releases a silent seat; a new browser takes it; the old tab is superseded when it wakes", async () => {
-	const old = tab.N;
+	const old = tab["1"];
 	const thaw = await freeze(old);
-	// Any seated player may release an offline seat (plan §2 D2); East is not the host.
-	await expect(rosterSeat(tab.E, "N")).toHaveAttribute(
+	// Any seated player may release an offline seat (plan §2 D2); Player 2 is not the host.
+	await expect(rosterSeat(tab["2"], "1")).toHaveAttribute(
 		"data-state",
 		"offline",
 		{
 			timeout: QUIET_MS,
 		},
 	);
-	await tab.E.getByTestId("release-N").click();
-	await tab.E.getByTestId("confirm-release-N").click();
-	await expect(rosterSeat(tab.E, "N")).toHaveAttribute("data-state", "free");
+	await tab["2"].getByTestId("release-1").click();
+	await tab["2"].getByTestId("confirm-release-1").click();
+	await expect(rosterSeat(tab["2"], "1")).toHaveAttribute("data-state", "free");
 
 	// N is the only free seat, so the newcomer's page takes it without a picker.
 	const page = await newcomer.page(link);
-	await expectSeat(page, "N", {
+	await expectSeat(page, "1", {
 		timeout: CONNECT_MS,
 	});
-	tab.N = page;
-	holder.N = newcomer;
+	tab["1"] = page;
+	holder["1"] = newcomer;
 	await expect(texts(page)).toHaveText(expected);
 
 	await thaw();
@@ -212,45 +214,45 @@ test("5c: another player releases a silent seat; a new browser takes it; the old
 	await expect(old.getByText("All seats are taken.")).toBeVisible();
 	await old.close();
 	await expect(
-		tab.W.getByTestId("roster").locator('li[data-state="online"]'),
+		tab["4"].getByTestId("roster").locator('li[data-state="online"]'),
 	).toHaveCount(4, { timeout: CONNECT_MS });
 });
 
 test("5d: reopening the link after closing the tab gives the same seat back", async () => {
-	await tab.E.close();
+	await tab["2"].close();
 	const page = await east.page(link);
-	await expectSeat(page, "E", {
+	await expectSeat(page, "2", {
 		timeout: CONNECT_MS,
 	});
 	await expect(
 		page.getByRole("heading", { name: "Choose your seat" }),
 	).toHaveCount(0);
 	await expect(texts(page)).toHaveText(expected);
-	tab.E = page;
+	tab["2"] = page;
 });
 
 test("6: the host crashes; a guest message waits; it is stored once after the host reopens", async () => {
 	test.setTimeout(240_000);
-	await tab.W.close({ runBeforeUnload: false });
+	await tab["4"].close({ runBeforeUnload: false });
 	// Until the other players' last reports of the host are HOST_LOST_MS old, the banner says that the host is
 	// unreachable; the wait allows for that and for the roster update.
-	await expectBanner(tab.N, "waiting-for-host", {
+	await expectBanner(tab["1"], "waiting-for-host", {
 		timeout: HOST_LOST_MS + 10_000,
 	});
-	// The newcomer took North in 5c with a new tab, and a new tab starts with the drawer closed.
-	await openDrawer(tab.N);
-	await tab.N.getByTestId("send").click();
-	const waiting = tab.N.getByTestId("pending").locator("li");
+	// The newcomer took Player 1 in 5c with a new tab, and a new tab starts with the drawer closed.
+	await openDrawer(tab["1"]);
+	await tab["1"].getByTestId("send").click();
+	const waiting = tab["1"].getByTestId("pending").locator("li");
 	await expect(waiting).toHaveAttribute("data-state", "pending");
 	await expect(waiting).toContainText("Pending — waiting for the host");
-	await expect(texts(tab.N)).toHaveText(expected);
+	await expect(texts(tab["1"])).toHaveText(expected);
 
 	// The table link opens the seat picker (ADR 0005); a player reopens with their own URL, which names the seat.
-	tab.W = await west.page(ownLink(link, "W"));
-	await expectSeat(tab.W, "W", {
+	tab["4"] = await west.page(ownLink(link, "4"));
+	await expectSeat(tab["4"], "4", {
 		timeout: CONNECT_MS,
 	});
-	expected.push(MESSAGE.N);
+	expected.push(MESSAGE["1"]);
 	await expectAllTranscripts();
 	await expect(waiting).toHaveCount(0);
 	for (const page of Object.values(tab))
@@ -265,7 +267,7 @@ test("6: the host crashes; a guest message waits; it is stored once after the ho
 });
 
 test("7: all four browsers quit and reopen the link: same seats, same table", async () => {
-	const seats = ["W", "N", "S", "E"] as const;
+	const seats = ["4", "1", "3", "2"] as const;
 	for (const seat of seats) await holder[seat].restart();
 	for (const seat of seats) {
 		tab[seat] = await holder[seat].page(ownLink(link, seat));
@@ -283,7 +285,7 @@ test("7: all four browsers quit and reopen the link: same seats, same table", as
 
 test("8: a message whose result is lost is stored once", async () => {
 	const host = await commonHost();
-	const seat = (["S", "E", "N"] as const).find((other) => other !== host);
+	const seat = (["3", "2", "1"] as const).find((other) => other !== host);
 	if (!seat) throw new Error("no guest seat");
 	// The host page holds the message unread while the guest's tab closes, so the result goes to a closed page.
 	const thaw = await freeze(tab[host]);
@@ -315,18 +317,18 @@ test("8: a message whose result is lost is stored once", async () => {
 
 test("9: a second game gets a new link and shows no old messages", async () => {
 	const oldKey = new URL(link).hash;
-	await tab.W.goto("./");
-	const second = await createRoom(tab.W);
+	await tab["4"].goto("./");
+	const second = await createRoom(tab["4"]);
 	expect(new URL(second).hash).not.toBe(oldKey);
-	await expect(lines(tab.W)).toHaveCount(0);
+	await expect(lines(tab["4"])).toHaveCount(0);
 	const page = await south.page(second);
-	await expect(page.getByTestId("pick-S")).toBeVisible({
+	await expect(page.getByTestId("pick-3")).toBeVisible({
 		timeout: CONNECT_MS,
 	});
-	await pick(page, "S");
+	await pick(page, "3");
 	await expect(lines(page)).toHaveCount(0);
 	// The first table is unaffected.
-	await expect(texts(tab.N)).toHaveText(expected);
+	await expect(texts(tab["1"])).toHaveText(expected);
 });
 
 test("no uncaught errors and no request to the old backend", () => {

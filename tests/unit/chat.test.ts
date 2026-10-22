@@ -11,8 +11,8 @@ import { CONFIG, OTHER_ROOM_ID, ROOM_ID } from "./fixtures";
 const CONTEXT = {
 	roomId: ROOM_ID,
 	config: CONFIG,
-	seat: "S" as const,
-	holder: "holder-S",
+	seat: "3" as const,
+	holder: "holder-3",
 	commandId: "cmd-1",
 	seq: 1,
 	present: [],
@@ -110,13 +110,13 @@ describe("chatModule.apply", () => {
 describe("parseChatEvent", () => {
 	it("reads an enveloped event and refuses an incomplete one", () => {
 		const event = envelopeEvent(
-			{ roomId: ROOM_ID, seq: 2, commandId: "cmd-2", fromSeat: "S" },
+			{ roomId: ROOM_ID, seq: 2, commandId: "cmd-2", fromSeat: "3" },
 			{ fromName: "player2", text: "hi" },
 		);
 		expect(parseChatEvent(event)).toEqual({
 			seq: 2,
 			commandId: "cmd-2",
-			fromSeat: "S",
+			fromSeat: "3",
 			fromName: "player2",
 			text: "hi",
 		});

@@ -79,7 +79,7 @@ export const MAX_PENDING_PER_SEAT = 50;
 export const MAX_OUTBOX = 50;
 export const MAX_LOG_ENTRIES = 20_000;
 export const MAX_TERM = 2 ** 31 - 1;
-/** Nesting depth of a payload, event or state; a canasta match state uses about 6. */
+/** Nesting depth of a payload, event or state; a rummy table state uses about 6. */
 export const MAX_JSON_DEPTH = 32;
 
 // Rate limits (plan §5).

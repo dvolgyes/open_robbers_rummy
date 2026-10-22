@@ -38,9 +38,9 @@ describe("idleMs and isIdle", () => {
 describe("cleanup", () => {
 	it("expires idle tables with all their partitions and keeps active ones", async () => {
 		const storage = new MemoryStorage();
-		await stored(storage, TABLE, "N", NOW - TABLE_IDLE_MS);
-		await stored(storage, TABLE, "E", NOW - TABLE_IDLE_MS - 1);
-		await stored(storage, OTHER_TABLE, "N", NOW - 1_000);
+		await stored(storage, TABLE, "1", NOW - TABLE_IDLE_MS);
+		await stored(storage, TABLE, "2", NOW - TABLE_IDLE_MS - 1);
+		await stored(storage, OTHER_TABLE, "1", NOW - 1_000);
 		expect(await cleanup(storage, NOW)).toEqual({ ok: true, value: [TABLE] });
 		const left = await storage.partitions();
 		expect(left.ok && left.value.map((info) => info.tableId)).toEqual([
@@ -54,8 +54,8 @@ describe("cleanup", () => {
 
 	it("keeps a stale partition while another partition of its table is active", async () => {
 		const storage = new MemoryStorage();
-		await stored(storage, TABLE, "N", NOW - 2 * TABLE_IDLE_MS);
-		await stored(storage, TABLE, "E", NOW - 1_000);
+		await stored(storage, TABLE, "1", NOW - 2 * TABLE_IDLE_MS);
+		await stored(storage, TABLE, "2", NOW - 1_000);
 		expect(await cleanup(storage, NOW)).toEqual({ ok: true, value: [] });
 		const left = await storage.partitions();
 		expect(left.ok && left.value).toHaveLength(2);

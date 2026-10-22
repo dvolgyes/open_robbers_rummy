@@ -92,11 +92,11 @@ test.afterAll(async () => {
 
 test("a frozen player's seat shows offline, frees after the timeout, and the thawed tab is superseded", async () => {
 	test.setTimeout(180_000);
-	tab.W = await host.page("./");
-	link = await createRoom(tab.W);
+	tab["4"] = await host.page("./");
+	link = await createRoom(tab["4"]);
 	for (const [player, seat] of [
-		[north, "N"],
-		[east, "E"],
+		[north, "1"],
+		[east, "2"],
 	] as const) {
 		const page = await player.page(link);
 		await expect(page.getByTestId(`pick-${seat}`)).toBeVisible({
@@ -105,33 +105,37 @@ test("a frozen player's seat shows offline, frees after the timeout, and the tha
 		await pick(page, seat);
 		tab[seat] = page;
 	}
-	// South is the last free seat, so its page takes it without a picker. Its seat stays held during the test.
-	tab.S = await south.page(link);
-	await expectSeat(tab.S, "S", {
+	// Player 3 is the last free seat, so its page takes it without a picker. Its seat stays held during the test.
+	tab["3"] = await south.page(link);
+	await expectSeat(tab["3"], "3", {
 		timeout: CONNECT_MS,
 	});
-	await expect(rosterSeat(tab.W, "N")).toHaveAttribute("data-state", "online", {
-		timeout: CONNECT_MS,
-	});
+	await expect(rosterSeat(tab["4"], "1")).toHaveAttribute(
+		"data-state",
+		"online",
+		{
+			timeout: CONNECT_MS,
+		},
+	);
 
-	const old = tab.N;
+	const old = tab["1"];
 	const thaw = await freeze(old);
 	const silentSince = Date.now();
-	for (const seat of ["W", "E"] as const)
-		await expect(rosterSeat(tab[seat], "N")).toHaveAttribute(
+	for (const seat of ["4", "2"] as const)
+		await expect(rosterSeat(tab[seat], "1")).toHaveAttribute(
 			"data-state",
 			"offline",
 			{ timeout: QUIET_MS },
 		);
 
 	const page = await newcomer.page(link);
-	const elapsed = await seatOffered(page, "N", silentSince);
+	const elapsed = await seatOffered(page, "1", silentSince);
 	test.info().annotations.push({
 		type: "seat offered after (ms)",
 		description: String(elapsed),
 	});
 	expect(elapsed).toBeGreaterThanOrEqual(EARLIEST_MS);
-	tab.N = page;
+	tab["1"] = page;
 
 	await thaw();
 	await expectBanner(old, "superseded");
@@ -139,47 +143,50 @@ test("a frozen player's seat shows offline, frees after the timeout, and the tha
 		"another device holds this seat now",
 	);
 	await expect(old.getByTestId("send")).toBeDisabled();
-	await expect(rosterSeat(tab.W, "N")).toHaveAttribute("data-state", "online");
+	await expect(rosterSeat(tab["4"], "1")).toHaveAttribute(
+		"data-state",
+		"online",
+	);
 });
 
 test("a frozen host is replaced; its seat frees after the timeout; the thawed old host is superseded", async () => {
 	test.setTimeout(180_000);
-	const old = tab.W;
+	const old = tab["4"];
 	const thaw = await freeze(old);
 	// A frozen or crashed host is "unreachable" until the other players' last reports of it are HOST_LOST_MS old.
-	await expectBanner(tab.N, "waiting-for-host", {
+	await expectBanner(tab["1"], "waiting-for-host", {
 		timeout: HOST_LOST_MS + 10_000,
 	});
-	// East is the witness of the new North (plan §2 D1).
-	const become = tab.N.getByTestId("become-host");
+	// Player 2 is the witness of the new Player 1 (plan §2 D1).
+	const become = tab["1"].getByTestId("become-host");
 	await expect(become).toBeEnabled({ timeout: BUTTON_LATEST_MS });
 	await become.click();
 	const hostSince = Date.now();
-	for (const seat of ["N", "E"] as const) {
-		await expect(hostRows(tab[seat])).toHaveAttribute("data-seat", "N");
+	for (const seat of ["1", "2"] as const) {
+		await expect(hostRows(tab[seat])).toHaveAttribute("data-seat", "1");
 		await expect(tab[seat].getByTestId("banner")).toBeHidden();
 	}
 
 	// The new host starts the old host's seat clock at its claim (plan §4.4 rule 9), and the old host is offline
 	// from then on, so its seat frees after the seat grace.
 	const page = await latecomer.page(link);
-	const elapsed = await seatOffered(page, "W", hostSince);
+	const elapsed = await seatOffered(page, "4", hostSince);
 	test.info().annotations.push({
 		type: "host seat offered after (ms)",
 		description: String(elapsed),
 	});
 	expect(elapsed).toBeGreaterThanOrEqual(SEAT_GRACE_MS - 2_000);
-	tab.W = page;
+	tab["4"] = page;
 
 	await thaw();
 	await expectBanner(old, "superseded");
 	await expect(old.getByTestId("send")).toBeDisabled();
 
-	// The new host orders the new West's message.
-	await sendDraft(tab.W);
-	for (const seat of ["W", "N", "E"] as const)
-		await expect(texts(tab[seat])).toHaveText([MESSAGE.W]);
-	await expectSeat(tab.W, "W");
+	// The new host orders the new Player 4's message.
+	await sendDraft(tab["4"]);
+	for (const seat of ["4", "1", "2"] as const)
+		await expect(texts(tab[seat])).toHaveText([MESSAGE["4"]]);
+	await expectSeat(tab["4"], "4");
 });
 
 test("no uncaught errors and no request to the old backend", () => {

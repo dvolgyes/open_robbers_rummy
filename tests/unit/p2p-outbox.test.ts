@@ -30,7 +30,7 @@ import {
 const HOST = peerId("host");
 const OTHER = peerId("other");
 const TARGET: Target = { peer: HOST, gen: 2 };
-const WAITING = "Waiting for West to come back";
+const WAITING = "Waiting for Player 4 to come back";
 
 class Rig {
 	readonly clock = new VirtualClock();
@@ -65,7 +65,7 @@ class Rig {
 		});
 		if (!created.ok) throw new Error(created.detail);
 		for (const record of records) await storage.putOutbox(record);
-		const opened = await openLog(storage, TABLE, "N");
+		const opened = await openLog(storage, TABLE, "1");
 		if (!opened.ok) throw new Error(opened.detail);
 		return new Rig(storage, opened.value.log, [...opened.value.outbox]);
 	}
@@ -94,7 +94,7 @@ class Rig {
 	}
 
 	async stored(): Promise<string[]> {
-		const loaded = await this.storage.load(TABLE, "N");
+		const loaded = await this.storage.load(TABLE, "1");
 		if (!loaded.ok) throw new Error(loaded.detail);
 		return loaded.value?.outbox.map((record) => record.id) ?? [];
 	}
@@ -166,12 +166,12 @@ describe("submit", () => {
 
 	it("rejects records of another partition", async () => {
 		const storage = new TestStorage();
-		const log = new LocalLog(storage, TABLE, "N");
+		const log = new LocalLog(storage, TABLE, "1");
 		expect(
 			() => new Rig(storage, log, [outboxRecord(1, { tableId: OTHER_TABLE })]),
 		).toThrow("another partition");
 		expect(
-			() => new Rig(storage, log, [outboxRecord(1, { replica: "E" })]),
+			() => new Rig(storage, log, [outboxRecord(1, { replica: "2" })]),
 		).toThrow("another partition");
 	});
 });

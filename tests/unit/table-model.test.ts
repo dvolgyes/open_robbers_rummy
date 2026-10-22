@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { RummyState } from "../../src/game/rummy";
 import { translator } from "../../src/i18n";
 import {
+	DEFAULT_TABLE_SETUP,
 	PROTOCOL_VERSION,
 	type RoomConfig,
 	SEATS,
@@ -21,13 +22,14 @@ import {
 
 const ROOM = "room-1";
 const CONFIG: RoomConfig = {
-	names: { N: "Ann", E: "Ben", S: "Cy", W: "Dee" },
+	names: { "1": "Ann", "2": "Ben", "3": "Cy", "4": "Dee" },
+	table: DEFAULT_TABLE_SETUP,
 };
 const ROSTER: RosterRow[] = SEATS.map((seat) => ({
 	seat,
 	label: seat,
-	host: seat === "N",
-	you: seat === "S",
+	host: seat === "1",
+	you: seat === "3",
 	state: "online",
 	releasable: false,
 }));
@@ -40,7 +42,7 @@ interface HandInput {
 	readonly outcome?: HandState["outcome"];
 }
 
-/** South (engine seat 2) holds a run in hearts; the table has one run. */
+/** Player 3 (engine seat 2) holds a run in hearts; the table has one run. */
 function hand(input: HandInput = {}): HandState {
 	const rules = rulesFor(input.preset ?? "wikipedia", 4, true);
 	return {
@@ -82,7 +84,7 @@ function stateOf(match: HandState | null, actions = 3): RummyState {
 
 function inputFor(
 	state: RummyState | null | undefined,
-	seat: Seat = "S",
+	seat: Seat = "3",
 	overrides: Partial<TableViewInput> = {},
 ): TableViewInput {
 	return {
@@ -92,7 +94,7 @@ function inputFor(
 		terminal: false,
 		present: new Set(SEATS),
 		roster: ROSTER,
-		hostSeat: "N",
+		hostSeat: "1",
 		outbox: [],
 		failures: [],
 		undone: [],
@@ -110,15 +112,15 @@ describe("table phases", () => {
 
 	it("lists the seats in turn order after the viewer and waits for absent players", () => {
 		const view = tableView(
-			inputFor(stateOf(null), "S", { present: new Set(["N", "S"]) }),
+			inputFor(stateOf(null), "3", { present: new Set(["1", "3"]) }),
 		);
 		expect(view.phase).toBe("waiting");
-		expect(view.seats.map((seat) => seat.seat)).toEqual(["W", "N", "E", "S"]);
-		expect(view.prompt).toBe("Waiting for East and West to come back");
+		expect(view.seats.map((seat) => seat.seat)).toEqual(["4", "1", "2", "3"]);
+		expect(view.prompt).toBe("Waiting for Player 2 and Player 4 to come back");
 	});
 
 	it("puts the viewer last in the seat order", () => {
-		expect(seatsAfter(["N", "E", "S", "W"], "N")).toEqual(["E", "S", "W", "N"]);
+		expect(seatsAfter(["1", "2", "3", "4"], "1")).toEqual(["2", "3", "4", "1"]);
 	});
 });
 
@@ -127,12 +129,12 @@ describe("a game in play", () => {
 		const view = tableView(inputFor(stateOf(hand())));
 		expect(view.phase).toBe("play");
 		expect(view.seats.map((seat) => [seat.seat, seat.handCount])).toEqual([
-			["W", 3],
-			["N", 2],
-			["E", 1],
-			["S", 4],
+			["4", 3],
+			["1", 2],
+			["2", 1],
+			["3", 4],
 		]);
-		expect(view.seats.find((seat) => seat.turn)?.seat).toBe("S");
+		expect(view.seats.find((seat) => seat.turn)?.seat).toBe("3");
 		expect(view.table[0]?.cards.map((card) => [card.text, card.gold])).toEqual([
 			["5♥", false],
 			["6♥", false],
@@ -173,7 +175,7 @@ describe("a game in play", () => {
 
 	it("blocks the viewer while a table command is in flight", () => {
 		const view = tableView(
-			inputFor(stateOf(hand()), "S", {
+			inputFor(stateOf(hand()), "3", {
 				outbox: [
 					{
 						id: "c1",
@@ -213,7 +215,7 @@ describe("the draft", () => {
 		);
 		const moved = moveCards(start, ["0-8H", "0-9H"], 0);
 		if (!moved.ok) throw new Error(moved.reason);
-		const draft = draftView(view, "S", moved.draft);
+		const draft = draftView(view, "3", moved.draft);
 		expect(draft.changed).toBe(true);
 		expect(draft.problem).toBeNull();
 		expect(draft.play).toEqual({
@@ -236,7 +238,7 @@ describe("the draft", () => {
 			0,
 		);
 		if (!moved.ok) throw new Error(moved.reason);
-		const draft = draftView(view, "S", moved.draft);
+		const draft = draftView(view, "3", moved.draft);
 		expect(draft.play).toBeUndefined();
 		expect(draft.melds[0]?.problem).toBe(
 			"the cards of a run must share one suit",

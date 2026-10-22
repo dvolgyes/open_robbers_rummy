@@ -6,7 +6,11 @@ import {
 	type Translate,
 	translator,
 } from "../../src/i18n";
-import { PROTOCOL_VERSION, SEATS } from "../../src/protocol";
+import {
+	DEFAULT_TABLE_SETUP,
+	PROTOCOL_VERSION,
+	SEATS,
+} from "../../src/protocol";
 import { type Action, type HandState, rulesFor } from "../../src/rummy";
 import type { RosterRow } from "../../src/ui/model";
 import "../../src/ui/style.css";
@@ -31,8 +35,8 @@ interface HandInput {
 }
 
 /**
- * South (engine seat 2) is the viewer and holds three hearts that extend the table run, the king of clubs, and a
- * joker. East's latest play put the 7♥ on the table.
+ * Player 3 (engine seat 2) is the viewer and holds three hearts that extend the table run, the king of clubs, and a
+ * joker. Player 2's latest play put the 7♥ on the table.
  */
 function hand(input: HandInput = {}): HandState {
 	return {
@@ -60,7 +64,7 @@ function hand(input: HandInput = {}): HandState {
 	};
 }
 
-/** The view of South; North hosts. */
+/** The view of Player 3; Player 1 hosts. */
 function viewOf(
 	match: HandState,
 	actions = 3,
@@ -81,19 +85,22 @@ function viewOf(
 	const roster: RosterRow[] = SEATS.map((seat) => ({
 		seat,
 		label: seat,
-		host: seat === "N",
-		you: seat === "S",
+		host: seat === "1",
+		you: seat === "3",
 		state: "online",
 		releasable: false,
 	}));
 	return tableView({
-		config: { names: { N: "Ann", E: "Ben", S: "Cy", W: "Dee" } },
-		seat: "S",
+		config: {
+			names: { "1": "Ann", "2": "Ben", "3": "Cy", "4": "Dee" },
+			table: DEFAULT_TABLE_SETUP,
+		},
+		seat: "3",
 		state,
 		terminal: false,
 		present: new Set(SEATS),
 		roster,
-		hostSeat: "N",
+		hostSeat: "1",
 		outbox: [],
 		failures: [],
 		undone: [],
@@ -156,8 +163,8 @@ describe("the other players", () => {
 		const seats = [...opponents.querySelectorAll(".seat.opponent")].map(
 			(node) => node.getAttribute("data-testid"),
 		);
-		expect(seats).toEqual(["seat-W", "seat-N", "seat-E"]);
-		const west = query(opponents, '[data-testid="seat-W"]');
+		expect(seats).toEqual(["seat-4", "seat-1", "seat-2"]);
+		const west = query(opponents, '[data-testid="seat-4"]');
 		const strip = query(west, '[data-testid="card-count"]');
 		expect(strip.dataset.count).toBe("3");
 		expect(strip.querySelectorAll(".count-back")).toHaveLength(3);
@@ -444,7 +451,7 @@ describe("texts", () => {
 		click(section.element, '[data-meld="0"] [data-testid="meld-add"]');
 		click(section.element, '[data-meld="0"] [data-card="0-KC"]');
 		click(section.element, ".sort-toggle");
-		section.setBotControls(true, ["E", "W"]);
+		section.setBotControls(true, ["2", "4"]);
 		section.setPlayerAutoplay(true, false, false, "");
 		section.setPlayerAutoplay(true, true, false, "");
 		section.render(

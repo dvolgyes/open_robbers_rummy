@@ -14,6 +14,8 @@ import {
 	type RoomConfig,
 	SEATS,
 	type Seat,
+	seatName,
+	seatsOf,
 } from "../protocol";
 import {
 	type Authority,
@@ -500,8 +502,8 @@ function ageOf(value: unknown): number | undefined {
 export function parseTableConfig(value: unknown): RoomConfig | undefined {
 	const config = parseRoomConfig(value);
 	if (config === undefined) return undefined;
-	for (const seat of SEATS) {
-		const name = config.names[seat];
+	for (const seat of seatsOf(config)) {
+		const name = seatName(config, seat);
 		if (name.trim() !== name || Array.from(name).length > MAX_NAME_LENGTH) {
 			return undefined;
 		}

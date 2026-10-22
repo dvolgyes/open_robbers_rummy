@@ -69,14 +69,14 @@ test("host bots play a whole hand, and the host deals the next one", async ({
 	const requests = await routeBots(page);
 	await page.goto("/");
 	for (const [seat, name] of [
-		["N", "robot north"],
-		["E", "bot east"],
-		["S", "robot south"],
-		["W", "robot west"],
+		["1", "robot north"],
+		["2", "bot east"],
+		["3", "robot south"],
+		["4", "robot west"],
 	] as const) {
 		await page.locator(`input[name="name-${seat}"]`).fill(name);
 	}
-	for (const seat of ["N", "E", "S", "W"])
+	for (const seat of ["1", "2", "3", "4"])
 		await page.locator(`input[name="bot-${seat}"]`).check();
 	await page.locator('input[name="openrouter-key"]').fill("test-key");
 	await page.getByTestId("create").click();
@@ -113,7 +113,7 @@ test("paused bots stay paused after the host reloads, and play again only on res
 	test.setTimeout(180_000);
 	const requests = await routeBots(page);
 	await page.goto("/");
-	for (const seat of ["N", "E", "S", "W"])
+	for (const seat of ["1", "2", "3", "4"])
 		await page.locator(`input[name="bot-${seat}"]`).check();
 	await page.locator('input[name="openrouter-key"]').fill("test-key");
 	await page.getByTestId("create").click();
@@ -134,7 +134,7 @@ test("paused bots stay paused after the host reloads, and play again only on res
 	await expect(page.getByRole("button", { name: "Resume bots" })).toBeVisible();
 	await expect(page.getByRole("button", { name: "Pause bots" })).toBeHidden();
 	await expect(
-		page.getByTestId("tile-E").locator(".bot-overlay"),
+		page.getByTestId("tile-2").locator(".bot-overlay"),
 	).toBeVisible();
 	const pausedAt = await page.getByTestId("table").getAttribute("data-at");
 	const pausedRequests = requests();
@@ -176,21 +176,26 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 		await routeBots(hostPage);
 		const link = await createRoom(hostPage);
 		const northPage = await north.page(link);
-		await pick(northPage, "N");
+		await pick(northPage, "1");
 		const southPage = await south.page(link);
-		await pick(southPage, "S");
-		// East is the last free seat, so its page takes it without a picker.
+		await pick(southPage, "3");
+		// Player 2 is the last free seat, so its page takes it without a picker.
 		const eastPage = await east.page(link);
-		const pages = { W: hostPage, N: northPage, E: eastPage, S: southPage };
+		const pages = {
+			"4": hostPage,
+			"1": northPage,
+			"2": eastPage,
+			"3": southPage,
+		};
 		for (const page of Object.values(pages))
 			await expect(page.getByTestId("table")).toHaveAttribute(
 				"data-phase",
 				"play",
 				{ timeout: CONNECT_MS },
 			);
-		// The first dealer is random. The players before East take their turns, so that East has the turn.
+		// The first dealer is random. The players before Player 2 take their turns, so that Player 2 has the turn.
 		const order = await turnOrder(pages);
-		const before = order.indexOf("E");
+		const before = order.indexOf("2");
 		for (const [index, seat] of order.slice(0, before).entries())
 			await takeTurn(pages[seat], index * 2);
 		await expect(eastPage.getByTestId("action-draw")).toBeEnabled({
@@ -206,7 +211,7 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 			.getByRole("button", { name: "Join call", exact: true })
 			.click();
 		await expect(northPage.getByTestId("call-note")).toContainText(
-			"Connected to West.",
+			"Connected to Player 4.",
 			{ timeout: CONNECT_MS },
 		);
 
@@ -218,9 +223,9 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 			.fill("test-key");
 		await hostPage.getByRole("button", { name: "Save key" }).click();
 
-		// A bot seat keeps the person's call: North still sends audio while its seat plays as a bot.
+		// A bot seat keeps the person's call: Player 1 still sends audio while its seat plays as a bot.
 		await hostPage
-			.getByTestId("tile-N")
+			.getByTestId("tile-1")
 			.getByRole("button", { name: /Switch to bot$/ })
 			.click();
 		await expect(
@@ -230,13 +235,13 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 			northPage.getByRole("button", { name: "Send mic audio", exact: true }),
 		).toHaveAttribute("data-actual", "on");
 		await hostPage
-			.getByTestId("tile-N")
+			.getByTestId("tile-1")
 			.getByRole("button", { name: /Switch to player$/ })
 			.click();
 
-		// East has the turn: as a bot it draws and discards without a click, so the table moves past its turn.
+		// Player 2 has the turn: as a bot it draws and discards without a click, so the table moves past its turn.
 		await hostPage
-			.getByTestId("tile-E")
+			.getByTestId("tile-2")
 			.getByRole("button", { name: /Switch to bot$/ })
 			.click();
 		await expect
@@ -246,11 +251,11 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 				{ timeout: 30_000 },
 			)
 			.toBeGreaterThanOrEqual(before * 2 + 2);
-		expect(new URL(hostPage.url()).searchParams.get("bot_seats")).toBe("E");
+		expect(new URL(hostPage.url()).searchParams.get("bot_seats")).toBe("2");
 		await expect(
-			hostPage.getByTestId("tile-E").locator(".bot-overlay"),
+			hostPage.getByTestId("tile-2").locator(".bot-overlay"),
 		).toBeVisible();
-		// South plays next, as a person.
+		// Player 3 plays next, as a person.
 		await expect(southPage.getByTestId("action-draw")).toBeEnabled({
 			timeout: 30_000,
 		});
@@ -258,7 +263,7 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 		// The bot seat survives the host's reload: the seat list is in the host's URL.
 		await hostPage.reload();
 		await expect(
-			hostPage.getByTestId("tile-E").locator(".bot-overlay"),
+			hostPage.getByTestId("tile-2").locator(".bot-overlay"),
 		).toBeVisible({ timeout: CONNECT_MS });
 	} finally {
 		for (const player of [host, north, east, south]) await player.close();

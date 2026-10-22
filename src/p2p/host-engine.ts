@@ -1,5 +1,11 @@
 import type { GameModule } from "../game/module";
-import { envelopeEvent, type JsonObject, SEATS, type Seat } from "../protocol";
+import {
+	envelopeEvent,
+	type JsonObject,
+	SEATS,
+	type Seat,
+	seatsOf,
+} from "../protocol";
 import { type Authority, sameAuthority } from "./authority";
 import { idleMs, isIdle } from "./expiry";
 import { deriveHolder } from "./keys";
@@ -159,11 +165,13 @@ export class HostEngine {
 	async activateBots(seats: readonly Seat[]): Promise<boolean> {
 		let table = this.#table();
 		if (!table || this.#stopped) return false;
+		const inPlay = seatsOf(table.config);
+		if (!seats.every((seat) => inPlay.includes(seat))) return false;
 		for (const seat of seats) {
 			let row = seatRow(table, seat);
 			const holder = await deriveHolder(
 				this.#tableId,
-				`open-canasta|host-bot|${seat}`,
+				`open-robbers-rummy|host-bot|${seat}`,
 			);
 			if (row.holder === null) {
 				const seq = table.rev + 1;
@@ -216,11 +224,12 @@ export class HostEngine {
 	/** Host-only automation. An occupied player's holder stays; an empty seat gets a deterministic bot holder. */
 	async setBotSeat(seat: Seat, enabled: boolean): Promise<boolean> {
 		let table = this.#table();
-		if (!table || this.#stopped) return false;
+		if (!table || this.#stopped || !seatsOf(table.config).includes(seat))
+			return false;
 		const row = seatRow(table, seat);
 		const holder = await deriveHolder(
 			this.#tableId,
-			`open-canasta|host-bot|${seat}`,
+			`open-robbers-rummy|host-bot|${seat}`,
 		);
 		if (enabled) {
 			if (seat !== this.#deps.log.seat && row.holder === null) {
@@ -407,7 +416,7 @@ export class HostEngine {
 			auth: this.#deps.auth,
 			seats,
 			peers: peers.filter(
-				({ peer }) => !peer.startsWith("open-canasta-host-bot:"),
+				({ peer }) => !peer.startsWith("open-robbers-rummy-host-bot:"),
 			),
 			bots: [...this.#localBots],
 			autoplay: true,
@@ -737,7 +746,7 @@ export class HostEngine {
 				holder,
 				commandId: id,
 				seq,
-				present: SEATS.filter(
+				present: seatsOf(table.config).filter(
 					(seat) => seat === this.#deps.log.seat || this.#online(table, seat),
 				),
 				features: new Map(
@@ -880,7 +889,7 @@ export class HostEngine {
 	}
 
 	#localPeer(seat: Seat): string {
-		return `open-canasta-host-bot:${seat}`;
+		return `open-robbers-rummy-host-bot:${seat}`;
 	}
 
 	#localResultKey(peer: string, id: string): string {
@@ -991,6 +1000,7 @@ export class HostEngine {
 
 	/** Free, or held by an offline holder past the seat hold or grace period (plan §4.6). */
 	#available(table: TableRecord, seat: Seat): boolean {
+		if (!seatsOf(table.config).includes(seat)) return false;
 		const row = seatRow(table, seat);
 		return (
 			row.holder === null ||

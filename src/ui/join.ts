@@ -169,7 +169,7 @@ export function showTable(
 		}
 		if (view.seat !== null) {
 			navigation.rememberSeat(view.seat);
-			document.title = `Open Robber's Rummy: ${view.table?.config.names[view.seat] ?? SEAT_NAMES[view.seat]} (${deps.t(view.seat)})`;
+			document.title = `Open Robber's Rummy: ${view.table?.config.names[view.seat] ?? SEAT_NAMES[view.seat]} (${deps.t(SEAT_NAMES[view.seat])})`;
 			shown = undefined;
 			notice = undefined;
 			roomSeat = view.seat;

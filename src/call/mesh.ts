@@ -35,6 +35,8 @@ export interface CallRoomSnapshot {
 	readonly roomId: string;
 	/** Null when this tab is superseded, the room expired, or the room stopped. */
 	readonly self: { readonly seat: Seat; readonly generation: number } | null;
+	/** The seats in play at this table, in `SEATS` order. */
+	readonly seats: readonly Seat[];
 	/** Seats with a holder → the holder's current generation. */
 	readonly holders: Partial<Record<Seat, number>>;
 	/** Seats whose current holder is present in the room channel. */

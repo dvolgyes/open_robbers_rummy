@@ -3,7 +3,6 @@ import {
 	handViewFor,
 	isTableCommand,
 	parseAction,
-	playingSeats,
 	type RummyState,
 	tableSeat,
 	waitingText,
@@ -12,7 +11,13 @@ import { englishTranslator as english, type Translate } from "../i18n";
 import type { OutboxItem } from "../p2p/outbox";
 import type { CommandFailure } from "../p2p/table";
 import type { Entry } from "../p2p/wire";
-import { isObject, type RoomConfig, SEAT_NAMES, type Seat } from "../protocol";
+import {
+	isObject,
+	type RoomConfig,
+	SEAT_NAMES,
+	type Seat,
+	seatsOf,
+} from "../protocol";
 import {
 	type Action,
 	applyAction,
@@ -167,7 +172,7 @@ function seatViews(
 ): SeatView[] {
 	const { seat, config, roster, hostSeat, present, bots } = input;
 	const hostOnline = hostSeat !== null && present.has(hostSeat);
-	return seatsAfter(playingSeats(config), seat).map((owner): SeatView => {
+	return seatsAfter(seatsOf(config), seat).map((owner): SeatView => {
 		const presence = presenceOf(roster, owner);
 		const joined = presence !== "free";
 		const bot = bots?.has(owner) ?? false;
@@ -537,7 +542,7 @@ export function tableView(input: TableViewInput): TableView {
 		return emptyView("unreadable", t("This room has no rummy table."));
 
 	const match = state.match;
-	const dealWait = waitingText(playingSeats(config), [...input.present]);
+	const dealWait = waitingText(seatsOf(config), [...input.present]);
 	if (match === null) {
 		return {
 			...emptyView("waiting", ""),

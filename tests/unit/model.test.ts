@@ -10,7 +10,12 @@ import type {
 	TableStatus,
 } from "../../src/p2p/table";
 import type { Entry, Lobby, Roster } from "../../src/p2p/wire";
-import type { JsonObject, RoomConfig, Seat } from "../../src/protocol";
+import {
+	DEFAULT_TABLE_SETUP,
+	type JsonObject,
+	type RoomConfig,
+	type Seat,
+} from "../../src/protocol";
 import {
 	type BannerInput,
 	bannerFor,
@@ -31,10 +36,11 @@ import {
 
 const TABLE_ID = "Table_ID-0123456789abc";
 const CONFIG: RoomConfig = {
-	names: { N: "player1", E: "player3", S: "player2", W: "player4" },
+	names: { "1": "player1", "2": "player3", "3": "player2", "4": "player4" },
+	table: DEFAULT_TABLE_SETUP,
 };
-const AUTH = { term: 1, tag: "holder-W", inc: 1 };
-const ALL = new Set<Seat>(["N", "E", "S", "W"]);
+const AUTH = { term: 1, tag: "holder-4", inc: 1 };
+const ALL = new Set<Seat>(["1", "2", "3", "4"]);
 
 function chatEntry(
 	seq: number,
@@ -67,12 +73,12 @@ function chatEntry(
 function input(overrides: Partial<RoomViewInput> = {}): RoomViewInput {
 	return {
 		config: CONFIG,
-		seat: "N",
+		seat: "1",
 		terminal: false,
 		ready: true,
 		held: ALL,
 		online: ALL,
-		hostSeat: "W",
+		hostSeat: "4",
 		acked: {},
 		entries: [],
 		outbox: [],
@@ -83,33 +89,89 @@ function input(overrides: Partial<RoomViewInput> = {}): RoomViewInput {
 }
 
 describe("checkCreateFields", () => {
-	it("accepts the default fields with West as the creator's seat and trims names", () => {
+	it("accepts the default fields with player 1 as the creator's seat and trims names", () => {
 		const result = checkCreateFields({
 			...DEFAULT_CREATE_FIELDS,
-			names: { ...DEFAULT_CREATE_FIELDS.names, N: "  player1  " },
+			names: { ...DEFAULT_CREATE_FIELDS.names, "1": "  player1  " },
 		});
-		expect(result).toEqual({ ok: true, config: CONFIG, seat: "W" });
+		expect(result).toEqual({
+			ok: true,
+			config: {
+				names: {
+					"1": "player1",
+					"2": "player2",
+					"3": "player3",
+					"4": "player4",
+				},
+				table: DEFAULT_TABLE_SETUP,
+			},
+			seat: "1",
+		});
+	});
+
+	it("keeps only the names of the seats in play, from two to six players", () => {
+		const fields = {
+			...DEFAULT_CREATE_FIELDS,
+			names: { ...DEFAULT_CREATE_FIELDS.names, "6": "" },
+		};
+		const two = checkCreateFields({ ...fields, count: 2 });
+		expect(two.ok && two.config.names).toEqual({
+			"1": "player1",
+			"2": "player2",
+		});
+		const table = { preset: "machiavelli", jokers: 6, assist: false } as const;
+		const six = checkCreateFields({
+			...DEFAULT_CREATE_FIELDS,
+			count: 6,
+			seat: "6",
+			table,
+		});
+		expect(six.ok && Object.keys(six.config.names)).toEqual([
+			"1",
+			"2",
+			"3",
+			"4",
+			"5",
+			"6",
+		]);
+		expect(six.ok && six.config.table).toEqual(table);
+		expect(checkCreateFields({ ...DEFAULT_CREATE_FIELDS, count: 1 }).ok).toBe(
+			false,
+		);
+		expect(checkCreateFields({ ...DEFAULT_CREATE_FIELDS, count: 7 }).ok).toBe(
+			false,
+		);
+	});
+
+	it("refuses a creator's seat outside the players in play", () => {
+		expect(
+			checkCreateFields({ ...DEFAULT_CREATE_FIELDS, count: 3, seat: "4" }),
+		).toEqual({ ok: false, errors: ["Choose your seat."] });
 	});
 
 	it("counts characters, not UTF-16 units, against the 40-character limit", () => {
 		const forty = "🂡".repeat(40);
-		const names = { ...DEFAULT_CREATE_FIELDS.names, E: forty, S: `${forty}x` };
+		const names = {
+			...DEFAULT_CREATE_FIELDS.names,
+			"2": forty,
+			"3": `${forty}x`,
+		};
 		const result = checkCreateFields({ ...DEFAULT_CREATE_FIELDS, names });
 		expect(result).toEqual({
 			ok: false,
-			errors: ["South: use at most 40 characters."],
+			errors: ["Player 3: use at most 40 characters."],
 		});
 	});
 
 	it("lists every problem: blank names and no seat for the creator", () => {
-		const names = { ...DEFAULT_CREATE_FIELDS.names, N: " ", W: "" };
+		const names = { ...DEFAULT_CREATE_FIELDS.names, "1": " ", "4": "" };
 		expect(
 			checkCreateFields({ ...DEFAULT_CREATE_FIELDS, names, seat: "X" }),
 		).toEqual({
 			ok: false,
 			errors: [
-				"North: enter a name.",
-				"West: enter a name.",
+				"Player 1: enter a name.",
+				"Player 4: enter a name.",
 				"Choose your seat.",
 			],
 		});
@@ -201,10 +263,10 @@ describe("lobbyScreen", () => {
 		config: CONFIG,
 		idleMs: 0,
 		seats: [
-			{ seat: "N", available: true, online: false, mine: false },
-			{ seat: "E", available: false, online: true, mine: false },
-			{ seat: "S", available: true, online: false, mine: true },
-			{ seat: "W", available: false, online: true, mine: false },
+			{ seat: "1", available: true, online: false, mine: false },
+			{ seat: "2", available: false, online: true, mine: false },
+			{ seat: "3", available: true, online: false, mine: true },
+			{ seat: "4", available: false, online: true, mine: false },
 		],
 	};
 	const lobby = (overrides: Partial<LobbyInput> = {}) =>
@@ -218,10 +280,10 @@ describe("lobbyScreen", () => {
 		});
 
 	it("offers only available seats that no active same-browser tab holds", () => {
-		expect(lobby({ heldElsewhere: ["S"] })).toEqual({
+		expect(lobby({ heldElsewhere: ["3"] })).toEqual({
 			kind: "lobby",
 			status: undefined,
-			choices: [{ seat: "N", label: "North — player1" }],
+			choices: [{ seat: "1", label: "Player 1 — player1" }],
 		});
 	});
 
@@ -229,7 +291,7 @@ describe("lobbyScreen", () => {
 		expect(
 			lobby({
 				lobby: null,
-				heldElsewhere: ["E"],
+				heldElsewhere: ["2"],
 				election: { phase: "waiting-for-host", absentMs: 3000, button: null },
 			}),
 		).toEqual({
@@ -277,11 +339,11 @@ describe("networkLines", () => {
 	const PEERS: PeerView[] = [
 		{
 			peer: "peer-e",
-			seat: "E",
+			seat: "2",
 			check: { state: "ready", rttMs: 41.6 },
 			path: { local: "srflx", remote: "srflx" },
 		},
-		{ peer: "peer-s", seat: "S", check: { state: "checking" }, path: null },
+		{ peer: "peer-s", seat: "3", check: { state: "checking" }, path: null },
 		{
 			peer: "visitor",
 			seat: null,
@@ -302,7 +364,7 @@ describe("networkLines", () => {
 		).toEqual([
 			{ label: "Trackers reachable", value: "2 of 3" },
 			{ label: "Direct connections", value: "3" },
-			{ label: "Players checked", value: "East (42 ms)" },
+			{ label: "Players checked", value: "Player 2 (42 ms)" },
 			{ label: "Pages not reachable directly", value: "1" },
 			{
 				label: "Link repair rooms",
@@ -338,20 +400,20 @@ describe("seats", () => {
 			k: "roster",
 			auth: AUTH,
 			seats: [
-				{ seat: "N", holder: "h-n", gen: 2, acked: 0 },
-				{ seat: "E", holder: "h-e", gen: 1, acked: 0 },
-				{ seat: "S", holder: null, gen: 1, acked: 0 },
-				{ seat: "W", holder: "h-w", gen: 1, acked: 0 },
+				{ seat: "1", holder: "h-n", gen: 2, acked: 0 },
+				{ seat: "2", holder: "h-e", gen: 1, acked: 0 },
+				{ seat: "3", holder: null, gen: 1, acked: 0 },
+				{ seat: "4", holder: "h-w", gen: 1, acked: 0 },
 			],
 			peers: [
-				{ peer: "peer-n", seat: "N", gen: 1 },
-				{ peer: "peer-e", seat: "E", gen: 1 },
+				{ peer: "peer-n", seat: "1", gen: 1 },
+				{ peer: "peer-e", seat: "2", gen: 1 },
 			],
 			bots: [],
 		};
-		expect([...presentSeats("W", roster)].sort()).toEqual(["E", "W"]);
+		expect([...presentSeats("4", roster)].sort()).toEqual(["2", "4"]);
 		expect([...presentSeats(null, null)]).toEqual([]);
-		expect([...heldSeats(roster.seats)].sort()).toEqual(["E", "N", "W"]);
+		expect([...heldSeats(roster.seats)].sort()).toEqual(["1", "2", "4"]);
 	});
 });
 
@@ -359,14 +421,14 @@ describe("roomView", () => {
 	it("counts receipts from the seats other than the sender", () => {
 		const view = roomView(
 			input({
-				entries: [chatEntry(1, "W", "hello all")],
-				acked: { N: 1, E: 0, S: 1, W: 1 },
+				entries: [chatEntry(1, "4", "hello all")],
+				acked: { "1": 1, "2": 0, "3": 1, "4": 1 },
 			}),
 		);
 		expect(view.transcript).toEqual([
 			{
 				seq: 1,
-				from: "West — player4",
+				from: "Player 4 — player4",
 				text: "hello all",
 				receivedBy: 2,
 				of: 3,
@@ -375,14 +437,14 @@ describe("roomView", () => {
 	});
 
 	it("leaves seat changes and table events out of the messages", () => {
-		const { payload: _, ...base } = chatEntry(1, "N", "");
+		const { payload: _, ...base } = chatEntry(1, "1", "");
 		const claim: Entry = {
 			...base,
 			kind: "seat",
 			op: { type: "claim", holder: "h-n" },
 			event: {},
 		};
-		const call = chatEntry(2, "N", "");
+		const call = chatEntry(2, "1", "");
 		const tableEvent: Entry = {
 			...call,
 			payload: {
@@ -396,7 +458,7 @@ describe("roomView", () => {
 			event: { ...call.event, kind: "call" },
 		};
 		const view = roomView(
-			input({ entries: [claim, tableEvent, chatEntry(3, "E", "good luck")] }),
+			input({ entries: [claim, tableEvent, chatEntry(3, "2", "good luck")] }),
 		);
 		expect(view.transcript.map((line) => [line.seq, line.text])).toEqual([
 			[3, "good luck"],
@@ -435,7 +497,7 @@ describe("roomView", () => {
 		};
 		const view = roomView(
 			input({
-				undone: [chatEntry(5, "N", "lost")],
+				undone: [chatEntry(5, "1", "lost")],
 				failures: [
 					failure(1, "rejected", "message is empty"),
 					failure(2, "full"),
@@ -444,7 +506,7 @@ describe("roomView", () => {
 					item(1, "queued"),
 					item(2, "sent"),
 					item(3, "accepted"),
-					item(4, "queued", "Waiting for East to come back"),
+					item(4, "queued", "Waiting for Player 2 to come back"),
 					{ id: "local-5", payload: play, order: 5, state: "queued" },
 				],
 			}),
@@ -458,7 +520,7 @@ describe("roomView", () => {
 			["m1", "pending", undefined],
 			["m2", "sending", undefined],
 			["m3", "sending", undefined],
-			["m4", "pending", "Waiting for East to come back"],
+			["m4", "pending", "Waiting for Player 2 to come back"],
 		]);
 	});
 
@@ -473,23 +535,23 @@ describe("roomView", () => {
 	});
 
 	it("marks seats online, offline or free; any seated player may release another player's offline seat", () => {
-		const held = new Set<Seat>(["N", "S", "W"]);
-		const online = new Set<Seat>(["N", "W"]);
-		const view = roomView(input({ held, online, hostSeat: "W" }));
+		const held = new Set<Seat>(["1", "3", "4"]);
+		const online = new Set<Seat>(["1", "4"]);
+		const view = roomView(input({ held, online, hostSeat: "4" }));
 		expect(
 			view.roster.map((row) => [row.seat, row.state, row.host, row.releasable]),
 		).toEqual([
-			["N", "online", false, false],
-			["E", "free", false, false],
-			["S", "offline", false, true],
-			["W", "online", true, false],
+			["1", "online", false, false],
+			["2", "free", false, false],
+			["3", "offline", false, true],
+			["4", "online", true, false],
 		]);
 		const terminal = roomView(input({ held, online, terminal: true }));
 		expect(terminal.roster.some((row) => row.releasable)).toBe(false);
 	});
 
 	it("fills the send field with a test message from the own seat", () => {
-		expect(draftFor("E")).toBe("Connection test from East");
+		expect(draftFor("2")).toBe("Connection test from Player 2");
 	});
 
 	it("says why a chat message was not sent in the viewer's language", () => {

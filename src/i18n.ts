@@ -29,14 +29,6 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 		de: {
 			Language: "Sprache",
 			Automatic: "Automatisch",
-			North: "Norden",
-			East: "Osten",
-			South: "Süden",
-			West: "Westen",
-			N: "N",
-			E: "O",
-			S: "S",
-			W: "W",
 			and: "und",
 			"Room lobby": "Raumlobby",
 			"Waiting for {players} to come back":
@@ -81,8 +73,6 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"Gib einen OpenRouter-API-Schlüssel ein, um Bots in diesem Browser zu verwenden.",
 			"This browser could not store the OpenRouter API key.":
 				"Dieser Browser konnte den OpenRouter-API-Schlüssel nicht speichern.",
-			"Enter the four players. Choose your seat. Your browser hosts first; anyone at the table can take over.":
-				"Gib die vier Spielernamen ein und wähle deinen Platz. Dein Browser hostet zuerst; alle am Tisch können übernehmen.",
 			"This link is for the old version. Ask the table creator for a new link.":
 				"Dieser Link gehört zu einer alten Version. Bitte den Ersteller des Tisches um einen neuen Link.",
 			"This link is for another version of the app. Reload the page, or ask the table creator for a new link.":
@@ -359,14 +349,6 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 		hu: {
 			Language: "Nyelv",
 			Automatic: "Automatikus",
-			North: "Észak",
-			East: "Kelet",
-			South: "Dél",
-			West: "Nyugat",
-			N: "É",
-			E: "K",
-			S: "D",
-			W: "Ny",
 			and: "és",
 			"Room lobby": "Játékszoba várója",
 			"Waiting for {players} to come back":
@@ -414,8 +396,6 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"Adj meg egy OpenRouter API-kulcsot a botok futtatásához ebben a böngészőben.",
 			"This browser could not store the OpenRouter API key.":
 				"A böngésző nem tudta eltárolni az OpenRouter API-kulcsot.",
-			"Enter the four players. Choose your seat. Your browser hosts first; anyone at the table can take over.":
-				"Add meg a négy játékos nevét, majd válassz helyet. A böngésződ lesz először a host; bárki átveheti az asztalnál.",
 			"This link is for the old version. Ask the table creator for a new link.":
 				"Ez a hivatkozás egy régi verzióhoz tartozik. Kérj új hivatkozást a játék létrehozójától.",
 			"This link is for another version of the app. Reload the page, or ask the table creator for a new link.":
@@ -686,14 +666,6 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 		no: {
 			Language: "Språk",
 			Automatic: "Automatisk",
-			North: "Nord",
-			East: "Øst",
-			South: "Sør",
-			West: "Vest",
-			N: "N",
-			E: "Ø",
-			S: "S",
-			W: "V",
 			and: "og",
 			"Room lobby": "Romlobby",
 			"Waiting for {players} to come back":
@@ -935,8 +907,6 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Could not share the board URL.": "Kunne ikke dele URL-en til bordet.",
 			"Enter an OpenRouter API key to run bot seats in this browser.":
 				"Skriv inn en OpenRouter API-nøkkel for å kjøre botplasser i denne nettleseren.",
-			"Enter the four players. Choose your seat. Your browser hosts first; anyone at the table can take over.":
-				"Skriv inn de fire spillerne. Velg plassen din. Nettleseren din er vert først; hvem som helst ved bordet kan ta over.",
 			"Insufficient OpenRouter balance. Bots are paused until you update the API key or balance.":
 				"For lav saldo hos OpenRouter. Botene er satt på pause til du oppdaterer API-nøkkelen eller saldoen.",
 			"Model priority: the first model is primary; after a server error, the bot tries the next model.":

@@ -1,4 +1,4 @@
-import { SEATS, type Seat } from "../protocol";
+import type { Seat } from "../protocol";
 import type { FailureCode } from "../result";
 import type { Form } from "./device-class";
 import { type CaptureState, type GetUserMedia, LocalMedia } from "./media";
@@ -94,6 +94,7 @@ export class CallController {
 	#prefs: Prefs = { inCall: false, ...presetById("watch").switches };
 	#form: Form;
 	#self: Seat | undefined;
+	#seats: readonly Seat[] = [];
 	/** The status that the mesh last announced for this seat. */
 	#told: Party | undefined;
 
@@ -124,9 +125,9 @@ export class CallController {
 			mic: this.#media.state("audio"),
 			camera: this.#media.state("video"),
 			problem: this.#mesh.problem,
-			remotes: SEATS.filter((seat) => seat !== this.#self).map((seat) =>
-				this.#remote(seat, status, local),
-			),
+			remotes: this.#seats
+				.filter((seat) => seat !== this.#self)
+				.map((seat) => this.#remote(seat, status, local)),
 		};
 	}
 
@@ -138,6 +139,7 @@ export class CallController {
 	/** The room changed; a lost seat ends the call. */
 	update(snapshot: CallRoomSnapshot): void {
 		this.#self = snapshot.self?.seat;
+		this.#seats = snapshot.seats;
 		this.#mesh.update(snapshot);
 	}
 

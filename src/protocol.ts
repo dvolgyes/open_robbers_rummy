@@ -1,14 +1,38 @@
 /** Shared vocabulary of the room protocol. Every command payload, event and state carries `v` and `roomId`. */
 
 export const PROTOCOL_VERSION = 1;
-export const SEATS = ["N", "E", "S", "W"] as const;
+/** Every seat a table can have. A table uses the first two to six of them (`seatsOf`). */
+export const SEATS = ["1", "2", "3", "4", "5", "6"] as const;
 export type Seat = (typeof SEATS)[number];
+export const MIN_PLAYERS = 2;
 
 export const SEAT_NAMES: Readonly<Record<Seat, string>> = {
-	N: "North",
-	E: "East",
-	S: "South",
-	W: "West",
+	"1": "Player 1",
+	"2": "Player 2",
+	"3": "Player 3",
+	"4": "Player 4",
+	"5": "Player 5",
+	"6": "Player 6",
+};
+
+/** The rule presets of the table; `src/rummy/rules.ts` owns their meaning. */
+export const TABLE_PRESETS = ["gamerules", "wikipedia", "machiavelli"] as const;
+export type TablePreset = (typeof TABLE_PRESETS)[number];
+export const MIN_JOKERS = 2;
+export const MAX_JOKERS = 6;
+
+/** The rules chosen at table creation. Every peer reads them from the room config. */
+export interface TableSetup {
+	readonly preset: TablePreset;
+	readonly jokers: number;
+	/** The solver may suggest a play to a human player. */
+	readonly assist: boolean;
+}
+
+export const DEFAULT_TABLE_SETUP: TableSetup = {
+	preset: "gamerules",
+	jokers: 4,
+	assist: true,
 };
 
 export const MAX_NAME_LENGTH = 40;
@@ -41,72 +65,34 @@ const DECISION_MODEL_NAMES: ReadonlySet<string> = new Set([
 	"openai/gpt-6-luna-decisions",
 ]);
 
-const BOT_MODEL_LABELS: Readonly<Record<BotModel, string>> = {
-	"inception/mercury-3": "inception/mercury-3 · Responses",
-	"openai/gpt-6-luna": "openai/gpt-6-luna · Responses",
-	"~perplexity/pplx-decider-latest":
-		"~perplexity/pplx-decider-latest · Decisions",
-	"openai/gpt-6-luna-decisions": "openai/gpt-6-luna-decisions · Decisions",
-	"inception/mercury-decide": "inception/mercury-decide · Decisions",
-	"typesafe/jev-1.14": "typesafe/jev-1.14 · Decisions",
-	"~openai/gpt-sol-latest":
-		"~openai/gpt-sol-latest · Responses · medium reasoning",
-};
-
-const LEGACY_BOT_MODEL_ALIASES: Readonly<Record<string, BotModel>> = {
-	"liquid/d1-ultra-20261015": "~perplexity/pplx-decider-latest",
-	"inception/mercury-decide-20260930": "inception/mercury-decide",
-	"typesafe/jev-1.14-20261014": "typesafe/jev-1.14",
-	"openai/gpt-6-luna-decisions-20261006": "openai/gpt-6-luna-decisions",
-};
-
 /** The model ID selects the Responses or Decisions API contract. */
 export function botModelType(model: string): BotModelType {
 	return DECISION_MODEL_NAMES.has(model) ? "decisions" : "responses";
 }
 
-export function botModelLabel(model: BotModel): string {
-	return BOT_MODEL_LABELS[model];
-}
-
 export interface BotSetup {
 	/** The bot seats when the room is first created. */
 	readonly seats: readonly Seat[];
-	readonly model: BotModel;
-	readonly fallbackModel: BotModel;
-	/** Ordered model priority. The first two entries match model and fallbackModel. */
-	readonly modelOrder?: readonly BotModel[];
-	/** Retries after the first request, from 0 through 10. */
-	readonly retries: number;
-	readonly retryDelayMs: number;
-}
-
-export const DEFAULT_BOT_SETUP: BotSetup = {
-	seats: [],
-	model: "inception/mercury-3",
-	fallbackModel: "openai/gpt-6-luna",
-	retries: 5,
-	retryDelayMs: 3000,
-};
-
-export function botModelOrder(
-	setup: Pick<BotSetup, "model" | "fallbackModel" | "modelOrder">,
-): BotModel[] {
-	return [
-		...(setup.modelOrder ?? [
-			setup.model,
-			setup.fallbackModel,
-			...BOT_MODELS.filter(
-				(model) => model !== setup.model && model !== setup.fallbackModel,
-			),
-		]),
-	];
 }
 
 export interface RoomConfig {
-	readonly names: Readonly<Record<Seat, string>>;
-	/** Optional for rooms created by older app versions. */
+	/** One name for each seat in play: seats "1" to "n", 2 ≤ n ≤ 6. */
+	readonly names: Readonly<Partial<Record<Seat, string>>>;
+	readonly table: TableSetup;
 	readonly botSetup?: BotSetup;
+}
+
+/** The seats in play, in `SEATS` order. */
+export function seatsOf(config: Pick<RoomConfig, "names">): Seat[] {
+	return SEATS.filter((seat) => config.names[seat] !== undefined);
+}
+
+/** The name of a seat in play; an empty text for a seat outside the table. */
+export function seatName(
+	config: Pick<RoomConfig, "names">,
+	seat: Seat,
+): string {
+	return config.names[seat] ?? "";
 }
 
 export type JsonObject = { [key: string]: unknown };
@@ -133,89 +119,64 @@ export function isNonNegativeInteger(value: unknown): value is number {
 export function parseRoomConfig(value: unknown): RoomConfig | undefined {
 	if (!isObject(value) || !isObject(value.names)) return undefined;
 	const names: Partial<Record<Seat, string>> = {};
+	for (const key of Object.keys(value.names))
+		if (!isSeat(key)) return undefined;
+	let count = 0;
 	for (const seat of SEATS) {
 		const name = value.names[seat];
+		if (name === undefined) break;
 		if (typeof name !== "string" || name.length === 0) return undefined;
 		names[seat] = name;
+		count += 1;
 	}
+	if (count < MIN_PLAYERS || Object.keys(value.names).length !== count)
+		return undefined;
+	const table = parseTableSetup(value.table);
+	if (table === undefined) return undefined;
 	let botSetup: BotSetup | undefined;
 	if (Object.hasOwn(value, "botSetup")) {
 		const parsedBotSetup = parseBotSetup(value.botSetup);
-		if (parsedBotSetup === undefined) return undefined;
+		if (
+			parsedBotSetup === undefined ||
+			!parsedBotSetup.seats.every((seat) => names[seat] !== undefined)
+		)
+			return undefined;
 		botSetup = parsedBotSetup;
 	}
-	return {
-		names: names as Record<Seat, string>,
-		...(botSetup === undefined ? {} : { botSetup }),
-	};
+	return { names, table, ...(botSetup === undefined ? {} : { botSetup }) };
+}
+
+export function parseTableSetup(value: unknown): TableSetup | undefined {
+	if (!isObject(value)) return undefined;
+	const { preset, jokers, assist } = value;
+	if (
+		!isTablePreset(preset) ||
+		!Number.isSafeInteger(jokers) ||
+		(jokers as number) < MIN_JOKERS ||
+		(jokers as number) > MAX_JOKERS ||
+		typeof assist !== "boolean"
+	)
+		return undefined;
+	return { preset, jokers: jokers as number, assist };
+}
+
+export function isTablePreset(value: unknown): value is TablePreset {
+	return (
+		typeof value === "string" &&
+		(TABLE_PRESETS as readonly string[]).includes(value)
+	);
 }
 
 export function parseBotSetup(value: unknown): BotSetup | undefined {
 	if (!isObject(value)) return undefined;
-	const { seats, model, fallbackModel, modelOrder, retries, retryDelayMs } =
-		value;
-	const parsedModelOrder =
-		modelOrder === undefined
-			? undefined
-			: Array.isArray(modelOrder) &&
-					modelOrder.length >= 2 &&
-					modelOrder.length <= BOT_MODELS.length &&
-					modelOrder.every((model) => normalizeBotModel(model) !== undefined) &&
-					new Set(modelOrder.map(normalizeBotModel)).size === modelOrder.length
-				? [
-						...(modelOrder.map(normalizeBotModel) as BotModel[]),
-						...BOT_MODELS.filter(
-							(model) =>
-								!modelOrder.some((entry) => normalizeBotModel(entry) === model),
-						),
-					]
-				: null;
-	const parsedModel = normalizeBotModel(model);
-	const parsedFallbackModel = normalizeBotModel(fallbackModel);
+	const { seats } = value;
 	if (
 		!Array.isArray(seats) ||
 		!seats.every(isSeat) ||
-		new Set(seats).size !== seats.length ||
-		seats.length > SEATS.length ||
-		parsedModel === undefined ||
-		parsedFallbackModel === undefined ||
-		parsedModel === parsedFallbackModel ||
-		parsedModelOrder === null ||
-		(parsedModelOrder !== undefined &&
-			(parsedModelOrder[0] !== parsedModel ||
-				parsedModelOrder[1] !== parsedFallbackModel)) ||
-		!Number.isSafeInteger(retries) ||
-		(retries as number) < 0 ||
-		(retries as number) > 10 ||
-		!Number.isSafeInteger(retryDelayMs) ||
-		(retryDelayMs as number) < 1000 ||
-		(retryDelayMs as number) > 60_000
+		new Set(seats).size !== seats.length
 	)
 		return undefined;
-	return {
-		seats: [...seats],
-		model: parsedModel,
-		fallbackModel: parsedFallbackModel,
-		...(parsedModelOrder === undefined
-			? {}
-			: { modelOrder: [...parsedModelOrder] }),
-		retries: retries as number,
-		retryDelayMs: retryDelayMs as number,
-	};
-}
-
-export function isBotModel(value: unknown): value is BotModel {
-	return (
-		typeof value === "string" &&
-		(BOT_MODELS as readonly string[]).includes(value)
-	);
-}
-
-function normalizeBotModel(value: unknown): BotModel | undefined {
-	if (isBotModel(value)) return value;
-	return typeof value === "string"
-		? LEGACY_BOT_MODEL_ALIASES[value]
-		: undefined;
+	return { seats: [...seats] };
 }
 
 export interface EventEnvelope {
@@ -241,11 +202,6 @@ export function envelopeEvent(
 	};
 }
 
-/** The seat `steps` places clockwise from `seat`. */
-export function seatAfter(seat: Seat, steps: number): Seat {
-	return SEATS[(SEATS.indexOf(seat) + steps) % 4] as Seat;
-}
-
 export function seatLabel(config: RoomConfig, seat: Seat): string {
-	return `${SEAT_NAMES[seat]} — ${config.names[seat]}`;
+	return `${SEAT_NAMES[seat]} — ${seatName(config, seat)}`;
 }

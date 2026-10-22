@@ -33,9 +33,9 @@ import { AUTH_1, AUTH_2, HOLDER_E, HOLDER_N, TABLE } from "./p2p-fixtures";
 const HOLDER_S = "SSSSSSSSSSSSSSSS";
 const HOLDER_W = "zzzzzzzzzzzzzzzz";
 const VISITOR = "vvvvvvvvvvvvvvvv";
-const TAG_W = makeTag(HOLDER_W, "W");
+const TAG_W = makeTag(HOLDER_W, "4");
 /** Same term as AUTH_2 with a higher tag, so AUTH_2 beats it. */
-const AUTH_S2: Authority = { term: 2, tag: makeTag(HOLDER_S, "S"), inc: 1 };
+const AUTH_S2: Authority = { term: 2, tag: makeTag(HOLDER_S, "3"), inc: 1 };
 /** AUTH_2 after a resume: the higher incarnation beats AUTH_2. */
 const AUTH_E2_RESUMED: Authority = { ...AUTH_2, inc: 2 };
 const POS: Position = { rev: 1, lastAuth: AUTH_1 };
@@ -183,11 +183,11 @@ class Page {
 }
 
 function west(overrides: Partial<Seating> = {}): Page {
-	return new Page(facts(HOLDER_W, seating("W", overrides)));
+	return new Page(facts(HOLDER_W, seating("4", overrides)));
 }
 
 function creator(): Page {
-	return new Page(facts(HOLDER_N, seating("N", { inc: 1 })), {
+	return new Page(facts(HOLDER_N, seating("1", { inc: 1 })), {
 		creator: true,
 	});
 }
@@ -243,7 +243,7 @@ describe("following a host (rules 1–3)", () => {
 	it("shows an unreachable host while a peer reports a fresh beat from it", () => {
 		const page = west();
 		const report = { auth: AUTH_1, seenAgoMs: 1_000 };
-		page.hear("pE", followerBeat(HOLDER_E, "E", { report }), 100);
+		page.hear("pE", followerBeat(HOLDER_E, "2", { report }), 100);
 		expect(page.view).toEqual({ phase: "host-unreachable" });
 		expect(followedHost(page.state)).toBeNull();
 		page.tick(100 + HOST_LOST_MS - 1_000 - 1);
@@ -283,7 +283,7 @@ describe("stepping down (rule 4)", () => {
 	it("steps down at a report of a better authority", () => {
 		const page = creator();
 		const report = { auth: AUTH_2, seenAgoMs: 1_000 };
-		const effects = page.hear("pS", followerBeat(HOLDER_S, "S", { report }));
+		const effects = page.hear("pS", followerBeat(HOLDER_S, "3", { report }));
 		expect(ofType(effects, "step-down")).toHaveLength(1);
 		expect(page.view).toEqual({ phase: "host-unreachable" });
 	});
@@ -293,7 +293,7 @@ describe("stepping down (rule 4)", () => {
 		const pos = { rev: 5, lastAuth: AUTH_2 };
 		const effects = page.hear(
 			"pS",
-			followerBeat(HOLDER_S, "S", { report: hearsay(AUTH_1), pos }),
+			followerBeat(HOLDER_S, "3", { report: hearsay(AUTH_1), pos }),
 		);
 		expect(ofType(effects, "step-down")).toHaveLength(1);
 		expect(page.view).toMatchObject({ phase: "waiting-for-host" });
@@ -301,7 +301,7 @@ describe("stepping down (rule 4)", () => {
 
 	it("keeps hosting at a beat from a worse authority", () => {
 		const page = new Page(
-			facts(HOLDER_E, seating("E", { host: AUTH_2, inc: 1 })),
+			facts(HOLDER_E, seating("2", { host: AUTH_2, inc: 1 })),
 			{ creator: true },
 		);
 		expect(ofType(page.hear("pN", leaderBeat(AUTH_1)), "step-down")).toEqual(
@@ -312,7 +312,7 @@ describe("stepping down (rule 4)", () => {
 
 	it("steps down when the page stops being eligible", () => {
 		const page = creator();
-		const broken = facts(HOLDER_N, seating("N", { inc: 1, writable: false }));
+		const broken = facts(HOLDER_N, seating("1", { inc: 1, writable: false }));
 		const effects = page.step({ type: "self", now: 100, self: broken });
 		expect(ofType(effects, "step-down")).toEqual([
 			{ type: "step-down", auth: AUTH_1 },
@@ -322,7 +322,7 @@ describe("stepping down (rule 4)", () => {
 
 	it("lets the newer of two tabs with the same tag win; the old tab steps down and is superseded", () => {
 		const old = creator();
-		const fresh = new Page(facts(HOLDER_N, seating("N", { inc: 1 })));
+		const fresh = new Page(facts(HOLDER_N, seating("1", { inc: 1 })));
 		fresh.run(RESUME_ONLINE_MS);
 		const resumed = { ...AUTH_1, inc: 2 };
 		expect(fresh.state.mode).toMatchObject({ kind: "claiming", auth: resumed });
@@ -465,7 +465,7 @@ describe("the Make me the host button (rules 6–7)", () => {
 		expect(visitor.view).toMatchObject({ phase: "waiting-for-host" });
 		visitor.run(TICK_MS);
 		expect(visitor.view).toEqual({ phase: "nobody-here" });
-		const witness = { peer: "pE", beat: followerBeat(HOLDER_E, "E") };
+		const witness = { peer: "pE", beat: followerBeat(HOLDER_E, "2") };
 		visitor.run(BEAT_MS, [witness]);
 		expect(visitor.view).toMatchObject({
 			button: { enabled: false, reason: "seat" },
@@ -476,7 +476,7 @@ describe("the Make me the host button (rules 6–7)", () => {
 describe("the automatic volunteer (rule 8)", () => {
 	it("does not elect an automated client that cannot deal boards", () => {
 		const bot = new Page({
-			...facts(HOLDER_W, seating("W")),
+			...facts(HOLDER_W, seating("4")),
 			hostEligible: false,
 		});
 		const effects = bot.run(VOLUNTEER_MS + 4 * STAGGER_MS);
@@ -503,25 +503,25 @@ describe("the automatic volunteer (rule 8)", () => {
 		const page = west();
 		const equal = {
 			peer: "pN",
-			beat: followerBeat(HOLDER_N, "N", { report: hearsay(AUTH_1) }),
+			beat: followerBeat(HOLDER_N, "1", { report: hearsay(AUTH_1) }),
 		};
 		const ahead = {
 			peer: "pS",
-			beat: followerBeat(HOLDER_S, "S", {
+			beat: followerBeat(HOLDER_S, "3", {
 				report: hearsay(AUTH_1),
 				pos: { rev: 2, lastAuth: AUTH_1 },
 			}),
 		};
 		const behind = {
 			peer: "pE",
-			beat: followerBeat(HOLDER_E, "E", {
+			beat: followerBeat(HOLDER_E, "2", {
 				report: hearsay(AUTH_1),
 				pos: { rev: 0, lastAuth: null },
 			}),
 		};
 		const notEligible = {
 			peer: "pE2",
-			beat: followerBeat(HOLDER_E, "E", {
+			beat: followerBeat(HOLDER_E, "2", {
 				report: hearsay(AUTH_1),
 				pos: { rev: 9, lastAuth: AUTH_1 },
 				elig: false,
@@ -543,11 +543,11 @@ describe("a claim (rule 9)", () => {
 
 	it("takes the next term above every known authority and the next incarnation", () => {
 		const page = west({ inc: 3 });
-		const known = { term: 5, tag: makeTag(HOLDER_S, "S"), inc: 2 };
+		const known = { term: 5, tag: makeTag(HOLDER_S, "3"), inc: 2 };
 		const effects = clicked(page, [
 			{
 				peer: "pE",
-				beat: followerBeat(HOLDER_E, "E", { report: hearsay(known) }),
+				beat: followerBeat(HOLDER_E, "2", { report: hearsay(known) }),
 			},
 		]);
 		const claim = { term: 6, tag: TAG_W, inc: 4 };
@@ -559,14 +559,14 @@ describe("a claim (rule 9)", () => {
 		const page = west();
 		const better = {
 			peer: "pN",
-			beat: followerBeat(HOLDER_N, "N", {
+			beat: followerBeat(HOLDER_N, "1", {
 				report: hearsay(AUTH_1),
 				pos: { rev: 3, lastAuth: AUTH_1 },
 			}),
 		};
 		const equal = {
 			peer: "pE",
-			beat: followerBeat(HOLDER_E, "E", { report: hearsay(AUTH_1) }),
+			beat: followerBeat(HOLDER_E, "2", { report: hearsay(AUTH_1) }),
 		};
 		const effects = clicked(page, [equal, better]);
 		const claim = { term: 2, tag: TAG_W, inc: 1 };
@@ -585,7 +585,7 @@ describe("a claim (rule 9)", () => {
 		const page = west();
 		const better = {
 			peer: "pN",
-			beat: followerBeat(HOLDER_N, "N", {
+			beat: followerBeat(HOLDER_N, "1", {
 				pos: { rev: 3, lastAuth: AUTH_1 },
 			}),
 		};
@@ -621,7 +621,7 @@ describe("a claim (rule 9)", () => {
 		expect(ofType(effects, "beat")[0]?.beat).toMatchObject({
 			role: "host",
 			auth: claim,
-			seat: "W",
+			seat: "4",
 			elig: true,
 		});
 		expect(page.view).toEqual({ phase: "host" });
@@ -646,12 +646,12 @@ describe("a claim (rule 9)", () => {
 	});
 
 	it("lets the lower tag win two claims for the same term", () => {
-		const south = new Page(facts(HOLDER_S, seating("S")));
-		const east = new Page(facts(HOLDER_E, seating("E")));
-		const southClaim = { term: 2, tag: makeTag(HOLDER_S, "S"), inc: 1 };
-		const eastClaim = { term: 2, tag: makeTag(HOLDER_E, "E"), inc: 1 };
-		south.run(BUTTON_MS, [{ peer: "east", beat: followerBeat(HOLDER_E, "E") }]);
-		east.run(BUTTON_MS, [{ peer: "south", beat: followerBeat(HOLDER_S, "S") }]);
+		const south = new Page(facts(HOLDER_S, seating("3")));
+		const east = new Page(facts(HOLDER_E, seating("2")));
+		const southClaim = { term: 2, tag: makeTag(HOLDER_S, "3"), inc: 1 };
+		const eastClaim = { term: 2, tag: makeTag(HOLDER_E, "2"), inc: 1 };
+		south.run(BUTTON_MS, [{ peer: "east", beat: followerBeat(HOLDER_E, "2") }]);
+		east.run(BUTTON_MS, [{ peer: "south", beat: followerBeat(HOLDER_S, "3") }]);
 		const southEffects = south.step({ type: "click", now: south.now });
 		const eastEffects = east.step({ type: "click", now: east.now });
 		const southBeat = ofType(southEffects, "beat")[0]?.beat;
@@ -679,7 +679,7 @@ describe("resume and create (rules 10–11)", () => {
 	const RESUMED = { ...AUTH_1, inc: 2 };
 
 	function host(): Page {
-		return new Page(facts(HOLDER_N, seating("N", { inc: 1 })), {
+		return new Page(facts(HOLDER_N, seating("1", { inc: 1 })), {
 			online: false,
 		});
 	}
@@ -703,7 +703,7 @@ describe("resume and create (rules 10–11)", () => {
 		page.step({ type: "network", now: 0, online: true });
 		page.hear(
 			"pE",
-			followerBeat(HOLDER_E, "E", { report: hearsay(AUTH_2) }),
+			followerBeat(HOLDER_E, "2", { report: hearsay(AUTH_2) }),
 			1_000,
 		);
 		page.run(RESUME_ONLINE_MS + BUTTON_MS);
@@ -737,14 +737,14 @@ describe("resume and create (rules 10–11)", () => {
 		expect(() =>
 			initElection({
 				now: 0,
-				self: facts(HOLDER_E, seating("E")),
+				self: facts(HOLDER_E, seating("2")),
 				creator: true,
 			}),
 		).toThrow(/creator/);
 		expect(() =>
 			initElection({
 				now: 0,
-				self: facts(HOLDER_N, seating("N", { persistent: false })),
+				self: facts(HOLDER_N, seating("1", { persistent: false })),
 				creator: true,
 			}),
 		).toThrow(/creator/);
@@ -768,7 +768,7 @@ describe("beats", () => {
 			k: "beat",
 			role: "follower",
 			holder: HOLDER_W,
-			seat: "W",
+			seat: "4",
 			pos: POS,
 			elig: true,
 			auth: AUTH_1,
@@ -790,7 +790,7 @@ describe("beats", () => {
 			holder: VISITOR,
 			elig: false,
 		});
-		page.hear("pE", followerBeat(HOLDER_E, "E", { report: hearsay(AUTH_2) }));
+		page.hear("pE", followerBeat(HOLDER_E, "2", { report: hearsay(AUTH_2) }));
 		expect(ofType(page.run(BEAT_MS), "beat")[0]?.beat).toEqual({
 			k: "beat",
 			role: "visitor",

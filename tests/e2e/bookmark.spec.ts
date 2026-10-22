@@ -33,16 +33,16 @@ test.afterAll(async () => {
 
 test("the create screen is prefilled from the bookmark, with the host seat chosen", async () => {
 	page = await owner.page(`./?${BOOKMARK_QUERY}`);
-	await expect(page.getByLabel("East name")).toHaveValue("zsdh");
-	await expect(page.getByLabel("West name")).toHaveValue("dvolgyes");
-	await expect(page.getByLabel("North name")).toHaveValue("player1");
-	await expect(page.locator('input[name="me"][value="E"]')).toBeChecked();
-	for (const seat of ["N", "E", "S", "W"]) {
+	await expect(page.getByLabel("Player 2 name")).toHaveValue("zsdh");
+	await expect(page.getByLabel("Player 4 name")).toHaveValue("dvolgyes");
+	await expect(page.getByLabel("Player 1 name")).toHaveValue("player1");
+	await expect(page.locator('input[name="me"][value="2"]')).toBeChecked();
+	for (const seat of ["1", "2", "3", "4"]) {
 		await expect(page.locator(`input[name="bot-${seat}"]`)).not.toBeChecked();
 	}
-	await page.getByLabel("North name").fill("robot");
-	await expect(page.locator('input[name="bot-N"]')).not.toBeChecked();
-	await page.getByLabel("North name").fill("player1");
+	await page.getByLabel("Player 1 name").fill("robot");
+	await expect(page.locator('input[name="bot-1"]')).not.toBeChecked();
+	await page.getByLabel("Player 1 name").fill("player1");
 });
 
 test("create opens the game and selects the host seat in the page URL", async () => {
@@ -62,13 +62,13 @@ test("create opens the game and selects the host seat in the page URL", async ()
 });
 
 test("the other players see the names and can choose a seat from the shared URL", async () => {
-	await expect(page.getByTestId("pick-W")).toHaveCount(0);
+	await expect(page.getByTestId("pick-4")).toHaveCount(0);
 
 	const visitor = await guest.page(link);
-	await expect(visitor.getByTestId("pick-W")).toContainText("dvolgyes", {
+	await expect(visitor.getByTestId("pick-4")).toContainText("dvolgyes", {
 		timeout: CONNECT_MS,
 	});
-	await visitor.getByTestId("pick-W").click();
+	await visitor.getByTestId("pick-4").click();
 	await expect(visitor).toHaveTitle(/dvolgyes \(W\)$/);
 });
 
@@ -77,7 +77,7 @@ test("reloading the selected-player address seats the host again", async () => {
 	await expect(page).toHaveTitle("Open Canasta: zsdh (E)", {
 		timeout: CONNECT_MS,
 	});
-	await expect(page.getByTestId("pick-E")).toHaveCount(0);
+	await expect(page.getByTestId("pick-2")).toHaveCount(0);
 });
 
 test("no uncaught errors", () => {

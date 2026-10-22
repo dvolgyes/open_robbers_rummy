@@ -189,13 +189,14 @@ class Player {
 	}
 }
 
-/** Both seats held at generation 1 and present. */
+/** A four-player table; seats 1 and 2 are held at generation 1 and present. */
 function snapshot(self: Seat | null): CallRoomSnapshot {
 	return {
 		roomId: ROOM_ID,
 		self: self === null ? null : { seat: self, generation: 1 },
-		holders: { N: 1, E: 1 },
-		online: new Set<Seat>(["N", "E"]),
+		seats: ["1", "2", "3", "4"],
+		holders: { "1": 1, "2": 1 },
+		online: new Set<Seat>(["1", "2"]),
 	};
 }
 
@@ -217,10 +218,10 @@ async function connected(
 beforeEach(() => {
 	vi.useFakeTimers();
 	wire = new Wire();
-	north = new Player("N", wire);
-	east = new Player("E", wire);
-	north.call.update(snapshot("N"));
-	east.call.update(snapshot("E"));
+	north = new Player("1", wire);
+	east = new Player("2", wire);
+	north.call.update(snapshot("1"));
+	east.call.update(snapshot("2"));
 });
 
 afterEach(() => {
@@ -247,9 +248,9 @@ describe("CallController (call/layout plan §4.5)", () => {
 			"listen",
 		]);
 		expect(view.remotes.map((r) => [r.seat, r.status])).toEqual([
-			["E", "unknown"],
-			["S", "unknown"],
-			["W", "unknown"],
+			["2", "unknown"],
+			["3", "unknown"],
+			["4", "unknown"],
 		]);
 
 		north.call.setForm("compact");
@@ -280,8 +281,8 @@ describe("CallController (call/layout plan §4.5)", () => {
 
 	it("never asks a compact device for the camera: not for restored video switches, not for a video switch", async () => {
 		north.call.dispose();
-		north = new Player("N", wire, "compact");
-		north.call.update(snapshot("N"));
+		north = new Player("1", wire, "compact");
+		north.call.update(snapshot("1"));
 		// The switches of a desktop session, as a restored preference would give them.
 		north.join("both");
 		expect(north.call.view.requested).toEqual({
@@ -297,7 +298,7 @@ describe("CallController (call/layout plan §4.5)", () => {
 		// Audio only on both sides of the pair: neither side has a video section.
 		expect(north.sections).toEqual(["audio"]);
 		expect(east.sections).toEqual(["audio"]);
-		expect(east.remote("N")?.peerSendsVideo).toBe(false);
+		expect(east.remote("1")?.peerSendsVideo).toBe(false);
 	});
 
 	it("accepts the confirmed camera when Send camera was turned on before Join", async () => {
@@ -324,8 +325,8 @@ describe("CallController (call/layout plan §4.5)", () => {
 		await settle(10);
 		expect(north.call.view.camera).toBe("on");
 		expect(north.sendingVideo).toBe(asTrack(camera as FakeTrack));
-		expect(east.remote("N")?.video).toBeDefined();
-		expect(east.remote("N")?.peerSendsVideo).toBe(true);
+		expect(east.remote("1")?.video).toBeDefined();
+		expect(east.remote("1")?.peerSendsVideo).toBe(true);
 
 		north.call.setSwitch("send", "video", false);
 		expect(camera?.stops).toBe(1);
@@ -335,18 +336,18 @@ describe("CallController (call/layout plan §4.5)", () => {
 		expect(north.sendingVideo).toBeNull();
 		// The peer clears the picture when the new prefs arrive; its audio stays.
 		await settle();
-		expect(east.remote("N")?.peerSendsVideo).toBe(false);
-		expect(east.remote("N")?.video).toBeUndefined();
-		expect(east.remote("N")?.audio).toBeDefined();
+		expect(east.remote("1")?.peerSendsVideo).toBe(false);
+		expect(east.remote("1")?.video).toBeUndefined();
+		expect(east.remote("1")?.audio).toBeDefined();
 	});
 
 	it("clears the picture at once when See cameras goes off", async () => {
 		await connected("both", "both");
 		await settle(10);
-		expect(east.remote("N")?.video).toBeDefined();
+		expect(east.remote("1")?.video).toBeDefined();
 		east.call.setSwitch("receive", "video", false);
-		expect(east.remote("N")?.video).toBeUndefined();
-		expect(east.remote("N")?.audio).toBeDefined();
+		expect(east.remote("1")?.video).toBeUndefined();
+		expect(east.remote("1")?.audio).toBeDefined();
 		expect(east.call.view.status).toBe("subscribed");
 	});
 
@@ -362,11 +363,11 @@ describe("CallController (call/layout plan §4.5)", () => {
 			inCall: true,
 			...presetById("audio").switches,
 		});
-		expect(north.remote("E")?.video).toBeUndefined();
+		expect(north.remote("2")?.video).toBeUndefined();
 		await settle();
 		expect(north.sendingVideo).toBeNull();
-		expect(east.remote("N")?.video).toBeUndefined();
-		expect(east.remote("N")?.audio).toBeDefined();
+		expect(east.remote("1")?.video).toBeUndefined();
+		expect(east.remote("1")?.audio).toBeDefined();
 		const video = (pc: FakePeerConnection | undefined) =>
 			pc?.getTransceivers().find((t) => t.receiver.track.kind === "video");
 		expect(video(north.open)?.currentDirection).toBe("inactive");
@@ -392,7 +393,7 @@ describe("CallController (call/layout plan §4.5)", () => {
 		expect(north.asked("video")).toEqual([]);
 		expect(north.sending).toBe(asTrack(mic));
 		expect(north.sendingVideo ?? null).toBeNull();
-		expect(east.remote("N")?.audio).toBeDefined();
+		expect(east.remote("1")?.audio).toBeDefined();
 	});
 
 	it("asks for the microphone only after Join, and never for Listen only", async () => {
@@ -404,11 +405,11 @@ describe("CallController (call/layout plan §4.5)", () => {
 		expect(east.requests).toEqual([]);
 		expect(north.call.view.mic).toBe("pending");
 		expect(east.call.view.mic).toBe("off");
-		expect(north.remote("E")?.status).toBe("waiting");
+		expect(north.remote("2")?.status).toBe("waiting");
 		await settle();
-		expect(north.remote("S")?.status).toBe("out");
-		expect(north.remote("E")?.status).toBe("connecting");
-		expect(east.remote("N")?.peerSendsAudio).toBe(true);
+		expect(north.remote("3")?.status).toBe("out");
+		expect(north.remote("2")?.status).toBe("connecting");
+		expect(east.remote("1")?.peerSendsAudio).toBe(true);
 	});
 
 	it("sends a microphone captured after the link exists, and gives a new link the live microphone", async () => {
@@ -419,15 +420,15 @@ describe("CallController (call/layout plan §4.5)", () => {
 		expect(north.call.view.mic).toBe("on");
 		expect(north.sending).toBe(asTrack(mic));
 
-		const south = new Player("S", wire);
+		const south = new Player("3", wire);
 		const three = (self: Seat): CallRoomSnapshot => ({
 			...snapshot(self),
-			holders: { N: 1, E: 1, S: 1 },
-			online: new Set<Seat>(["N", "E", "S"]),
+			holders: { "1": 1, "2": 1, "3": 1 },
+			online: new Set<Seat>(["1", "2", "3"]),
 		});
-		north.call.update(three("N"));
-		east.call.update(three("E"));
-		south.call.update(three("S"));
+		north.call.update(three("1"));
+		east.call.update(three("2"));
+		south.call.update(three("3"));
 		south.join("listen");
 		await settle();
 		const toSouth = north.connections.at(-1);
@@ -444,18 +445,18 @@ describe("CallController (call/layout plan §4.5)", () => {
 		expect(north.call.view.mic).toBe("off");
 		expect(north.call.view.status).toBe("subscribed");
 		await settle();
-		const prefs = wire.last("N", "prefs");
+		const prefs = wire.last("1", "prefs");
 		expect(prefs?.type === "prefs" && prefs.prefs.send.audio).toBe(false);
 		expect(north.sending).toBeNull();
-		expect(east.remote("N")?.peerSendsAudio).toBe(false);
+		expect(east.remote("1")?.peerSendsAudio).toBe(false);
 	});
 
 	it("detaches remote audio at once when Hear others goes off", async () => {
 		await connected();
-		expect(east.remote("N")?.status).toBe("connected");
-		expect(east.remote("N")?.audio).toBeDefined();
+		expect(east.remote("1")?.status).toBe("connected");
+		expect(east.remote("1")?.audio).toBeDefined();
 		east.call.setSwitch("receive", "audio", false);
-		expect(east.remote("N")?.audio).toBeUndefined();
+		expect(east.remote("1")?.audio).toBeUndefined();
 		expect(east.call.view.status).toBe("subscribed");
 	});
 
@@ -466,8 +467,8 @@ describe("CallController (call/layout plan §4.5)", () => {
 		expect(north.call.view.requested.inCall).toBe(false);
 		expect(north.connections.every((pc) => pc.closed)).toBe(true);
 		await settle();
-		expect(wire.types("N").at(-1)).toBe("leave");
-		expect(east.remote("N")?.status).toBe("out");
+		expect(wire.types("1").at(-1)).toBe("leave");
+		expect(east.remote("1")?.status).toBe("out");
 
 		const mic = east.grant();
 		await settle(10);
@@ -483,7 +484,7 @@ describe("CallController (call/layout plan §4.5)", () => {
 		await connected();
 		const mic = north.grant();
 		await settle(10);
-		wire.end("N");
+		wire.end("1");
 		expect(north.call.view.status).toBe("outside");
 		expect(north.call.view.requested.inCall).toBe(false);
 		expect(mic.stops).toBe(1);
@@ -509,7 +510,7 @@ describe("CallController (call/layout plan §4.5)", () => {
 		await connected();
 		north.call.setForm("desktop");
 		await settle();
-		const prefs = wire.last("N", "prefs");
+		const prefs = wire.last("1", "prefs");
 		expect(prefs?.type === "prefs" && prefs.form).toBe("desktop");
 		expect(north.call.view.status).toBe("subscribed");
 	});
@@ -524,6 +525,6 @@ describe("CallController (call/layout plan §4.5)", () => {
 		expect(north.connections.every((pc) => pc.closed)).toBe(true);
 		expect(north.changes).not.toHaveBeenCalled();
 		await settle();
-		expect(wire.types("N").at(-1)).toBe("leave");
+		expect(wire.types("1").at(-1)).toBe("leave");
 	});
 });

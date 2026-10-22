@@ -38,7 +38,7 @@ async function ageStoredTables(page: Page): Promise<number> {
 	return page.evaluate(
 		(aged) =>
 			new Promise<number>((resolve, reject) => {
-				const opened = indexedDB.open("oc-p2p");
+				const opened = indexedDB.open("orr-p2p");
 				opened.onerror = () => reject(opened.error);
 				opened.onsuccess = () => {
 					const db = opened.result;
@@ -82,14 +82,14 @@ test.afterEach(async ({}, testInfo) => {
 
 test("a tracker outage keeps the table: messages, the deal and the play go on; a newcomer finds the table afterwards", async () => {
 	test.setTimeout(180_000);
-	const seats = ["W", "N", "E", "S"] as const satisfies readonly SeatKey[];
+	const seats = ["4", "1", "2", "3"] as const satisfies readonly SeatKey[];
 	const browsers = {} as Record<SeatKey, Player>;
 	const tab = {} as Record<SeatKey, Page>;
 	for (const seat of seats)
 		browsers[seat] = await openBrowser(seat, { trackerSwitch: true });
-	tab.W = await browsers.W.page("./");
-	const link = await createRoom(tab.W);
-	for (const seat of ["N", "E", "S"] as const) {
+	tab["4"] = await browsers["4"].page("./");
+	const link = await createRoom(tab["4"]);
+	for (const seat of ["1", "2", "3"] as const) {
 		tab[seat] = await browsers[seat].page(link);
 		await expect(tab[seat].getByTestId(`pick-${seat}`)).toBeVisible({
 			timeout: CONNECT_MS,
@@ -165,12 +165,12 @@ test("a browser that does not store data cannot create a table, but it can take 
 	await expect(
 		page.getByText(/^This browser does not store data \(/),
 	).toBeVisible({ timeout: CONNECT_MS });
-	await expect(page.getByTestId("pick-N")).toBeVisible({ timeout: CONNECT_MS });
-	await pick(page, "N");
+	await expect(page.getByTestId("pick-1")).toBeVisible({ timeout: CONNECT_MS });
+	await pick(page, "1");
 	await sendDraft(page);
-	await expect(texts(creator)).toHaveText([MESSAGE.N]);
+	await expect(texts(creator)).toHaveText([MESSAGE["1"]]);
 	await sendDraft(creator);
-	await expect(texts(page)).toHaveText([MESSAGE.N, MESSAGE.W]);
+	await expect(texts(page)).toHaveText([MESSAGE["1"], MESSAGE["4"]]);
 
 	await creator.close({ runBeforeUnload: false });
 	await expectBanner(page, "waiting-for-host", {
@@ -223,10 +223,10 @@ test("a damaged key opens an empty table: nobody is there", async () => {
 		page.getByText("Nobody is at this table right now. Keep this page open"),
 	).toBeVisible({ timeout: CONNECT_MS });
 	// The link carries the full setup, so the empty table offers all four seats (ADR 0005). The real table, where
-	// West is taken, would offer three.
+	// Player 4 is taken, would offer three.
 	await expect(picks(page)).toHaveCount(4);
 	// The real table is unaffected.
-	await expectSeat(creator, "W");
+	await expectSeat(creator, "4");
 });
 
 test("a table without activity for 24 h expires and stays expired; the full room link starts it again", async () => {
@@ -261,8 +261,8 @@ test("a table without activity for 24 h expires and stays expired; the full room
 	// host seat starts a fresh table (ADR 0005).
 	await page.goto(link);
 	await expect(picks(page)).toHaveCount(4, { timeout: CONNECT_MS });
-	await pick(page, "W");
-	await expectSeat(page, "W");
+	await pick(page, "4");
+	await expectSeat(page, "4");
 	await expect(page.getByTestId("table")).toHaveAttribute(
 		"data-phase",
 		"waiting",

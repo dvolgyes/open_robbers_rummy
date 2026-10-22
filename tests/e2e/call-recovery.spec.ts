@@ -27,21 +27,21 @@ import {
 /**
  * The call after a crash, a host change and a lost permission (plan §12 R2), on one P2P table through the public
  * trackers. Each person has their own browser, which may use the microphone (a generated tone). The seats join
- * with different switches, so the captions show whether a restored status is the stored one: North sends no
- * audio, and East hears nobody. A crash closes the tab without unload handlers; a reopen is a new tab of the same
+ * with different switches, so the captions show whether a restored status is the stored one: Player 1 sends no
+ * audio, and Player 2 hears nobody. A crash closes the tab without unload handlers; a reopen is a new tab of the same
  * browser, so its replica, its seat and its call record come back.
  */
 test.describe.configure({ mode: "serial" });
 
-const SEATS = ["W", "N", "E", "S"] as const satisfies readonly SeatKey[];
+const SEATS = ["4", "1", "2", "3"] as const satisfies readonly SeatKey[];
 /** Each seat's Send mic audio and Hear others switches after test 1. */
 const SWITCHES: Readonly<
 	Record<SeatKey, { readonly send: boolean; readonly hear: boolean }>
 > = {
-	W: { send: true, hear: true },
-	N: { send: false, hear: true },
-	E: { send: true, hear: false },
-	S: { send: true, hear: true },
+	"4": { send: true, hear: true },
+	"1": { send: false, hear: true },
+	"2": { send: true, hear: false },
+	"3": { send: true, hear: true },
 };
 /** A closed page goes offline in the roster (acceptance.spec.ts), and then out of the call (VANISHED_MS 10 s). */
 const GONE_MS = 40_000;
@@ -148,35 +148,35 @@ test.afterAll(async () => {
 	for (const player of Object.values(players)) await player.close();
 });
 
-test("1: four browsers join the call; North turns its microphone off, and East stops hearing", async () => {
-	tab.W = await players.W.page("./");
-	link = await createRoom(tab.W);
-	for (const seat of ["N", "E"] as const) {
+test("1: four browsers join the call; Player 1 turns its microphone off, and Player 2 stops hearing", async () => {
+	tab["4"] = await players["4"].page("./");
+	link = await createRoom(tab["4"]);
+	for (const seat of ["1", "2"] as const) {
 		tab[seat] = await players[seat].page(link);
 		await pick(tab[seat], seat);
 	}
-	// South is the last free seat, so its page takes it without a picker.
-	tab.S = await players.S.page(link);
-	await expectSeat(tab.S, "S", {
+	// Player 3 is the last free seat, so its page takes it without a picker.
+	tab["3"] = await players["3"].page(link);
+	await expectSeat(tab["3"], "3", {
 		timeout: CONNECT_MS,
 	});
 	// The tiles come with the first hand, which the hosting page deals once all four seats are present.
 	for (const seat of SEATS)
 		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play");
 	for (const seat of SEATS) await joinWith(tab[seat], "Audio only");
-	await toggle(tab.N, "Send mic audio").click();
-	await toggle(tab.E, "Hear others: receive audio").click();
+	await toggle(tab["1"], "Send mic audio").click();
+	await toggle(tab["2"], "Hear others: receive audio").click();
 	await expectConnected(SEATS);
 	await expectStatuses(SEATS);
-	expect(await commonHost(SEATS)).toBe("W");
+	expect(await commonHost(SEATS)).toBe("4");
 });
 
 test("2: a player whose tab crashes comes back in the call with its switches, and opens no microphone", async () => {
 	test.setTimeout(180_000);
-	await crash("N");
-	const others = ["W", "E", "S"] as const;
+	await crash("1");
+	const others = ["4", "2", "3"] as const;
 	for (const seat of others)
-		await expect(caption(tab[seat], "N")).toHaveText(
+		await expect(caption(tab[seat], "1")).toHaveText(
 			"N - player1 · Not in call",
 			{
 				timeout: GONE_MS,
@@ -184,74 +184,74 @@ test("2: a player whose tab crashes comes back in the call with its switches, an
 		);
 	await expectConnected(others);
 
-	await reopen("N");
+	await reopen("1");
 	await expectConnected(SEATS);
 	await expectStatuses(SEATS);
 	// The stored status sends no audio, so the page never asks for the microphone.
-	expect(await requestsFor(tab.N, "audio")).toBe(0);
-	expect(await counts(tab.N)).toMatchObject({ captures: 0, liveTracks: 0 });
+	expect(await requestsFor(tab["1"], "audio")).toBe(0);
+	expect(await counts(tab["1"])).toMatchObject({ captures: 0, liveTracks: 0 });
 });
 
 test("3: the host's tab crashes; the call goes on, another player becomes the host, and the old host comes back in the call", async () => {
 	test.setTimeout(240_000);
-	await crash("W");
-	const others = ["N", "E", "S"] as const;
+	await crash("4");
+	const others = ["1", "2", "3"] as const;
 	for (const seat of others)
-		await expect(caption(tab[seat], "W")).toHaveText(
+		await expect(caption(tab[seat], "4")).toHaveText(
 			"W - player4 · Not in call",
 			{
 				timeout: GONE_MS,
 			},
 		);
-	await expectBanner(tab.E, "waiting-for-host");
+	await expectBanner(tab["2"], "waiting-for-host");
 	// The host change does not touch the call between the other seats.
 	await expectConnected(others);
 	await expectStatuses(others);
 
-	const become = tab.E.getByTestId("become-host");
+	const become = tab["2"].getByTestId("become-host");
 	await expect(become).toBeEnabled({ timeout: BUTTON_LATEST_MS });
 	await become.click();
-	expect(await commonHost(others)).toBe("E");
+	expect(await commonHost(others)).toBe("2");
 	await expectConnected(others);
 	await expectStatuses(others);
 
-	await reopen("W");
-	expect(await commonHost(SEATS)).toBe("E");
+	await reopen("4");
+	expect(await commonHost(SEATS)).toBe("2");
 	await expectConnected(SEATS);
 	await expectStatuses(SEATS);
-	await expectAudioArrives(tab.W);
-	expect(await counts(tab.W)).toMatchObject({ captures: 1, liveTracks: 1 });
+	await expectAudioArrives(tab["4"]);
+	expect(await counts(tab["4"])).toMatchObject({ captures: 1, liveTracks: 1 });
 });
 
 test("4: a browser that must ask for the microphone again offers Rejoin the call, and opens nothing before the click", async () => {
 	// The browser forgets the microphone permission, as after "Allow this time".
-	await tab.S.context().clearPermissions();
-	await tab.S.reload();
-	await expectSeat(tab.S, "S", {
+	await tab["3"].context().clearPermissions();
+	await tab["3"].reload();
+	await expectSeat(tab["3"], "3", {
 		timeout: CONNECT_MS,
 	});
-	await expect(rejoinButton(tab.S)).toBeVisible({ timeout: CONNECT_MS });
-	await tab.S.waitForTimeout(3_000);
-	expect(await counts(tab.S)).toMatchObject({
+	await expect(rejoinButton(tab["3"])).toBeVisible({ timeout: CONNECT_MS });
+	await tab["3"].waitForTimeout(3_000);
+	expect(await counts(tab["3"])).toMatchObject({
 		peers: 0,
 		captures: 0,
 		liveTracks: 0,
 		callSent: 0,
 	});
-	expect(await requestsFor(tab.S, "audio")).toBe(0);
-	for (const seat of ["W", "N", "E"] as const)
-		await expect(caption(tab[seat], "S")).toHaveText(
+	expect(await requestsFor(tab["3"], "audio")).toBe(0);
+	for (const seat of ["4", "1", "2"] as const)
+		await expect(caption(tab[seat], "3")).toHaveText(
 			"S - player2 · Not in call",
 			{
 				timeout: GONE_MS,
 			},
 		);
 
-	await tab.S.context().grantPermissions(["microphone"]);
-	await rejoinButton(tab.S).click();
+	await tab["3"].context().grantPermissions(["microphone"]);
+	await rejoinButton(tab["3"]).click();
 	await expectConnected(SEATS);
 	await expectStatuses(SEATS);
-	expect(await counts(tab.S)).toMatchObject({ captures: 1, liveTracks: 1 });
+	expect(await counts(tab["3"])).toMatchObject({ captures: 1, liveTracks: 1 });
 });
 
 test("no uncaught errors and no request to the old backend", () => {

@@ -37,7 +37,11 @@ import {
 } from "../../../src/p2p/table";
 import { trysteroMesh } from "../../../src/p2p/trystero";
 import { frame } from "../../../src/p2p/wire";
-import type { RoomConfig, Seat } from "../../../src/protocol";
+import {
+	DEFAULT_TABLE_SETUP,
+	type RoomConfig,
+	type Seat,
+} from "../../../src/protocol";
 import { legalActions } from "../../../src/rummy";
 import { guardedStorage, SeatMemory, webSeatLocks } from "../../../src/session";
 
@@ -145,10 +149,11 @@ declare global {
 }
 
 const CONFIG: RoomConfig = {
-	names: { N: "north", E: "east", S: "south", W: "west" },
+	names: { "1": "north", "2": "east", "3": "south", "4": "west" },
+	table: DEFAULT_TABLE_SETUP,
 };
 
-const SEATS: readonly Seat[] = ["N", "E", "S", "W"];
+const SEATS: readonly Seat[] = ["1", "2", "3", "4"];
 
 const clock: Clock = {
 	monotonic: () => performance.now(),

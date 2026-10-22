@@ -9,7 +9,7 @@ import type { StoredCallRecord } from "../../src/call/record";
 import { parseRummyState, tableSeat } from "../../src/game/rummy";
 import { HOST_LOST_MS, SEAT_GRACE_MS } from "../../src/p2p/limits";
 import type { TableView } from "../../src/p2p/table";
-import type { Seat } from "../../src/protocol";
+import type { Seat as TableSeat } from "../../src/protocol";
 import type { CallView, Harness, TranscriptLine } from "./harness/main";
 import { withholdOffers } from "./network";
 import { buildTrackerUrls } from "./player";
@@ -22,7 +22,9 @@ import { buildTrackerUrls } from "./player";
  */
 
 const HARNESS = "http://localhost:4174/";
-const SEATS: readonly Seat[] = ["N", "E", "S", "W"];
+/** These tests fill a table of four players. */
+type Seat = Extract<TableSeat, "1" | "2" | "3" | "4">;
+const SEATS: readonly Seat[] = ["1", "2", "3", "4"];
 /** Discovery took under 1 s in the spike; this leaves room for a slow tracker. */
 const CONNECT_MS = 45_000;
 /** The host button appears after 10 s without a host. */
@@ -168,15 +170,15 @@ async function fullTable(
 	browser: Browser,
 ): Promise<{ key: string; players: Record<Seat, Player> }> {
 	const north = await newPlayer(browser);
-	const key = await create(north, "N");
-	await expectSeated(north.page, "N", "N");
+	const key = await create(north, "1");
+	await expectSeated(north.page, "1", "1");
 	const players: Record<Seat, Player> = {
-		N: north,
-		E: await newPlayer(browser),
-		S: await newPlayer(browser),
-		W: await newPlayer(browser),
+		"1": north,
+		"2": await newPlayer(browser),
+		"3": await newPlayer(browser),
+		"4": await newPlayer(browser),
 	};
-	for (const seat of ["E", "S", "W"] as const) {
+	for (const seat of ["2", "3", "4"] as const) {
 		await takeSeat(players[seat].page, key, seat);
 	}
 	return { key, players };
@@ -305,7 +307,12 @@ function deal(page: Page) {
 	return page.evaluate(() => (window.ocHarness as Harness).deal());
 }
 
-const SEAT_NAMES = { N: "North", E: "East", S: "South", W: "West" } as const;
+const SEAT_NAMES = {
+	"1": "Player 1",
+	"2": "Player 2",
+	"3": "Player 3",
+	"4": "Player 4",
+} as const;
 
 /** The seat that plays first in the dealt hand, from the state that the page holds. */
 async function firstPlayer(page: Page): Promise<Seat> {
@@ -314,7 +321,9 @@ async function firstPlayer(page: Page): Promise<Seat> {
 		? parseRummyState(record.state, record.tableId)?.match
 		: undefined;
 	if (!match) throw new Error("no hand is dealt");
-	return tableSeat(match.hand.turn);
+	const seat = SEATS.find((one) => one === tableSeat(match.hand.turn));
+	if (seat === undefined) throw new Error("the first player is not seated");
+	return seat;
 }
 
 async function commands(page: Page): Promise<number> {
@@ -350,10 +359,10 @@ async function openInboxes(
 		return self.generation;
 	};
 	return {
-		N: await generation("N"),
-		E: await generation("E"),
-		S: await generation("S"),
-		W: await generation("W"),
+		"1": await generation("1"),
+		"2": await generation("2"),
+		"3": await generation("3"),
+		"4": await generation("4"),
 	};
 }
 
@@ -458,30 +467,32 @@ test("four players form one table, take seats, and replicate commands", async ({
 			.toBe(true);
 		const current = await view(page);
 		expect(current?.peers).toHaveLength(3);
-		expect(current?.hostSeat).toBe("N");
+		expect(current?.hostSeat).toBe("1");
 		expect(current?.network?.wrongKey).toBe(0);
 	}
-	expect((await view(players.N.page))?.hosting).toBe(true);
+	expect((await view(players["1"].page))?.hosting).toBe(true);
 
-	expect(await send(players.E.page, "hello from east")).toEqual({ ok: true });
+	expect(await send(players["2"].page, "hello from east")).toEqual({
+		ok: true,
+	});
 	// Entry 1 is the creator's claim; three seat claims and the command follow.
-	const first = await expectSameLog(players.N.page, pages, 5);
+	const first = await expectSameLog(players["1"].page, pages, 5);
 	expect(first.filter((line) => line.kind === "cmd")).toHaveLength(1);
 
 	// R1: a follower reloads and gets its seat and the log back.
-	await players.E.page.reload();
-	await players.E.page.waitForFunction(() => window.ocHarness !== undefined);
-	await openTable(players.E.page, key, "E");
-	await expectSeated(players.E.page, "E", "N");
+	await players["2"].page.reload();
+	await players["2"].page.waitForFunction(() => window.ocHarness !== undefined);
+	await openTable(players["2"].page, key, "2");
+	await expectSeated(players["2"].page, "2", "1");
 
 	// R1: a follower crashes and reopens the link in a new tab.
-	await crash(players.S);
-	await reopenAfterCrash(players.S, key, "S");
-	await expectSeated(players.S.page, "S", "N");
+	await crash(players["3"]);
+	await reopenAfterCrash(players["3"], key, "3");
+	await expectSeated(players["3"].page, "3", "1");
 
-	expect(await send(players.S.page, "south is back")).toEqual({ ok: true });
+	expect(await send(players["3"].page, "south is back")).toEqual({ ok: true });
 	const second = await expectSameLog(
-		players.N.page,
+		players["1"].page,
 		pagesOf(players, SEATS),
 		first.length + 1,
 	);
@@ -494,49 +505,49 @@ test("the table survives the host and three players leaving", async ({
 }) => {
 	test.setTimeout(240_000);
 	const { key, players } = await fullTable(browser);
-	await expectSameLog(players.N.page, pagesOf(players, SEATS), 4);
+	await expectSameLog(players["1"].page, pagesOf(players, SEATS), 4);
 
 	// The host crashes. With other players connected, the button is enabled, and one click elects a host.
-	await crash(players.N);
-	expect(await waitForButton(players.E.page)).toEqual({ enabled: true });
-	await players.E.page.evaluate(() => (window.ocHarness as Harness).click());
+	await crash(players["1"]);
+	expect(await waitForButton(players["2"].page)).toEqual({ enabled: true });
+	await players["2"].page.evaluate(() => (window.ocHarness as Harness).click());
 	await expect
-		.poll(async () => (await view(players.E.page))?.hosting, {
+		.poll(async () => (await view(players["2"].page))?.hosting, {
 			timeout: CONNECT_MS,
 		})
 		.toBe(true);
-	for (const seat of ["S", "W"] as const) {
-		await expectSeated(players[seat].page, seat, "E");
+	for (const seat of ["3", "4"] as const) {
+		await expectSeated(players[seat].page, seat, "2");
 	}
-	expect(await send(players.S.page, "during the host change")).toEqual({
+	expect(await send(players["3"].page, "during the host change")).toEqual({
 		ok: true,
 	});
 
 	// The old host returns, sees the newer term, and follows.
-	await reopen(players.N, key, "N");
-	await expectSeated(players.N.page, "N", "E");
+	await reopen(players["1"], key, "1");
+	await expectSeated(players["1"].page, "1", "2");
 	// The new host counts the players who were connected before its claim, not only the ones who came later.
-	await expectBound(players.E.page, ["N", "S", "W"]);
+	await expectBound(players["2"].page, ["1", "3", "4"]);
 	const beforeSplit = await expectSameLog(
-		players.E.page,
+		players["2"].page,
 		pagesOf(players, SEATS),
 		5,
 	);
 
-	// Three players leave; North stays alone. Without a witness, North cannot elect itself (D1).
-	for (const seat of ["E", "S", "W"] as const) await crash(players[seat]);
-	expect(await waitForButton(players.N.page)).toEqual({
+	// Three players leave; Player 1 stays alone. Without a witness, Player 1 cannot elect itself (D1).
+	for (const seat of ["2", "3", "4"] as const) await crash(players[seat]);
+	expect(await waitForButton(players["1"].page)).toEqual({
 		enabled: false,
 		reason: "witness",
 	});
 
-	// Two players return and are the witnesses; North's copy restores the table.
-	await reopen(players.S, key, "S");
-	await reopen(players.W, key, "W");
+	// Two players return and are the witnesses; Player 1's copy restores the table.
+	await reopen(players["3"], key, "3");
+	await reopen(players["4"], key, "4");
 	await expect
 		.poll(
 			async () => {
-				const election = (await view(players.N.page))?.election;
+				const election = (await view(players["1"].page))?.election;
 				return election?.phase === "waiting-for-host"
 					? election.button?.enabled
 					: undefined;
@@ -544,19 +555,19 @@ test("the table survives the host and three players leaving", async ({
 			{ timeout: CONNECT_MS },
 		)
 		.toBe(true);
-	await players.N.page.evaluate(() => (window.ocHarness as Harness).click());
-	for (const seat of ["S", "W"] as const) {
-		await expectSeated(players[seat].page, seat, "N");
+	await players["1"].page.evaluate(() => (window.ocHarness as Harness).click());
+	for (const seat of ["3", "4"] as const) {
+		await expectSeated(players[seat].page, seat, "1");
 	}
 
 	// The last host returns, sees the newer term, and follows instead of resuming its own.
-	await reopen(players.E, key, "E");
-	await expectSeated(players.E.page, "E", "N");
-	await expectBound(players.N.page, ["E", "S", "W"]);
+	await reopen(players["2"], key, "2");
+	await expectSeated(players["2"].page, "2", "1");
+	await expectBound(players["1"].page, ["2", "3", "4"]);
 
-	expect(await send(players.W.page, "all back")).toEqual({ ok: true });
+	expect(await send(players["4"].page, "all back")).toEqual({ ok: true });
 	const final = await expectSameLog(
-		players.N.page,
+		players["1"].page,
 		pagesOf(players, SEATS),
 		beforeSplit.length + 1,
 	);
@@ -572,24 +583,24 @@ test("a page that changes network gets its links back with the same peer and sea
 	const { players } = await fullTable(browser);
 	const pages = pagesOf(players, SEATS);
 	for (const page of pages) await expectAllConnected(page);
-	const before = await bindingOf(players.N.page, "E");
+	const before = await bindingOf(players["1"].page, "2");
 	expect(before).toBeDefined();
-	const log = await expectSameLog(players.N.page, pages, 4);
+	const log = await expectSameLog(players["1"].page, pages, 4);
 
-	// East's links all close, as after a switch from Wi-Fi to cellular; the page and its peer id stay.
+	// Player 2's links all close, as after a switch from Wi-Fi to cellular; the page and its peer id stay.
 	expect(
-		await players.E.page.evaluate(() =>
+		await players["2"].page.evaluate(() =>
 			(window.ocHarness as Harness).dropLinks(),
 		),
 	).toEqual({ closed: 3, peersAfter: 0 });
 
-	// The full mesh comes back, East keeps its seat generation, and nothing in the log changed.
+	// The full mesh comes back, Player 2 keeps its seat generation, and nothing in the log changed.
 	for (const page of pages) await expectAllConnected(page);
-	expect(await bindingOf(players.N.page, "E")).toEqual(before);
-	expect(await send(players.E.page, "after the network change")).toEqual({
+	expect(await bindingOf(players["1"].page, "2")).toEqual(before);
+	expect(await send(players["2"].page, "after the network change")).toEqual({
 		ok: true,
 	});
-	const after = await expectSameLog(players.N.page, pages, log.length + 1);
+	const after = await expectSameLog(players["1"].page, pages, log.length + 1);
 	expect(after.slice(0, log.length)).toEqual(log);
 
 	// The two-page rooms close once the table room has their links.
@@ -603,7 +614,9 @@ test("a page that changes network gets its links back with the same peer and sea
 	const repaired = await Promise.all(
 		pages.map(async (page) => (await view(page))?.network?.repaired),
 	);
-	console.error(`links repaired through two-page rooms, N E S W: ${repaired}`);
+	console.error(
+		`links repaired through two-page rooms, N E S "4": ${repaired}`,
+	);
 });
 
 test("a visitor whose first links fail still connects within the connection budget", async ({
@@ -611,8 +624,8 @@ test("a visitor whose first links fail still connects within the connection budg
 }) => {
 	test.setTimeout(120_000);
 	const north = await newPlayer(browser);
-	const key = await create(north, "N");
-	await expectSeated(north.page, "N", "N");
+	const key = await create(north, "1");
+	await expectSeated(north.page, "1", "1");
 
 	// Each link that the visitor starts in its first 15 s fails its ICE checks. Trystero reports a failed
 	// link about 23 s after the exchange, and the table room tries again only at a later tracker announce.
@@ -654,14 +667,14 @@ test("a latecomer whose first offers reach no page that answers rejoins and conn
 }) => {
 	test.setTimeout(120_000);
 	const north = await newPlayer(browser);
-	const key = await create(north, "N");
-	await expectSeated(north.page, "N", "N");
+	const key = await create(north, "1");
+	await expectSeated(north.page, "1", "1");
 	const east = await newPlayer(browser);
-	await takeSeat(east.page, key, "E");
+	await takeSeat(east.page, key, "2");
 
 	// The trackers send each offer to a few pages, and those can be pages that cannot answer: a frozen tab, or
 	// a tab that left the room but keeps its tracker sockets (the full2 seat-timeout failure). For its first
-	// 8 s, the latecomer's offers reach no page, and no offer reaches it. North and East have their link, so
+	// 8 s, the latecomer's offers reach no page, and no offer reaches it. Player 1 and Player 2 have their link, so
 	// they do not rejoin. The trackers' announce interval is 120 s, so within the budget only the latecomer's
 	// rejoin after 10 s alone can send a new offer.
 	const withholdMs = 8_000;
@@ -694,15 +707,15 @@ test("game actions wait for every player (R4)", async ({ browser }) => {
 
 	// A quiet table: no command for longer than the 6 s presence window. All players are still there, so the
 	// host's deal lands.
-	await players.N.page.waitForTimeout(8_000);
+	await players["1"].page.waitForTimeout(8_000);
 	await expectCommands(pages, 0);
-	expect(await deal(players.N.page)).toEqual({ ok: true });
+	expect(await deal(players["1"].page)).toEqual({ ok: true });
 	await expectCommands(pages, 1);
 
-	// The first dealer is random, so the first player is too. A seat that is neither the host (North) nor the
+	// The first dealer is random, so the first player is too. A seat that is neither the host (Player 1) nor the
 	// first player leaves, and the first player's draw waits for it.
-	const first = await firstPlayer(players.N.page);
-	const [gone, idle] = SEATS.filter((seat) => seat !== "N" && seat !== first);
+	const first = await firstPlayer(players["1"].page);
+	const [gone, idle] = SEATS.filter((seat) => seat !== "1" && seat !== first);
 	if (gone === undefined || idle === undefined)
 		throw new Error("no seat to leave");
 	await crash(players[gone]);
@@ -723,7 +736,7 @@ test("game actions wait for every player (R4)", async ({ browser }) => {
 
 	// The seat returns, and the stored draw lands without a new click.
 	await reopen(players[gone], key, gone);
-	await expectSeated(players[gone].page, gone, "N");
+	await expectSeated(players[gone].page, gone, "1");
 	const all = pagesOf(players, SEATS);
 	await expectCommands(all, 2);
 	expect((await view(players[first].page))?.outbox).toEqual([]);
@@ -732,7 +745,7 @@ test("game actions wait for every player (R4)", async ({ browser }) => {
 	await actInTurn(players[first].page, all, 2);
 
 	for (const page of all) expect((await view(page))?.failures).toEqual([]);
-	const log = await transcript(players.N.page);
+	const log = await transcript(players["1"].page);
 	expectWellFormed(log);
 	expect(new Set(log.map((line) => line.term))).toEqual(new Set([1]));
 });
@@ -758,88 +771,88 @@ test("call signaling goes over the data channels, and only from bound seats (P7)
 	}
 
 	// A message to all reaches the three other inboxes, with the sender's seat from the roster.
-	const all = await callSend(players.N.page, null);
-	for (const seat of others("N")) {
-		await expectArrivals(players[seat].page, all, [["N", gens.N]]);
+	const all = await callSend(players["1"].page, null);
+	for (const seat of others("1")) {
+		await expectArrivals(players[seat].page, all, [["1", gens["1"]]]);
 	}
-	expect(await arrivals(players.N.page, all)).toEqual([]);
+	expect(await arrivals(players["1"].page, all)).toEqual([]);
 
-	// An addressed message reaches only its seat. Each data channel keeps its order, so once East's next message
+	// An addressed message reaches only its seat. Each data channel keeps its order, so once Player 2's next message
 	// to all has arrived, the addressed one would have arrived first if it had been sent there.
-	const direct = await callSend(players.E.page, "S");
-	const marker = await callSend(players.E.page, null);
-	for (const seat of others("E")) {
-		await expectArrivals(players[seat].page, marker, [["E", gens.E]]);
+	const direct = await callSend(players["2"].page, "3");
+	const marker = await callSend(players["2"].page, null);
+	for (const seat of others("2")) {
+		await expectArrivals(players[seat].page, marker, [["2", gens["2"]]]);
 	}
-	await expectArrivals(players.S.page, direct, [["E", gens.E]]);
-	for (const seat of ["N", "W"] as const) {
+	await expectArrivals(players["3"].page, direct, [["2", gens["2"]]]);
+	for (const seat of ["1", "4"] as const) {
 		expect(await arrivals(players[seat].page, direct)).toEqual([]);
 	}
 
-	// Raw frames from West's page: a wrong sender or receiver generation is dropped; the correct one, sent last on
+	// Raw frames from Player 4's page: a wrong sender or receiver generation is dropped; the correct one, sent last on
 	// the same channel, arrives, so the two before it were received and dropped.
-	const wrongFrom = await callForge(players.W.page, {
-		to: "N",
-		toGen: gens.N,
-		fromGen: gens.W + 1,
+	const wrongFrom = await callForge(players["4"].page, {
+		to: "1",
+		toGen: gens["1"],
+		fromGen: gens["4"] + 1,
 		count: 1,
 	});
-	const wrongTo = await callForge(players.W.page, {
-		to: "N",
-		toGen: gens.N + 1,
-		fromGen: gens.W,
+	const wrongTo = await callForge(players["4"].page, {
+		to: "1",
+		toGen: gens["1"] + 1,
+		fromGen: gens["4"],
 		count: 1,
 	});
-	const correct = await callForge(players.W.page, {
-		to: "N",
-		toGen: gens.N,
-		fromGen: gens.W,
+	const correct = await callForge(players["4"].page, {
+		to: "1",
+		toGen: gens["1"],
+		fromGen: gens["4"],
 		count: 1,
 	});
-	await expectArrivals(players.N.page, correct, [["W", gens.W]]);
-	expect(await arrivals(players.N.page, wrongFrom)).toEqual([]);
-	expect(await arrivals(players.N.page, wrongTo)).toEqual([]);
+	await expectArrivals(players["1"].page, correct, [["4", gens["4"]]]);
+	expect(await arrivals(players["1"].page, wrongFrom)).toEqual([]);
+	expect(await arrivals(players["1"].page, wrongTo)).toEqual([]);
 
-	// A flood of 30 from one seat: North takes 20 in the window, and East still gets through.
-	await players.N.page.waitForTimeout(1_500);
-	const flood = await callForge(players.W.page, {
-		to: "N",
-		toGen: gens.N,
-		fromGen: gens.W,
+	// A flood of 30 from one seat: Player 1 takes 20 in the window, and Player 2 still gets through.
+	await players["1"].page.waitForTimeout(1_500);
+	const flood = await callForge(players["4"].page, {
+		to: "1",
+		toGen: gens["1"],
+		fromGen: gens["4"],
 		count: 30,
 	});
-	const during = await callSend(players.E.page, "N");
-	await expectArrivals(players.N.page, during, [["E", gens.E]]);
-	await players.N.page.waitForTimeout(1_500);
-	const later = await callForge(players.W.page, {
-		to: "N",
-		toGen: gens.N,
-		fromGen: gens.W,
+	const during = await callSend(players["2"].page, "1");
+	await expectArrivals(players["1"].page, during, [["2", gens["2"]]]);
+	await players["1"].page.waitForTimeout(1_500);
+	const later = await callForge(players["4"].page, {
+		to: "1",
+		toGen: gens["1"],
+		fromGen: gens["4"],
 		count: 1,
 	});
-	await expectArrivals(players.N.page, later, [["W", gens.W]]);
-	expect(await arrivals(players.N.page, flood)).toHaveLength(20);
+	await expectArrivals(players["1"].page, later, [["4", gens["4"]]]);
+	expect(await arrivals(players["1"].page, flood)).toHaveLength(20);
 
-	// A visitor without a seat has a working link to North, but its frames never reach North's inbox.
+	// A visitor without a seat has a working link to Player 1, but its frames never reach Player 1's inbox.
 	const visitor = await newPlayer(browser);
 	await openTable(visitor.page, key);
 	await expect
 		.poll(
 			async () =>
-				(await view(players.N.page))?.peers
+				(await view(players["1"].page))?.peers
 					.filter((peer) => peer.seat === null)
 					.map((peer) => peer.check?.state),
 			{ timeout: CONNECT_MS },
 		)
 		.toEqual(["ready"]);
 	const stray = await callForge(visitor.page, {
-		to: "N",
-		toGen: gens.N,
+		to: "1",
+		toGen: gens["1"],
 		fromGen: 1,
 		count: 3,
 	});
-	await players.N.page.waitForTimeout(3_000);
-	expect(await arrivals(players.N.page, stray)).toEqual([]);
+	await players["1"].page.waitForTimeout(3_000);
+	expect(await arrivals(players["1"].page, stray)).toEqual([]);
 });
 
 test("call signaling and the call status come back after a network change and a reload (P7, R2)", async ({
@@ -851,86 +864,88 @@ test("call signaling and the call status come back after a network change and a 
 	for (const page of pages) await expectAllConnected(page);
 	const gens = await openInboxes(players);
 	await expect
-		.poll(async () => (await callView(players.N.page)).online, {
+		.poll(async () => (await callView(players["1"].page)).online, {
 			timeout: CONNECT_MS,
 		})
-		.toEqual(others("N"));
+		.toEqual(others("1"));
 
-	// East's links drop, as after a switch from Wi-Fi to cellular. North sees East leave and come back, and
-	// East's inbox stays open through it.
-	await players.E.page.evaluate(() =>
+	// Player 2's links drop, as after a switch from Wi-Fi to cellular. Player 1 sees Player 2 leave and come back, and
+	// Player 2's inbox stays open through it.
+	await players["2"].page.evaluate(() =>
 		(window.ocHarness as Harness).dropLinks(),
 	);
 	for (const page of pages) await expectAllConnected(page);
 	await expect
-		.poll(async () => (await callView(players.N.page)).online, {
+		.poll(async () => (await callView(players["1"].page)).online, {
 			timeout: CONNECT_MS,
 		})
-		.toEqual(others("N"));
-	const history = await players.N.page.evaluate(() =>
+		.toEqual(others("1"));
+	const history = await players["1"].page.evaluate(() =>
 		(window.ocHarness as Harness).callOnlineHistory(),
 	);
 	expect(
-		history.slice(history.indexOf("ESW")).some((seats) => !seats.includes("E")),
-		`North's online sets: ${history}`,
+		history.slice(history.indexOf("ESW")).some((seats) => !seats.includes("2")),
+		`Player 1's online sets: ${history}`,
 	).toBe(true);
 	expect(
-		await players.E.page.evaluate(() =>
+		await players["2"].page.evaluate(() =>
 			(window.ocHarness as Harness).callEnded(),
 		),
 	).toBeNull();
-	const toEast = await callSend(players.N.page, "E");
-	await expectArrivals(players.E.page, toEast, [["N", gens.N]]);
-	const fromEast = await callSend(players.E.page, null);
-	for (const seat of others("E")) {
-		await expectArrivals(players[seat].page, fromEast, [["E", gens.E]]);
+	const toEast = await callSend(players["1"].page, "2");
+	await expectArrivals(players["2"].page, toEast, [["1", gens["1"]]]);
+	const fromEast = await callSend(players["2"].page, null);
+	for (const seat of others("2")) {
+		await expectArrivals(players[seat].page, fromEast, [["2", gens["2"]]]);
 	}
 
-	// R2: East's call status is a versioned record in every replica; an equal version never replaces it. The host
-	// stores it with the holder of East's seat, which only East's own browser knows first-hand.
-	const eastHolder = await players.E.page.evaluate(() =>
+	// R2: Player 2's call status is a versioned record in every replica; an equal version never replaces it. The host
+	// stores it with the holder of Player 2's seat, which only Player 2's own browser knows first-hand.
+	const eastHolder = await players["2"].page.evaluate(() =>
 		(window.ocHarness as Harness).holder(),
 	);
-	expect(await sendMedia(players.E.page, 1, true)).toEqual({ ok: true });
-	await expectMedia(pages, { E: callStatus(1, true, eastHolder) });
-	expect(await sendMedia(players.E.page, 1, false)).toEqual({ ok: true });
+	expect(await sendMedia(players["2"].page, 1, true)).toEqual({ ok: true });
+	await expectMedia(pages, { "2": callStatus(1, true, eastHolder) });
+	expect(await sendMedia(players["2"].page, 1, false)).toEqual({ ok: true });
 	await expect
 		.poll(
 			async () =>
-				(await view(players.E.page))?.failures.map((failure) => [
+				(await view(players["2"].page))?.failures.map((failure) => [
 					failure.status,
 					failure.reason,
 				]),
 			{ timeout: CONNECT_MS },
 		)
 		.toEqual([["rejected", "a newer call status is stored"]]);
-	expect(await sendMedia(players.E.page, 2, false)).toEqual({ ok: true });
-	await expectMedia(pages, { E: callStatus(2, false, eastHolder) });
+	expect(await sendMedia(players["2"].page, 2, false)).toEqual({ ok: true });
+	await expectMedia(pages, { "2": callStatus(2, false, eastHolder) });
 
-	// After a reload, East reads its call status from its own replica. Its own URL binds the seat again at the
+	// After a reload, Player 2 reads its call status from its own replica. Its own URL binds the seat again at the
 	// generation that it holds, and its new inbox receives.
-	await players.E.page.reload();
-	await players.E.page.waitForFunction(() => window.ocHarness !== undefined);
-	await openTable(players.E.page, key, "E");
-	await expectSeated(players.E.page, "E", "N");
-	await expectMedia([players.E.page], { E: callStatus(2, false, eastHolder) });
-	const reopened = await callOpen(players.E.page);
-	expect(reopened.generation).toBe(gens.E);
+	await players["2"].page.reload();
+	await players["2"].page.waitForFunction(() => window.ocHarness !== undefined);
+	await openTable(players["2"].page, key, "2");
+	await expectSeated(players["2"].page, "2", "1");
+	await expectMedia([players["2"].page], {
+		"2": callStatus(2, false, eastHolder),
+	});
+	const reopened = await callOpen(players["2"].page);
+	expect(reopened.generation).toBe(gens["2"]);
 	await expect
-		.poll(() => callView(players.N.page), { timeout: CONNECT_MS })
+		.poll(() => callView(players["1"].page), { timeout: CONNECT_MS })
 		.toEqual({
-			self: { seat: "N", generation: gens.N },
-			holders: { ...gens, E: reopened.generation },
-			online: others("N"),
+			self: { seat: "1", generation: gens["1"] },
+			holders: { ...gens, "2": reopened.generation },
+			online: others("1"),
 		});
-	const afterReload = await callSend(players.N.page, "E");
-	await expectArrivals(players.E.page, afterReload, [["N", gens.N]]);
+	const afterReload = await callSend(players["1"].page, "2");
+	await expectArrivals(players["2"].page, afterReload, [["1", gens["1"]]]);
 });
 
 test("a page with another key never becomes a peer", async ({ browser }) => {
 	const north = await newPlayer(browser);
-	const key = await create(north, "N");
-	await expectSeated(north.page, "N", "N");
+	const key = await create(north, "1");
+	await expectSeated(north.page, "1", "1");
 	const stranger = await newPlayer(browser);
 	await stranger.page.evaluate(
 		(link) => (window.ocHarness as Harness).wrongKeyJoin(link),
@@ -962,8 +977,8 @@ test("the receive cap drops an oversize control message and the link keeps worki
 	browser,
 }) => {
 	const north = await newPlayer(browser);
-	const key = await create(north, "N");
-	await expectSeated(north.page, "N", "N");
+	const key = await create(north, "1");
+	await expectSeated(north.page, "1", "1");
 	const sender = await newPlayer(browser);
 	expect(
 		await sender.page.evaluate(
@@ -980,10 +995,10 @@ test("a second tab cannot take a seat from an active same-browser tab", async ({
 	browser,
 }) => {
 	const north = await newPlayer(browser);
-	const key = await create(north, "N");
-	await expectSeated(north.page, "N", "N");
+	const key = await create(north, "1");
+	await expectSeated(north.page, "1", "1");
 	const east = await newPlayer(browser);
-	await takeSeat(east.page, key, "E");
+	await takeSeat(east.page, key, "2");
 
 	const second = await openPage(east.context);
 	await openTable(second, key);
@@ -991,11 +1006,11 @@ test("a second tab cannot take a seat from an active same-browser tab", async ({
 		.poll(async () => (await view(second))?.heldElsewhere, {
 			timeout: CONNECT_MS,
 		})
-		.toEqual(["E"]);
+		.toEqual(["2"]);
 	expect(
-		await second.evaluate(() => (window.ocHarness as Harness).choose("E")),
+		await second.evaluate(() => (window.ocHarness as Harness).choose("2")),
 	).toEqual({ ok: false, reason: "held-elsewhere" });
-	await expectSeated(east.page, "E", "N");
+	await expectSeated(east.page, "2", "1");
 	expect(await send(east.page, "still active")).toEqual({ ok: true });
 	await expectSameLog(north.page, [east.page], 3);
 });
@@ -1004,10 +1019,10 @@ test("a claim for a taken seat fails and the page stays a visitor", async ({
 	browser,
 }) => {
 	const north = await newPlayer(browser);
-	const key = await create(north, "N");
-	await expectSeated(north.page, "N", "N");
+	const key = await create(north, "1");
+	await expectSeated(north.page, "1", "1");
 	const east = await newPlayer(browser);
-	await takeSeat(east.page, key, "E");
+	await takeSeat(east.page, key, "2");
 
 	const late = await newPlayer(browser);
 	await openTable(late.page, key);
@@ -1016,13 +1031,13 @@ test("a claim for a taken seat fails and the page stays a visitor", async ({
 			timeout: CONNECT_MS,
 		})
 		.toBe(true);
-	expect(await choose(late.page, "E")).toEqual({ ok: true });
+	expect(await choose(late.page, "2")).toEqual({ ok: true });
 	await expect
 		.poll(async () => {
 			const current = await view(late.page);
 			return [current?.seatError, current?.seat, current?.lobby !== null];
 		})
 		.toEqual(["taken", null, true]);
-	expect(await choose(late.page, "S")).toEqual({ ok: true });
-	await expectSeated(late.page, "S", "N");
+	expect(await choose(late.page, "3")).toEqual({ ok: true });
+	await expectSeated(late.page, "3", "1");
 });

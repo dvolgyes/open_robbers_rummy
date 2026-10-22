@@ -12,13 +12,14 @@ import {
 	tagHolder,
 	tagSeat,
 } from "../../src/p2p/keys";
+import { SEATS } from "../../src/protocol";
 
 // Reference values from Node's `crypto.createHash("sha256")` and `Buffer.toString("base64url")`, so the
 // expected text does not come from the code under test.
 const KEY = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE"; // 32 bytes of 0x01
-const TABLE_ID = "nA4T9YSm2T2Isf5qOeYuDn";
+const TABLE_ID = "epL6jif2XRTHihMIdzmW4B";
 const CLIENT_ID = "AgICAgICAgICAgICAgICAg"; // 16 bytes of 0x02
-const HOLDER = "Xjpu4Jr_HMMHDwPX";
+const HOLDER = "a_23jCSaYAC1VB2p";
 
 describe("deriveTableId", () => {
 	it("is the first 22 characters of the SHA-256 of the labelled key", async () => {
@@ -34,15 +35,15 @@ describe("deriveTableId", () => {
 
 describe("derivePairRoomId", () => {
 	it("is the first 22 characters of the SHA-256 of the labelled key and pair", async () => {
-		expect(await derivePairRoomId(KEY, "seat|E|S")).toBe(
-			"aoEEi3K_7wmAavbkfHP8Ed",
+		expect(await derivePairRoomId(KEY, "seat|2|3")).toBe(
+			"4Ez_j8XBcjXdV4c1f0bZoY",
 		);
 	});
 
 	it("differs from the table room and for another key", async () => {
-		const pair = await derivePairRoomId(KEY, "seat|E|S");
+		const pair = await derivePairRoomId(KEY, "seat|2|3");
 		expect(pair).not.toBe(TABLE_ID);
-		expect(await derivePairRoomId(`${KEY.slice(0, 42)}g`, "seat|E|S")).not.toBe(
+		expect(await derivePairRoomId(`${KEY.slice(0, 42)}g`, "seat|2|3")).not.toBe(
 			pair,
 		);
 	});
@@ -78,15 +79,22 @@ describe("newClientId", () => {
 
 describe("host tags", () => {
 	it("join holder and seat, and split again", () => {
-		const tag = makeTag(HOLDER, "E");
-		expect(tag).toBe(`${HOLDER}.E`);
+		const tag = makeTag(HOLDER, "2");
+		expect(tag).toBe(`${HOLDER}.2`);
 		expect(isTag(tag)).toBe(true);
-		expect(tagSeat(tag)).toBe("E");
+		expect(tagSeat(tag)).toBe("2");
 		expect(tagHolder(tag)).toBe(HOLDER);
 	});
 
+	it.each(SEATS)("accept seat %s", (seat) => {
+		expect(isTag(makeTag(HOLDER, seat))).toBe(true);
+		expect(tagSeat(makeTag(HOLDER, seat))).toBe(seat);
+	});
+
 	it.each([
-		["a short holder", `${HOLDER.slice(1)}.E`],
+		["a short holder", `${HOLDER.slice(1)}.2`],
+		["seat 7", `${HOLDER}.7`],
+		["a canasta seat letter", `${HOLDER}.N`],
 		["no seat", HOLDER],
 		["an unknown seat", `${HOLDER}.X`],
 		["a number", 7],
@@ -95,7 +103,7 @@ describe("host tags", () => {
 	});
 
 	it("refuses an invalid holder", () => {
-		expect(() => makeTag("short", "N")).toThrow("invalid host tag");
-		expect(() => tagSeat("short.N")).toThrow("invalid host tag");
+		expect(() => makeTag("short", "1")).toThrow("invalid host tag");
+		expect(() => tagSeat("short.1")).toThrow("invalid host tag");
 	});
 });

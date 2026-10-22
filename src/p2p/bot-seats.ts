@@ -1,4 +1,10 @@
-import { isBotName, type RoomConfig, SEATS, type Seat } from "../protocol";
+import {
+	isBotName,
+	type RoomConfig,
+	type Seat,
+	seatName,
+	seatsOf,
+} from "../protocol";
 import { deriveHolder } from "./keys";
 
 export interface BotSeatClaim {
@@ -8,15 +14,15 @@ export interface BotSeatClaim {
 }
 
 export function botSeats(config: RoomConfig): Seat[] {
-	return SEATS.filter(
+	return seatsOf(config).filter(
 		(seat) =>
 			config.botSetup?.seats.includes(seat) === true ||
-			isBotName(config.names[seat]),
+			isBotName(seatName(config, seat)),
 	);
 }
 
 export function botSeatHolder(tableId: string, seat: Seat): Promise<string> {
-	return deriveHolder(tableId, `open-canasta|host-bot|${seat}`);
+	return deriveHolder(tableId, `open-robbers-rummy|host-bot|${seat}`);
 }
 
 export async function botSeatClaims(

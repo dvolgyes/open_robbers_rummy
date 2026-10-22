@@ -58,7 +58,7 @@ function ownTail(): Entry[] {
 	if (!three) throw new Error("no entry");
 	return [
 		...entries(1, 2, AUTH_1, null),
-		{ ...three, id: commandId(903), seat: "E", gen: 1 },
+		{ ...three, id: commandId(903), seat: "2", gen: 1 },
 	];
 }
 
@@ -91,7 +91,7 @@ class Rig {
 	follower: Follower;
 
 	constructor(log: LocalLog | null = null) {
-		this.log = log ?? new LocalLog(this.storage, TABLE, "E");
+		this.log = log ?? new LocalLog(this.storage, TABLE, "2");
 		this.follower = new Follower(
 			{
 				tableId: TABLE,
@@ -111,19 +111,19 @@ class Rig {
 		const storage = new TestStorage();
 		const end = log.at(-1);
 		const table = tableRecord({
-			replica: "E",
+			replica: "2",
 			rev: log.length,
 			lastAuth: end?.auth ?? AUTH_1,
 			host: end?.auth ?? AUTH_1,
 			seats: SEATS.map((seat) => ({
 				seat,
-				holder: seat === "E" ? HOLDER_E : null,
-				gen: seat === "E" ? 1 : 0,
+				holder: seat === "2" ? HOLDER_E : null,
+				gen: seat === "2" ? 1 : 0,
 			})),
 		});
 		const created = await storage.commit({ table, expect: null, append: log });
 		if (!created.ok) throw new Error(created.detail);
-		const opened = await openLog(storage, TABLE, "E");
+		const opened = await openLog(storage, TABLE, "2");
 		if (!opened.ok) throw new Error(opened.detail);
 		const rig = new Rig(opened.value.log);
 		Object.assign(rig, { storage });
@@ -144,7 +144,7 @@ class Rig {
 			k: "welcome",
 			status: "bound",
 			auth: host.auth,
-			seat: "E",
+			seat: "2",
 			gen: 1,
 		});
 		await rig.answer(host.peer, source(hostLog, host.auth, rig.clock.wall()));
@@ -205,8 +205,8 @@ function lobby(auth: Authority): Lobby {
 		idleMs: 0,
 		seats: SEATS.map((seat) => ({
 			seat,
-			available: seat !== "N",
-			online: seat === "N",
+			available: seat !== "1",
+			online: seat === "1",
 			mine: false,
 		})),
 	};
@@ -219,8 +219,8 @@ describe("joining", () => {
 		rig.ctl(HOST, { k: "welcome", status: "unseated", auth: AUTH_1 });
 		rig.ctl(HOST, lobby(AUTH_1));
 		expect(rig.sent.of("claim-seat")).toEqual([]);
-		rig.follower.choose("E", rig.log);
-		rig.ctl(HOST, { k: "seat-result", req: 1, ok: true, seat: "E", gen: 1 });
+		rig.follower.choose("2", rig.log);
+		rig.ctl(HOST, { k: "seat-result", req: 1, ok: true, seat: "2", gen: 1 });
 		const hostLog = entries(1, 3, AUTH_1, null);
 		await rig.answer(HOST, source(hostLog, AUTH_1, rig.clock.wall()));
 		expect(rig.sent.sent.map((item) => [item.to, item.message])).toEqual([
@@ -232,7 +232,7 @@ describe("joining", () => {
 					client: CLIENT_E,
 				},
 			],
-			[HOST, { k: "claim-seat", req: 1, seat: "E" }],
+			[HOST, { k: "claim-seat", req: 1, seat: "2" }],
 			[HOST, { k: "sync", req: 2, pos: { rev: 0, lastAuth: null } }],
 		]);
 		expect(rig.types()).toEqual([
@@ -265,7 +265,7 @@ describe("joining", () => {
 				k: "hello",
 				b: LINK_VERSION,
 				client: CLIENT_E,
-				seat: "E",
+				seat: "2",
 				gen: 1,
 				pos: { rev: 3, lastAuth: AUTH_1 },
 			},
@@ -274,7 +274,7 @@ describe("joining", () => {
 			k: "welcome",
 			status: "bound",
 			auth: AUTH_1,
-			seat: "E",
+			seat: "2",
 			gen: 1,
 		});
 		const hostLog = entries(1, 5, AUTH_1, null);
@@ -301,7 +301,7 @@ describe("joining", () => {
 			k: "welcome",
 			status: "bound",
 			auth: AUTH_2,
-			seat: "E",
+			seat: "2",
 			gen: 1,
 		});
 		expect(rig.sent.sent).toEqual([]);
@@ -384,7 +384,7 @@ describe("live entries", () => {
 			k: "welcome",
 			status: "bound",
 			auth: AUTH_2,
-			seat: "E",
+			seat: "2",
 			gen: 1,
 		});
 		const sync = rig.lastSync();
@@ -410,7 +410,7 @@ describe("live entries", () => {
 			k: "welcome",
 			status: "bound",
 			auth: AUTH_1,
-			seat: "E",
+			seat: "2",
 			gen: 1,
 		});
 		await rig.tick(SYNC_TIMEOUT_MS);

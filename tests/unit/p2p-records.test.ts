@@ -51,7 +51,7 @@ describe("parseTableRecord", () => {
 		["a state that is too deep", { state: nested(40) }],
 		[
 			"a name with outer spaces",
-			{ config: { ...CONFIG, names: { ...CONFIG.names, N: " a" } } },
+			{ config: { ...CONFIG, names: { ...CONFIG.names, "1": " a" } } },
 		],
 		[
 			"a bad last authority",
@@ -152,7 +152,7 @@ describe("parseReplica", () => {
 		[
 			"an outbox record of another seat",
 			log,
-			[outboxRecord(1, { replica: "E" })],
+			[outboxRecord(1, { replica: "2" })],
 		],
 		[
 			"an outbox record of another table",

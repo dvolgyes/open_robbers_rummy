@@ -36,8 +36,8 @@ test("the last free seat is taken by the page that opens the link, and the first
 	const link = await createRoom(await creator.page("./"));
 
 	for (const [player, seat] of [
-		[north, "N"],
-		[east, "E"],
+		[north, "1"],
+		[east, "2"],
 	] as const) {
 		const page = await player.page(link);
 		await expect(page.getByTestId(`pick-${seat}`)).toBeVisible({
@@ -47,12 +47,12 @@ test("the last free seat is taken by the page that opens the link, and the first
 		await expectSeat(page, seat);
 	}
 
-	// Only South is free: this page takes it without a picker.
+	// Only Player 3 is free: this page takes it without a picker.
 	const page = await south.page(link);
-	await expectSeat(page, "S", {
+	await expectSeat(page, "3", {
 		timeout: CONNECT_MS,
 	});
-	await expect(page.getByTestId("pick-S")).toHaveCount(0);
+	await expect(page.getByTestId("pick-3")).toHaveCount(0);
 
 	// All four seats are present, so the host deals hand 1 automatically.
 	await expect(page.getByTestId("table")).toHaveAttribute("data-hand", "1", {

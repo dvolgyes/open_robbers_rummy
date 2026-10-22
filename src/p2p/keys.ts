@@ -1,5 +1,5 @@
 import { base64url, platformRandomBytes, type RandomBytes } from "../ids";
-import { isSeat, type Seat } from "../protocol";
+import { isSeat, SEATS, type Seat } from "../protocol";
 
 /**
  * Identifiers derived with SHA-256 (plan §4.1, §4.3). They are names, not secrets or signatures: the table key
@@ -11,7 +11,7 @@ const TABLE_ID_LENGTH = 22;
 const HOLDER_LENGTH = 16;
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 const HOLDER_PATTERN = /^[A-Za-z0-9_-]{16}$/;
-const TAG_PATTERN = /^[A-Za-z0-9_-]{16}\.[NESW]$/;
+const TAG_PATTERN = new RegExp(`^[A-Za-z0-9_-]{16}\\.[${SEATS.join("")}]$`);
 
 async function digest(text: string): Promise<string> {
 	const bytes = new TextEncoder().encode(text);
@@ -22,7 +22,10 @@ async function digest(text: string): Promise<string> {
 
 /** The Trystero room and storage name of the table; it satisfies `isRoomId`. */
 export async function deriveTableId(key: string): Promise<string> {
-	return (await digest(`open-canasta|table|${key}`)).slice(0, TABLE_ID_LENGTH);
+	return (await digest(`open-robbers-rummy|table|${key}`)).slice(
+		0,
+		TABLE_ID_LENGTH,
+	);
 }
 
 /** The Trystero room in which two pages of the table meet (`rendezvous.ts`). Only pages with K can derive it. */
@@ -30,7 +33,7 @@ export async function derivePairRoomId(
 	key: string,
 	name: string,
 ): Promise<string> {
-	return (await digest(`open-canasta|pair|${key}|${name}`)).slice(
+	return (await digest(`open-robbers-rummy|pair|${key}|${name}`)).slice(
 		0,
 		TABLE_ID_LENGTH,
 	);

@@ -78,7 +78,7 @@ function extended(
 async function loaded(
 	storage: TableStorage,
 	tableId = TABLE,
-	seat: Seat = "N",
+	seat: Seat = "1",
 ) {
 	return value(await storage.load(tableId, seat));
 }
@@ -228,22 +228,22 @@ describe.each(SUBJECTS)("%s storage", (_name, make) => {
 	it("keeps partitions of other tables and seats apart", async () => {
 		const { storage } = await make();
 		const north = created();
-		const east = created({ replica: "E", rev: 2 });
+		const east = created({ replica: "2", rev: 2 });
 		const other = created({ tableId: OTHER_TABLE, rev: 1 });
 		for (const change of [north, east, other]) {
 			value(await storage.commit(change));
 		}
-		value(await storage.putOutbox(outboxRecord(1, { replica: "E" })));
+		value(await storage.putOutbox(outboxRecord(1, { replica: "2" })));
 		value(await storage.commit(extended(north.table, 1)));
 		expect((await loaded(storage))?.table.rev).toBe(4);
 		expect((await loaded(storage))?.outbox).toEqual([]);
-		expect(await loaded(storage, TABLE, "E")).toEqual({
+		expect(await loaded(storage, TABLE, "2")).toEqual({
 			table: east.table,
 			entries: east.append,
-			outbox: [outboxRecord(1, { replica: "E" })],
+			outbox: [outboxRecord(1, { replica: "2" })],
 		});
 		expect((await loaded(storage, OTHER_TABLE))?.table).toEqual(other.table);
-		expect(await loaded(storage, TABLE, "S")).toBeNull();
+		expect(await loaded(storage, TABLE, "3")).toBeNull();
 	});
 
 	it("returns the outbox in send order and removes sent commands", async () => {
@@ -260,7 +260,7 @@ describe.each(SUBJECTS)("%s storage", (_name, make) => {
 
 		const rewritten = { ...first, payload: { type: "chat", text: "again" } };
 		value(await storage.putOutbox(rewritten));
-		value(await storage.deleteOutbox(TABLE, "N", second.id));
+		value(await storage.deleteOutbox(TABLE, "1", second.id));
 		expect((await loaded(storage))?.outbox).toEqual([rewritten, third]);
 
 		value(
@@ -279,13 +279,13 @@ describe.each(SUBJECTS)("%s storage", (_name, make) => {
 	it("expires every partition of a table and remembers it", async () => {
 		const { storage } = await make();
 		const other = created({ tableId: OTHER_TABLE });
-		for (const change of [created(), created({ replica: "E" }), other]) {
+		for (const change of [created(), created({ replica: "2" }), other]) {
 			value(await storage.commit(change));
 		}
 		value(await storage.putOutbox(outboxRecord(1)));
 		value(await storage.expireTable(TABLE, 5_000));
 		expect(await loaded(storage)).toBeNull();
-		expect(await loaded(storage, TABLE, "E")).toBeNull();
+		expect(await loaded(storage, TABLE, "2")).toBeNull();
 		expect((await loaded(storage, OTHER_TABLE))?.table).toEqual(other.table);
 		expect(value(await storage.tombstone(TABLE))).toEqual({
 			tableId: TABLE,
@@ -313,13 +313,13 @@ describe.each(SUBJECTS)("%s storage", (_name, make) => {
 	it("lists every partition with its last activity", async () => {
 		const { storage } = await make();
 		value(await storage.commit(created({ lastActivityAt: 7 })));
-		value(await storage.commit(created({ replica: "W", lastActivityAt: 9 })));
+		value(await storage.commit(created({ replica: "4", lastActivityAt: 9 })));
 		const listed = value(await storage.partitions());
 		expect(listed).toHaveLength(2);
 		expect(listed).toEqual(
 			expect.arrayContaining([
-				{ tableId: TABLE, replica: "N", lastActivityAt: 7 },
-				{ tableId: TABLE, replica: "W", lastActivityAt: 9 },
+				{ tableId: TABLE, replica: "1", lastActivityAt: 7 },
+				{ tableId: TABLE, replica: "4", lastActivityAt: 9 },
 			]),
 		);
 	});
@@ -432,14 +432,14 @@ describe("IndexedDB storage", () => {
 		[
 			"a damaged entry",
 			"entries",
-			{ tableId: TABLE, replica: "N", seq: 2, entry: { seq: 2 } },
+			{ tableId: TABLE, replica: "1", seq: 2, entry: { seq: 2 } },
 		],
 		[
 			"an entry row with another sequence number",
 			"entries",
 			{
 				tableId: TABLE,
-				replica: "N",
+				replica: "1",
 				seq: 2,
 				entry: entries(3, 3, AUTH_1, AUTH_1)[0],
 			},
@@ -457,10 +457,10 @@ describe("IndexedDB storage", () => {
 		const { storage } = await indexedDb();
 		value(await storage.commit(created()));
 		await rawPut("tables", [
-			{ tableId: TABLE, replica: "E", lastActivityAt: "yesterday" },
+			{ tableId: TABLE, replica: "2", lastActivityAt: "yesterday" },
 		]);
 		expect(value(await storage.partitions())).toEqual([
-			{ tableId: TABLE, replica: "N", lastActivityAt: 1_000 },
+			{ tableId: TABLE, replica: "1", lastActivityAt: 1_000 },
 		]);
 	});
 
@@ -494,7 +494,7 @@ describe("IndexedDB storage", () => {
 		expect(await storage.commit(extended(start.table, 1))).toMatchObject(
 			closed,
 		);
-		expect(await storage.load(TABLE, "N")).toMatchObject(closed);
+		expect(await storage.load(TABLE, "1")).toMatchObject(closed);
 	});
 
 	it("reports a database that a newer version of the page upgraded", async () => {

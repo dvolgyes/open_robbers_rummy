@@ -26,20 +26,20 @@ import { createRoom, pick, type SeatKey } from "./room";
 
 /**
  * Desktop video and the asymmetric combinations (call/layout plan C6), on one P2P table through the public
- * trackers. West, North and South may use the microphone and the camera (generated test media); East may use
- * only the microphone until test 4. South is a phone, so it is audio only even with camera access.
+ * trackers. Player 4, Player 1 and Player 3 may use the microphone and the camera (generated test media); Player 2 may use
+ * only the microphone until test 4. Player 3 is a phone, so it is audio only even with camera access.
  */
 test.describe.configure({ mode: "serial" });
 
-const SEATS = ["W", "N", "E", "S"] as const satisfies readonly SeatKey[];
-const DESKTOPS = ["W", "N", "E"] as const satisfies readonly SeatKey[];
+const SEATS = ["4", "1", "2", "3"] as const satisfies readonly SeatKey[];
+const DESKTOPS = ["4", "1", "2"] as const satisfies readonly SeatKey[];
 type Desktop = (typeof DESKTOPS)[number];
 
 const OPTIONS: Readonly<Record<SeatKey, ContextOptions>> = {
-	W: { permissions: ["microphone", "camera"] },
-	N: { permissions: ["microphone", "camera"] },
-	E: { permissions: ["microphone"] },
-	S: {
+	"4": { permissions: ["microphone", "camera"] },
+	"1": { permissions: ["microphone", "camera"] },
+	"2": { permissions: ["microphone"] },
+	"3": {
 		permissions: ["microphone", "camera"],
 		viewport: { width: 390, height: 664 },
 		isMobile: true,
@@ -106,7 +106,7 @@ function videoFlow(
 	return page.evaluate(async () => {
 		const probe = (window as unknown as { __callProbe: CallProbe }).__callProbe;
 		const seatOf = new Map<string, string>();
-		for (const seat of ["N", "E", "S", "W"]) {
+		for (const seat of ["1", "2", "3", "4"]) {
 			const node = document.querySelector(`[data-testid="video-${seat}"]`);
 			const source = node instanceof HTMLVideoElement ? node.srcObject : null;
 			const track =
@@ -257,26 +257,26 @@ test.afterAll(async () => {
 });
 
 test("1: the phone cannot turn on video, the desktop can receive it, and nothing asks for the camera before Join", async () => {
-	tab.W = await players.W.page("./");
-	const link = await createRoom(tab.W);
-	for (const seat of ["N", "E", "S"] as const) {
+	tab["4"] = await players["4"].page("./");
+	const link = await createRoom(tab["4"]);
+	for (const seat of ["1", "2", "3"] as const) {
 		tab[seat] = await players[seat].page(link);
 		await pick(tab[seat], seat);
 	}
 	// The hosting page deals the first hand by itself, so there is no click here.
-	await expect(tab.W.getByTestId("table")).toHaveAttribute(
+	await expect(tab["4"].getByTestId("table")).toHaveAttribute(
 		"data-phase",
 		"play",
 	);
 	// Both forms show the four switches; outside the call they choose what Join starts with, and the phone cannot
 	// turn on its two video switches.
-	for (const seat of ["W", "S"] as const)
+	for (const seat of ["4", "3"] as const)
 		for (const name of SWITCH_NAMES)
 			await expect(toggle(tab[seat], name)).toHaveCount(1);
-	await expect(toggle(tab.W, "See cameras: receive video")).toBeEnabled();
-	await expect(toggle(tab.W, "Send camera video")).toBeEnabled();
-	await expect(toggle(tab.S, "See cameras: receive video")).toBeDisabled();
-	await expect(toggle(tab.S, "Send camera video")).toBeDisabled();
+	await expect(toggle(tab["4"], "See cameras: receive video")).toBeEnabled();
+	await expect(toggle(tab["4"], "Send camera video")).toBeEnabled();
+	await expect(toggle(tab["3"], "See cameras: receive video")).toBeDisabled();
+	await expect(toggle(tab["3"], "Send camera video")).toBeDisabled();
 	for (const seat of SEATS) {
 		for (const other of SEATS) {
 			if (other === seat) continue;
@@ -288,7 +288,7 @@ test("1: the phone cannot turn on video, the desktop can receive it, and nothing
 });
 
 test("2: a tile shows each call state in place, and a camera stream gets the low priority", async () => {
-	const tile = tab.W.getByTestId("tile-N");
+	const tile = tab["4"].getByTestId("tile-1");
 	const boxes: { state: string; box: Box | null }[] = [];
 	// In page coordinates: the call panel is below the table, so a click on it scrolls the page.
 	const record = async (state: string): Promise<void> => {
@@ -303,49 +303,51 @@ test("2: a tile shows each call state in place, and a camera stream gets the low
 		});
 		boxes.push({ state, box });
 	};
-	await expect(caption(tab.W, "N")).toHaveText("N - player1");
+	await expect(caption(tab["4"], "1")).toHaveText("N - player1");
 	await record("outside");
 
-	await joinWith(tab.W, MODE_LABELS.both);
-	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Not in call");
+	await joinWith(tab["4"], MODE_LABELS.both);
+	await expect(caption(tab["4"], "1")).toHaveText("N - player1 · Not in call");
 	await record("Not in call");
 
-	// West answers late: its call messages leave 4 s after the app sends them, so its link to North stays in
+	// Player 4 answers late: its call messages leave 4 s after the app sends them, so its link to Player 1 stays in
 	// "Connecting" for seconds.
-	await setCallSendDelay(tab.W, 4_000);
-	await joinWith(tab.N, MODE_LABELS.audio);
-	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Connecting");
+	await setCallSendDelay(tab["4"], 4_000);
+	await joinWith(tab["1"], MODE_LABELS.audio);
+	await expect(caption(tab["4"], "1")).toHaveText("N - player1 · Connecting");
 	await record("Connecting");
-	await setCallSendDelay(tab.W, 0);
-	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Audio only");
+	await setCallSendDelay(tab["4"], 0);
+	await expect(caption(tab["4"], "1")).toHaveText("N - player1 · Audio only");
 	await expect(tile).toHaveAttribute("data-video", "off");
 	await record("Audio only");
 
-	await toggle(tab.N, "Send camera video").click();
-	await confirmCamera(tab.N);
-	await expect(toggle(tab.N, "Send camera video")).toHaveAttribute(
+	await toggle(tab["1"], "Send camera video").click();
+	await confirmCamera(tab["1"]);
+	await expect(toggle(tab["1"], "Send camera video")).toHaveAttribute(
 		"data-actual",
 		"on",
 	);
-	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Audio + video");
+	await expect(caption(tab["4"], "1")).toHaveText(
+		"N - player1 · Audio + video",
+	);
 	await expect(tile).toHaveAttribute("data-video", "on");
-	await expect(tab.W.getByTestId("video-N")).toHaveAttribute(
+	await expect(tab["4"].getByTestId("video-1")).toHaveAttribute(
 		"data-play",
 		"playing",
 	);
 	await expect
 		.poll(() =>
-			tab.W.getByTestId("video-N").evaluate(
-				(node) => (node as HTMLVideoElement).videoWidth,
-			),
+			tab["4"]
+				.getByTestId("video-1")
+				.evaluate((node) => (node as HTMLVideoElement).videoWidth),
 		)
 		.toBeGreaterThan(0);
 	await record("Audio + video");
 
-	// North's only connection is the one to West: audio goes first on a poor network.
+	// Player 1's only connection is the one to Player 4: audio goes first on a poor network.
 	await expect
 		.poll(() =>
-			tab.N.evaluate(() => {
+			tab["1"].evaluate(() => {
 				const probe = (window as unknown as { __callProbe: CallProbe })
 					.__callProbe;
 				const peer = probe.peers.find(
@@ -383,12 +385,12 @@ test("2: a tile shows each call state in place, and a camera stream gets the low
 			},
 		]);
 
-	await toggle(tab.W, "See cameras: receive video").click();
-	await expect(caption(tab.W, "N")).toHaveText(
+	await toggle(tab["4"], "See cameras: receive video").click();
+	await expect(caption(tab["4"], "1")).toHaveText(
 		"N - player1 · Video reception off",
 	);
 	await expect(tile).toHaveAttribute("data-video", "off");
-	expect(await hasSource(tab.W, "N")).toBe(false);
+	expect(await hasSource(tab["4"], "1")).toBe(false);
 	await record("Video reception off");
 
 	const origin = boxes[0]?.box;
@@ -402,24 +404,26 @@ test("2: a tile shows each call state in place, and a camera stream gets the low
 		}
 	}
 
-	await toggle(tab.W, "See cameras: receive video").click();
-	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Audio + video");
+	await toggle(tab["4"], "See cameras: receive video").click();
+	await expect(caption(tab["4"], "1")).toHaveText(
+		"N - player1 · Audio + video",
+	);
 });
 
-test("3: with the camera blocked, the preview says so and Join waits; East joins without it, and nobody sees a picture of East", async () => {
-	await chooseMode(tab.E, MODE_LABELS.both);
-	await joinButton(tab.E).click();
-	await expect(tab.E.getByTestId("camera-preview-status")).toHaveText(
+test("3: with the camera blocked, the preview says so and Join waits; Player 2 joins without it, and nobody sees a picture of Player 2", async () => {
+	await chooseMode(tab["2"], MODE_LABELS.both);
+	await joinButton(tab["2"]).click();
+	await expect(tab["2"].getByTestId("camera-preview-status")).toHaveText(
 		"Camera access was denied.",
 	);
-	await expect(tab.E.getByTestId("camera-preview-confirm")).toBeDisabled();
-	await tab.E.getByTestId("camera-preview-cancel").click();
-	await expect(tab.E.getByTestId("camera-preview")).toBeHidden();
-	await expect(joinButton(tab.E)).toBeVisible();
-	expect((await counts(tab.E)).openPeers).toBe(0);
+	await expect(tab["2"].getByTestId("camera-preview-confirm")).toBeDisabled();
+	await tab["2"].getByTestId("camera-preview-cancel").click();
+	await expect(tab["2"].getByTestId("camera-preview")).toBeHidden();
+	await expect(joinButton(tab["2"])).toBeVisible();
+	expect((await counts(tab["2"])).openPeers).toBe(0);
 
-	await joinWith(tab.E, MODE_LABELS.watch);
-	await expect(toggle(tab.E, "Send mic audio")).toHaveAttribute(
+	await joinWith(tab["2"], MODE_LABELS.watch);
+	await expect(toggle(tab["2"], "Send mic audio")).toHaveAttribute(
 		"data-actual",
 		"on",
 	);
@@ -434,56 +438,56 @@ test("3: with the camera blocked, the preview says so and Join waits; East joins
 			)
 			.toBe(true);
 	}
-	// West receives video from North only; North receives none; East receives both pictures.
+	// Player 4 receives video from Player 1 only; Player 1 receives none; Player 2 receives both pictures.
 	await expect
-		.poll(() => videoFlow(tab.W))
+		.poll(() => videoFlow(tab["4"]))
 		.toEqual({
-			attached: ["N"],
-			arriving: ["N"],
+			attached: ["1"],
+			arriving: ["1"],
 		});
-	await expect(caption(tab.W, "E")).toHaveText("E - player3 · Audio only");
+	await expect(caption(tab["4"], "2")).toHaveText("E - player3 · Audio only");
 	await expect
-		.poll(() => videoFlow(tab.N))
+		.poll(() => videoFlow(tab["1"]))
 		.toEqual({
 			attached: [],
 			arriving: [],
 		});
 	await expect
-		.poll(() => videoFlow(tab.E))
+		.poll(() => videoFlow(tab["2"]))
 		.toEqual({
-			attached: ["N", "W"],
-			arriving: ["N", "W"],
+			attached: ["1", "4"],
+			arriving: ["1", "4"],
 		});
-	expect(await requestsFor(tab.E, "video")).toBe(1);
+	expect(await requestsFor(tab["2"], "video")).toBe(1);
 });
 
 /**
  * A covering set of mode pairs (call/layout plan C6): each mode sends next to a peer that receives video and
  * one that does not, in A by Join, then in B and C by the switches of a running call.
- *   A: West both, North camera, East watch.  B: West camera, North watch, East audio.
- *   C: West listen, North both, East camera.
+ *   A: Player 4 both, Player 1 camera, Player 2 watch.  B: Player 4 camera, Player 1 watch, Player 2 audio.
+ *   C: Player 4 listen, Player 1 both, Player 2 camera.
  */
-const ROUND_A = { W: "both", N: "camera", E: "watch" } as const;
-const ROUND_B = { W: "camera", N: "watch", E: "audio" } as const;
-const ROUND_C = { W: "listen", N: "both", E: "camera" } as const;
+const ROUND_A = { "4": "both", "1": "camera", "2": "watch" } as const;
+const ROUND_B = { "4": "camera", "1": "watch", "2": "audio" } as const;
+const ROUND_C = { "4": "listen", "1": "both", "2": "camera" } as const;
 
 test("4: video frames arrive only where the sender sends and the receiver receives", async () => {
 	for (const seat of DESKTOPS) {
 		await leaveButton(tab[seat]).click();
 		await expect(joinButton(tab[seat])).toBeVisible();
 	}
-	await players.E.grantPermissions(["camera"]);
-	const eastCamera = await requestsFor(tab.E, "video");
+	await players["2"].grantPermissions(["camera"]);
+	const eastCamera = await requestsFor(tab["2"], "video");
 	for (const seat of DESKTOPS)
 		await joinWith(tab[seat], MODE_LABELS[ROUND_A[seat]]);
 	for (const seat of DESKTOPS) await expectSwitches(tab[seat], ROUND_A[seat]);
-	await expect(toggle(tab.N, "Send camera video")).toHaveAttribute(
+	await expect(toggle(tab["1"], "Send camera video")).toHaveAttribute(
 		"data-actual",
 		"on",
 	);
 	await expectRound(ROUND_A);
-	// East watches: it gets the pictures and does not ask for the camera.
-	expect(await requestsFor(tab.E, "video")).toBe(eastCamera);
+	// Player 2 watches: it gets the pictures and does not ask for the camera.
+	expect(await requestsFor(tab["2"], "video")).toBe(eastCamera);
 
 	for (const seat of DESKTOPS)
 		await switchMode(tab[seat], ROUND_A[seat], ROUND_B[seat]);
@@ -492,7 +496,7 @@ test("4: video frames arrive only where the sender sends and the receiver receiv
 	for (const seat of DESKTOPS)
 		await switchMode(tab[seat], ROUND_B[seat], ROUND_C[seat]);
 	await expectRound(ROUND_C);
-	await expect(toggle(tab.E, "Send camera video")).toHaveAttribute(
+	await expect(toggle(tab["2"], "Send camera video")).toHaveAttribute(
 		"data-actual",
 		"on",
 	);
@@ -500,67 +504,67 @@ test("4: video frames arrive only where the sender sends and the receiver receiv
 
 test("5: a seat that turns off See cameras gets no video from its partners, and their video to a third seat continues", async () => {
 	// Owner, 2026-10-19: a receiver can ask its partners to stop sending video. All three desktops send and see.
-	const all = { W: "both", N: "both", E: "both" } as const;
-	await switchMode(tab.W, ROUND_C.W, all.W);
-	await switchMode(tab.E, ROUND_C.E, all.E);
+	const all = { "4": "both", "1": "both", "2": "both" } as const;
+	await switchMode(tab["4"], ROUND_C["4"], all["4"]);
+	await switchMode(tab["2"], ROUND_C["2"], all["2"]);
 	await expectRound(all);
-	// North's video senders to East and to West, by the SSRC that each receiver sees. The link order stays while
+	// Player 1's video senders to Player 2 and to Player 4, by the SSRC that each receiver sees. The link order stays while
 	// no link opens or closes.
-	const toEast = await receivedSsrc(tab.E, "N", "video");
-	const toWest = await receivedSsrc(tab.W, "N", "video");
-	const flowing = await senderFlow(tab.N, "video");
+	const toEast = await receivedSsrc(tab["2"], "1", "video");
+	const toWest = await receivedSsrc(tab["4"], "1", "video");
+	const flowing = await senderFlow(tab["1"], "video");
 	const eastSender = flowing.findIndex((sender) => sender.ssrc === toEast);
 	const westSender = flowing.findIndex((sender) => sender.ssrc === toWest);
 	expect(toEast).toBeDefined();
 	expect(eastSender).toBeGreaterThanOrEqual(0);
 	expect(westSender).toBeGreaterThanOrEqual(0);
 
-	await toggle(tab.E, "See cameras: receive video").click();
-	await expect(caption(tab.E, "N")).toHaveText(
+	await toggle(tab["2"], "See cameras: receive video").click();
+	await expect(caption(tab["2"], "1")).toHaveText(
 		"N - player1 · Video reception off",
 	);
-	// The sender side: North's sender to East has no track and sends nothing; its sender to West goes on.
+	// The sender side: Player 1's sender to Player 2 has no track and sends nothing; its sender to Player 4 goes on.
 	await expect
-		.poll(async () => (await senderFlow(tab.N, "video"))[eastSender]?.track)
+		.poll(async () => (await senderFlow(tab["1"], "video"))[eastSender]?.track)
 		.toBe(false);
-	const paused = await senderFlow(tab.N, "video");
-	console.error(`pause: North's video senders ${JSON.stringify(paused)}`);
+	const paused = await senderFlow(tab["1"], "video");
+	console.error(`pause: Player 1's video senders ${JSON.stringify(paused)}`);
 	expect(paused[eastSender]?.bytes).toBe(0);
 	expect(paused[westSender]?.track).toBe(true);
 	expect(paused[westSender]?.bytes).toBeGreaterThan(SOUND);
-	await expectRound({ ...all, E: "camera" });
+	await expectRound({ ...all, "2": "camera" });
 
-	await toggle(tab.E, "See cameras: receive video").click();
+	await toggle(tab["2"], "See cameras: receive video").click();
 	await expectRound(all);
 	await expect
 		.poll(async () =>
-			(await senderFlow(tab.N, "video")).map(
+			(await senderFlow(tab["1"], "video")).map(
 				(sender) => sender.track && sender.bytes > SOUND,
 			),
 		)
 		.toEqual([true, true]);
 
 	// Round C again, for the phone.
-	await switchMode(tab.W, all.W, ROUND_C.W);
-	await switchMode(tab.E, all.E, ROUND_C.E);
+	await switchMode(tab["4"], all["4"], ROUND_C["4"]);
+	await switchMode(tab["2"], all["2"], ROUND_C["2"]);
 	await expectRound(ROUND_C);
 });
 
 test("6: a phone gets audio only next to camera senders, also when an offer forces video on it", async () => {
-	await joinWith(tab.S, MODE_LABELS.audio);
-	await expectAudioArrives(tab.S);
+	await joinWith(tab["3"], MODE_LABELS.audio);
+	await expectAudioArrives(tab["3"]);
 	for (const seat of DESKTOPS) {
 		await expect.poll(() => audioOnlyPeers(tab[seat])).toBe(1);
-		await expect(caption(tab.S, seat)).toHaveText(/· (Audio only|Mic off)$/);
+		await expect(caption(tab["3"], seat)).toHaveText(/· (Audio only|Mic off)$/);
 	}
-	expect(await directions(tab.S, "video")).toEqual([]);
-	expect(await videoFlow(tab.S)).toEqual({ attached: [], arriving: [] });
-	// The desktop receiver still gets its picture: North sees East.
+	expect(await directions(tab["3"], "video")).toEqual([]);
+	expect(await videoFlow(tab["3"])).toEqual({ attached: [], arriving: [] });
+	// The desktop receiver still gets its picture: Player 1 sees Player 2.
 	await expectRound(ROUND_C);
 
-	// North adds a sendrecv video section with a drawn track to its connection to South, and keeps it from
+	// Player 1 adds a sendrecv video section with a drawn track to its connection to Player 3, and keeps it from
 	// being turned off; its next offer carries it.
-	await tab.N.evaluate(() => {
+	await tab["1"].evaluate(() => {
 		const probe = (window as unknown as { __callProbe: CallProbe }).__callProbe;
 		const peer = probe.peers.find(
 			(item) =>
@@ -592,87 +596,88 @@ test("6: a phone gets audio only next to camera senders, also when an offer forc
 			value: async () => undefined,
 		});
 	});
-	const mic = toggle(tab.N, "Send mic audio");
+	const mic = toggle(tab["1"], "Send mic audio");
 	await mic.click();
 	await expect(mic).toHaveAttribute("aria-pressed", "false");
-	await expect.poll(() => directions(tab.S, "video")).toEqual(["inactive"]);
+	await expect.poll(() => directions(tab["3"], "video")).toEqual(["inactive"]);
 	await mic.click();
 	await expect(mic).toHaveAttribute("aria-pressed", "true");
-	expect(await videoFlow(tab.S)).toEqual({ attached: [], arriving: [] });
-	expect(Object.values(await peerBytes(tab.S, "video"))).toEqual([0, 0, 0]);
-	expect(await requestsFor(tab.S, "video")).toBe(0);
-	for (const seat of DESKTOPS) expect(await hasSource(tab.S, seat)).toBe(false);
-	await expectAudioArrives(tab.S);
+	expect(await videoFlow(tab["3"])).toEqual({ attached: [], arriving: [] });
+	expect(Object.values(await peerBytes(tab["3"], "video"))).toEqual([0, 0, 0]);
+	expect(await requestsFor(tab["3"], "video")).toBe(0);
+	for (const seat of DESKTOPS)
+		expect(await hasSource(tab["3"], seat)).toBe(false);
+	await expectAudioArrives(tab["3"]);
 });
 
 test("7: a desktop that becomes compact stops its camera at once and keeps the audio; video stays off afterwards", async () => {
-	await switchMode(tab.W, ROUND_C.W, "both");
-	await expect(toggle(tab.W, "Send camera video")).toHaveAttribute(
+	await switchMode(tab["4"], ROUND_C["4"], "both");
+	await expect(toggle(tab["4"], "Send camera video")).toHaveAttribute(
 		"data-actual",
 		"on",
 	);
 	await expect
-		.poll(() => videoFlow(tab.W))
+		.poll(() => videoFlow(tab["4"]))
 		.toEqual({
-			attached: ["E", "N"],
-			arriving: ["E", "N"],
+			attached: ["2", "1"],
+			arriving: ["2", "1"],
 		});
-	await expect.poll(() => hasSource(tab.N, "W")).toBe(true);
-	const cameraRequests = await requestsFor(tab.W, "video");
+	await expect.poll(() => hasSource(tab["1"], "4")).toBe(true);
+	const cameraRequests = await requestsFor(tab["4"], "video");
 
 	const start = Date.now();
-	await tab.W.setViewportSize({ width: 800, height: 720 });
+	await tab["4"].setViewportSize({ width: 800, height: 720 });
 	const ended = await timeWhen(
-		async () => (await liveCameras(tab.W)) === 0,
+		async () => (await liveCameras(tab["4"])) === 0,
 		5_000,
 		50,
 	);
 	console.log(`compact: camera ended ${ended - start} ms after the resize`);
 	expect(ended - start).toBeLessThanOrEqual(1_000);
-	await expect(toggle(tab.W, "Send camera video")).toBeDisabled();
-	await expect(toggle(tab.W, "Send camera video")).toHaveAttribute(
+	await expect(toggle(tab["4"], "Send camera video")).toBeDisabled();
+	await expect(toggle(tab["4"], "Send camera video")).toHaveAttribute(
 		"aria-pressed",
 		"false",
 	);
-	for (const seat of ["N", "E", "S"] as const)
-		expect(await hasSource(tab.W, seat)).toBe(false);
-	await expectAudioArrives(tab.W);
-	for (const bytes of await peerAudioGrowth(tab.N))
+	for (const seat of ["1", "2", "3"] as const)
+		expect(await hasSource(tab["4"], seat)).toBe(false);
+	await expectAudioArrives(tab["4"]);
+	for (const bytes of await peerAudioGrowth(tab["1"]))
 		expect(bytes).toBeGreaterThan(SOUND);
-	await expect.poll(() => hasSource(tab.N, "W")).toBe(false);
+	await expect.poll(() => hasSource(tab["1"], "4")).toBe(false);
 
-	await tab.W.setViewportSize({ width: 1280, height: 720 });
-	await expect(toggle(tab.W, "Send camera video")).toHaveAttribute(
+	await tab["4"].setViewportSize({ width: 1280, height: 720 });
+	await expect(toggle(tab["4"], "Send camera video")).toHaveAttribute(
 		"aria-pressed",
 		"false",
 	);
-	await expect(toggle(tab.W, "See cameras: receive video")).toHaveAttribute(
+	await expect(toggle(tab["4"], "See cameras: receive video")).toHaveAttribute(
 		"aria-pressed",
 		"false",
 	);
-	await expect(toggle(tab.W, "Send mic audio")).toHaveAttribute(
+	await expect(toggle(tab["4"], "Send mic audio")).toHaveAttribute(
 		"aria-pressed",
 		"true",
 	);
 	// The absence of a new camera request needs time to show.
-	await tab.W.waitForTimeout(3_000);
-	expect(await requestsFor(tab.W, "video")).toBe(cameraRequests);
-	expect(await liveCameras(tab.W)).toBe(0);
-	for (const seat of ["N", "E", "S"] as const)
-		expect(await hasSource(tab.W, seat)).toBe(false);
+	await tab["4"].waitForTimeout(3_000);
+	expect(await requestsFor(tab["4"], "video")).toBe(cameraRequests);
+	expect(await liveCameras(tab["4"])).toBe(0);
+	for (const seat of ["1", "2", "3"] as const)
+		expect(await hasSource(tab["4"], seat)).toBe(false);
 });
 
 test("8: the phone leaves with its icon: its microphone and connections end, and the desktops see Not in call", async () => {
-	await leaveButton(tab.S).click();
-	await expect(joinButton(tab.S)).toBeVisible();
+	await leaveButton(tab["3"]).click();
+	await expect(joinButton(tab["3"])).toBeVisible();
 	await expect
 		.poll(async () => {
-			const { openPeers, liveTracks } = await counts(tab.S);
+			const { openPeers, liveTracks } = await counts(tab["3"]);
 			return { openPeers, liveTracks };
 		})
 		.toEqual({ openPeers: 0, liveTracks: 0 });
 	for (const seat of DESKTOPS) {
-		await expect(caption(tab[seat], "S")).toHaveText(
+		await expect(caption(tab[seat], "3")).toHaveText(
 			"S - player2 · Not in call",
 		);
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(2);

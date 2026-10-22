@@ -3,18 +3,18 @@ import { expect, type Locator, type Page } from "@playwright/test";
 /** Page helpers shared by the browser tests. They use only what a person sees and clicks. */
 
 export const YOU = {
-	W: "You are West — player4",
-	N: "You are North — player1",
-	E: "You are East — player3",
-	S: "You are South — player2",
+	"4": "You are Player 4 — player4",
+	"1": "You are Player 1 — player1",
+	"2": "You are Player 2 — player3",
+	"3": "You are Player 3 — player2",
 } as const;
 
 /** The prefilled test message of each seat. */
 export const MESSAGE = {
-	W: "Connection test from West",
-	N: "Connection test from North",
-	E: "Connection test from East",
-	S: "Connection test from South",
+	"4": "Connection test from Player 4",
+	"1": "Connection test from Player 1",
+	"2": "Connection test from Player 2",
+	"3": "Connection test from Player 3",
 } as const;
 
 export type SeatKey = keyof typeof YOU;
@@ -44,10 +44,10 @@ export const hostRows = (page: Page): Locator =>
 		.filter({ has: page.locator(".tag", { hasText: /^Host$/ }) });
 
 const TABLE_LINK =
-	/^http:\/\/localhost:\d+\/?\?.*#v=p2p-v1&k=[A-Za-z0-9_-]{43}$/;
+	/^http:\/\/localhost:\d+\/?\?.*#v=p2p-v2&k=[A-Za-z0-9_-]{43}$/;
 
 /**
- * Creates a table with the default names. The creator sits West and enters the game directly.
+ * Creates a table with the default names. The creator sits Player 4 and enters the game directly.
  * Returns the unselected room URL that all players share.
  */
 export async function createRoom(page: Page): Promise<string> {
@@ -56,7 +56,7 @@ export async function createRoom(page: Page): Promise<string> {
 		.getByTestId("create")
 		.evaluate((button) => (button as HTMLButtonElement).click());
 	await expect(page).toHaveTitle(/player4 \(W\)$/);
-	await expect(page).toHaveURL(/\?.*#v=p2p-v1&k=[A-Za-z0-9_-]{43}$/);
+	await expect(page).toHaveURL(/\?.*#v=p2p-v2&k=[A-Za-z0-9_-]{43}$/);
 	const linkUrl = new URL(page.url());
 	linkUrl.searchParams.delete("selected_player");
 	const link = linkUrl.toString();
@@ -102,7 +102,7 @@ export async function openDrawer(page: Page): Promise<void> {
 }
 
 /** The seats clockwise, in the order of play. */
-const CLOCKWISE = ["N", "E", "S", "W"] as const satisfies readonly SeatKey[];
+const CLOCKWISE = ["1", "2", "3", "4"] as const satisfies readonly SeatKey[];
 
 /**
  * The seats in the order of play from the seat whose page shows its turn. The first dealer is random, so the first

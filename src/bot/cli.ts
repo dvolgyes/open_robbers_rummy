@@ -18,7 +18,7 @@ import { MemoryStorage } from "../p2p/storage";
 import { TableController, tableIdentity } from "../p2p/table";
 import { trysteroMesh } from "../p2p/trystero";
 import type { RoomConfig, Seat } from "../protocol";
-import { isBotName, SEATS } from "../protocol";
+import { isBotName, seatName, seatsOf } from "../protocol";
 import type { Action } from "../rummy";
 import { type SeatLocks, SeatMemory } from "../session";
 import { chooseAction, neverPlay } from "./policy";
@@ -82,8 +82,8 @@ function candidateSeats(
 	username: string | undefined,
 ): Seat[] {
 	const wanted = username?.toLocaleLowerCase();
-	return SEATS.filter((seat) => {
-		const name = config.names[seat].trim();
+	return seatsOf(config).filter((seat) => {
+		const name = seatName(config, seat).trim();
 		return wanted === undefined
 			? isBotName(name)
 			: name.toLocaleLowerCase() === wanted;

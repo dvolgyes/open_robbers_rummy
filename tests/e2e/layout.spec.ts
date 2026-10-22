@@ -9,21 +9,21 @@ import { CONNECT_MS, createRoom, pick, type SeatKey, turnOrder } from "./room";
  */
 test.describe.configure({ mode: "serial" });
 
-const SEATS = ["N", "E", "S", "W"] as const satisfies readonly SeatKey[];
+const SEATS = ["1", "2", "3", "4"] as const satisfies readonly SeatKey[];
 const SEAT_NAMES: Readonly<Record<SeatKey, string>> = {
-	N: "North",
-	E: "East",
-	S: "South",
-	W: "West",
+	"1": "Player 1",
+	"2": "Player 2",
+	"3": "Player 3",
+	"4": "Player 4",
 };
 /** Play goes clockwise, so the next seat sits on the viewer's left. */
 const AROUND: Readonly<
 	Record<SeatKey, { left: SeatKey; partner: SeatKey; right: SeatKey }>
 > = {
-	N: { left: "E", partner: "S", right: "W" },
-	E: { left: "S", partner: "W", right: "N" },
-	S: { left: "W", partner: "N", right: "E" },
-	W: { left: "N", partner: "E", right: "S" },
+	"1": { left: "2", partner: "3", right: "4" },
+	"2": { left: "3", partner: "4", right: "1" },
+	"3": { left: "4", partner: "1", right: "2" },
+	"4": { left: "1", partner: "2", right: "3" },
 };
 /** Half a pixel absorbs subpixel rounding of the layout. */
 const SUBPIXEL = 0.5;
@@ -306,10 +306,10 @@ const OWN_PARTS = {
 test.beforeAll(async ({ browser, baseURL }) => {
 	if (!baseURL) throw new Error("baseURL is not configured");
 	for (const [seat, identity] of [
-		["W", "identity-9"],
-		["N", "identity-6"],
-		["S", "identity-7"],
-		["E", "identity-8"],
+		["4", "identity-9"],
+		["1", "identity-6"],
+		["3", "identity-7"],
+		["2", "identity-8"],
 	] as const)
 		players[seat] = await Player.open(browser, baseURL, identity);
 	phone = await Player.open(browser, baseURL, "identity-4", {
@@ -325,9 +325,9 @@ test.afterAll(async () => {
 });
 
 test("1: desktop, first hand: each of the four viewers sits at the bottom, with tiles in the other places", async () => {
-	tab.W = await players.W.page("./");
-	const link = await createRoom(tab.W);
-	for (const seat of ["N", "S", "E"] as const) {
+	tab["4"] = await players["4"].page("./");
+	const link = await createRoom(tab["4"]);
+	for (const seat of ["1", "3", "2"] as const) {
 		tab[seat] = await players[seat].page(link);
 		await pick(tab[seat], seat);
 	}
@@ -354,11 +354,11 @@ test("1: desktop, first hand: each of the four viewers sits at the bottom, with 
 
 test("2: a phone shows the table without sideways scroll, with the own hand and the actions in reach", async () => {
 	if (!phone) throw new Error("the phone browser is not open");
-	const host = await players.W.page("./");
+	const host = await players["4"].page("./");
 	const link = await createRoom(host);
 	phoneTab = await phone.page(link);
-	await pick(phoneTab, "N");
-	for (const seat of ["S", "E"] as const)
+	await pick(phoneTab, "1");
+	for (const seat of ["3", "2"] as const)
 		await pick(await players[seat].page(link), seat);
 	await expect(table(phoneTab)).toHaveAttribute("data-phase", "play", {
 		timeout: CONNECT_MS,
@@ -367,7 +367,7 @@ test("2: a phone shows the table without sideways scroll, with the own hand and 
 		await phoneTab.setViewportSize(size);
 		await test.step(`${size.width}×${size.height}`, async () => {
 			const page = phoneTab as Page;
-			await expectRotation(page, "N", "around");
+			await expectRotation(page, "1", "around");
 			await expectSideParts(page, "below");
 			await page.locator(".own-hand").scrollIntoViewIfNeeded();
 			const view = await page.evaluate(() => ({
@@ -385,7 +385,7 @@ test("2: a phone shows the table without sideways scroll, with the own hand and 
 test("3: the call controls have names that spell out the way and the medium, and their off state has a slash", async () => {
 	if (!phoneTab) throw new Error("the phone tab is not open");
 	const forms = [
-		[tab.W, DESKTOP_TOGGLES],
+		[tab["4"], DESKTOP_TOGGLES],
 		[phoneTab, COMPACT_TOGGLES],
 	] as const;
 	// Outside the call the switches choose what Join starts with (call-video test 1), so a switch that is on is

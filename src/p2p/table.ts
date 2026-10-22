@@ -6,6 +6,7 @@ import {
 	type RoomConfig,
 	SEATS,
 	type Seat,
+	seatsOf,
 } from "../protocol";
 import type { MaybeStorage, SeatLocks, SeatMemory } from "../session";
 import { botSeatClaims } from "./bot-seats";
@@ -369,6 +370,7 @@ export class TableController {
 		const self = this.#callSelf();
 		return {
 			roomId: this.#tableId,
+			seats: table ? seatsOf(table.config) : [],
 			self:
 				self && holders[self.seat] === self.gen
 					? { seat: self.seat, generation: self.gen }
@@ -626,9 +628,11 @@ export class TableController {
 			path: this.#paths.get(peer) ?? null,
 		}));
 		const seat = this.#lock?.seat ?? null;
+		const inPlay = (replication?.log?.table ?? this.#lastTable)?.config;
 		const allConnected =
 			seat !== null &&
-			SEATS.every(
+			inPlay !== undefined &&
+			seatsOf(inPlay).every(
 				(other) =>
 					other === seat ||
 					(roster?.bots.includes(other) ?? false) ||

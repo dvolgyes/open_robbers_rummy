@@ -26,7 +26,7 @@ import {
 } from "../unit/p2p-fixtures";
 import { deleteDatabase, openNewerVersion, openStorage } from "./indexed-db";
 
-const AUTH_3: Authority = { term: 3, tag: `${HOLDER_E}.E`, inc: 4 };
+const AUTH_3: Authority = { term: 3, tag: `${HOLDER_E}.2`, inc: 4 };
 
 beforeEach(deleteDatabase);
 
@@ -39,7 +39,7 @@ async function storedLog(
 	const into = storage ?? (await openStorage());
 	const created = await into.commit({ table, expect: null, append: log });
 	if (!created.ok) throw new Error(created.detail);
-	const opened = await openLog(into, TABLE, "N");
+	const opened = await openLog(into, TABLE, "1");
 	if (!opened.ok) throw new Error(opened.detail);
 	return opened.value.log;
 }
@@ -54,13 +54,13 @@ function appendNext(log: LocalLog, count = 1) {
 
 describe("LocalLog", () => {
 	it("creates the partition with the creator's seat claim and tells its listeners", async () => {
-		const log = new LocalLog(await openStorage(), TABLE, "N");
+		const log = new LocalLog(await openStorage(), TABLE, "1");
 		const changes: LogChange[] = [];
 		log.subscribe((change) => changes.push(change));
 		const written = await log.write(() =>
 			creationCommit({
 				tableId: TABLE,
-				seat: "N",
+				seat: "1",
 				holder: HOLDER_N,
 				config: CONFIG,
 				state: { phase: "lobby" },
@@ -73,8 +73,8 @@ describe("LocalLog", () => {
 		expect(log.position()).toEqual({ rev: 1, lastAuth: AUTH_1 });
 		expect(log.table?.host).toEqual(AUTH_1);
 		expect(log.table?.inc).toBe(1);
-		expect(log.table?.seats.find((row) => row.seat === "N")).toEqual({
-			seat: "N",
+		expect(log.table?.seats.find((row) => row.seat === "1")).toEqual({
+			seat: "1",
 			holder: HOLDER_N,
 			gen: 1,
 		});
@@ -106,7 +106,7 @@ describe("LocalLog", () => {
 		]);
 		expect(log.position().rev).toBe(6);
 		expect(log.seqOf(commandId(6))).toBe(6);
-		const reloaded = await openLog(await openStorage(), TABLE, "N");
+		const reloaded = await openLog(await openStorage(), TABLE, "1");
 		expect(reloaded.ok && reloaded.value.log.entries).toEqual(log.entries);
 	});
 
@@ -121,7 +121,7 @@ describe("LocalLog", () => {
 		const storage = await openStorage();
 		const log = await storedLog(storage);
 		await storage.commit({
-			table: tableRecord({ replica: "E" }),
+			table: tableRecord({ replica: "2" }),
 			expect: null,
 			append: entries(1, 3, AUTH_1, null),
 		});
@@ -144,12 +144,12 @@ describe("LocalLog", () => {
 		await storedLog(storage);
 		await storage.putOutbox(outboxRecord(2));
 		await storage.putOutbox(outboxRecord(1));
-		const opened = await openLog(storage, TABLE, "N");
+		const opened = await openLog(storage, TABLE, "1");
 		expect(opened.ok).toBe(true);
 		if (!opened.ok) return;
 		expect(opened.value.log.position()).toEqual({ rev: 3, lastAuth: AUTH_1 });
 		expect(opened.value.outbox.map((record) => record.order)).toEqual([1, 2]);
-		const absent = await openLog(storage, TABLE, "S");
+		const absent = await openLog(storage, TABLE, "3");
 		expect(absent.ok && absent.value.log.table).toBeNull();
 		expect(absent.ok && absent.value.outbox).toEqual([]);
 	});
@@ -160,7 +160,7 @@ describe("LocalLog", () => {
 		await storage.putOutbox(outboxRecord(1, { id: commandId(4) }));
 		await storage.putOutbox(outboxRecord(2));
 		await appendNext(log);
-		const loaded = await storage.load(TABLE, "N");
+		const loaded = await storage.load(TABLE, "1");
 		expect(
 			loaded.ok && loaded.value?.outbox.map((record) => record.id),
 		).toEqual([outboxRecord(2).id]);
@@ -188,7 +188,7 @@ describe("stored host", () => {
 	});
 
 	it("writes nothing without a table", async () => {
-		const log = new LocalLog(await openStorage(), TABLE, "N");
+		const log = new LocalLog(await openStorage(), TABLE, "1");
 		expect(await storeFollowed(log, AUTH_2)).toEqual({
 			ok: true,
 			value: false,

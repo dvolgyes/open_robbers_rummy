@@ -620,7 +620,7 @@ export function tableSection(
 			el(
 				"span",
 				{ className: "avatar", attrs: { "aria-hidden": "true" } },
-				t(seat),
+				seat,
 			),
 			video,
 			botOverlay,

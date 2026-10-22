@@ -13,7 +13,7 @@ import { showLinkProblem, showTable } from "./join";
 import { languageControl } from "./language-control";
 
 /**
- * Routes on the URL fragment: empty → create, `#v=p2p-v1&k=<key>` → the table. The query prefills the create screen
+ * Routes on the URL fragment: empty → create, `#v=p2p-v2&k=<key>` → the table. The query prefills the create screen
  * and can select a seat in a table. Leaving a screen disposes it, so a previous table's mesh and timers stop before
  * the next table starts.
  */
@@ -46,7 +46,7 @@ export function startApp(root: HTMLElement, deps: AppDeps): void {
 					parseBookmark(location.search),
 					(key, config, seat, hostBots) => {
 						// Keep setup data and the selected seat in the address; replaceState fires no hashchange.
-						const query = bookmarkQuery(config.names, seat, config.botSetup);
+						const query = bookmarkQuery(config, seat);
 						const sharedUrl = new URL(deps.pageUrl());
 						sharedUrl.search = query;
 						sharedUrl.hash = tableFragment(key);

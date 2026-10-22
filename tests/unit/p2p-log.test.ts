@@ -15,7 +15,7 @@ import {
 
 // LocalLog and the stored host are tested on Chrome's IndexedDB in tests/browser/p2p-log.test.ts.
 
-const AUTH_3: Authority = { term: 3, tag: `${HOLDER_E}.E`, inc: 4 };
+const AUTH_3: Authority = { term: 3, tag: `${HOLDER_E}.2`, inc: 4 };
 
 describe("commits", () => {
 	it("a replacement keeps the better host and the incarnation, and takes the seats of the new log", () => {
@@ -25,7 +25,7 @@ describe("commits", () => {
 			auth: AUTH_2,
 			prevAuth: null,
 			id: commandId(1),
-			seat: "E",
+			seat: "2",
 			gen: 1,
 			kind: "seat",
 			op: { type: "claim", holder: HOLDER_E },
@@ -33,7 +33,7 @@ describe("commits", () => {
 		};
 		const commit = replaceCommit(current, {
 			tableId: TABLE,
-			replica: "N",
+			replica: "1",
 			config: CONFIG,
 			entries: [claim, ...entries(2, 3, AUTH_2, AUTH_2)],
 			state: { phase: "new" },
@@ -50,7 +50,7 @@ describe("commits", () => {
 			lastActivityAt: 3_000,
 		});
 		expect(commit.table.seats.filter((row) => row.holder !== null)).toEqual([
-			{ seat: "E", holder: HOLDER_E, gen: 1 },
+			{ seat: "2", holder: HOLDER_E, gen: 1 },
 		]);
 		expect(commit.sent).toEqual([commandId(2), commandId(3)]);
 	});
@@ -58,7 +58,7 @@ describe("commits", () => {
 	it("creates the partition from a replacement when none exists", () => {
 		const commit = replaceCommit(null, {
 			tableId: TABLE,
-			replica: "S",
+			replica: "3",
 			config: CONFIG,
 			entries: entries(1, 2, AUTH_1, null),
 			state: {},
@@ -75,7 +75,7 @@ describe("commits", () => {
 		const claim: Entry = {
 			...entries(4, 4, AUTH_1, AUTH_1)[0],
 			kind: "seat",
-			seat: "E",
+			seat: "2",
 			gen: 1,
 			op: { type: "claim", holder: HOLDER_E },
 		} as Entry;
@@ -83,15 +83,15 @@ describe("commits", () => {
 			...claim,
 			seq: 5,
 			gen: 2,
-			op: { type: "release", by: "N" },
+			op: { type: "release", by: "1" },
 		} as Entry;
-		expect(seatsAfter(base, [claim]).find((row) => row.seat === "E")).toEqual({
-			seat: "E",
+		expect(seatsAfter(base, [claim]).find((row) => row.seat === "2")).toEqual({
+			seat: "2",
 			holder: HOLDER_E,
 			gen: 1,
 		});
 		expect(
-			seatsAfter(base, [claim, release]).find((row) => row.seat === "E"),
-		).toEqual({ seat: "E", holder: null, gen: 2 });
+			seatsAfter(base, [claim, release]).find((row) => row.seat === "2"),
+		).toEqual({ seat: "2", holder: null, gen: 2 });
 	});
 });

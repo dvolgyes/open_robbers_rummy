@@ -493,8 +493,6 @@ const rows: readonly TranslationRow[] = [
 		"Disattiva il gioco automatico",
 		"Automatisch spelen uit",
 	],
-	["E", "E", "E", "E", "E", "O"],
-	["East", "Este", "Este", "Est", "Est", "Oost"],
 	[
 		"Enable autoplay (bot)",
 		"Activar juego automático (bot)",
@@ -510,14 +508,6 @@ const rows: readonly TranslationRow[] = [
 		"Saisissez une clé API OpenRouter pour utiliser les bots à cette table.",
 		"Inserisci una chiave API OpenRouter per usare i bot in questo tavolo.",
 		"Voer een OpenRouter-API-sleutel in om bots aan deze tafel te gebruiken.",
-	],
-	[
-		"Enter the four players. Choose your seat. Your browser hosts first; anyone at the table can take over.",
-		"Introduce los cuatro jugadores y elige tu asiento. Tu navegador será el anfitrión; cualquier jugador podrá asumir ese papel.",
-		"Introduza os quatro jogadores e escolha o seu lugar. O seu navegador será o anfitrião; qualquer pessoa à mesa poderá assumir esse papel.",
-		"Saisissez les quatre joueurs et choisissez votre place. Votre navigateur sera l'hôte ; un autre joueur pourra prendre le relais.",
-		"Inserisci i quattro giocatori e scegli il tuo posto. Il tuo browser farà da host; chiunque al tavolo potrà subentrare.",
-		"Vul de vier spelers in en kies je plaats. Je browser is eerst de host; iedereen aan tafel kan die rol overnemen.",
 	],
 	["Exit", "Salir", "Sair", "Quitter", "Esci", "Afsluiten"],
 	[
@@ -662,7 +652,6 @@ const rows: readonly TranslationRow[] = [
 		"Sposta {model} in alto",
 		"{model} omhoog verplaatsen",
 	],
-	["N", "N", "N", "N", "N", "N"],
 	["Name", "Nombre", "Nome", "Nom", "Nome", "Naam"],
 	["Network", "Red", "Rede", "Réseau", "Rete", "Netwerk"],
 	[
@@ -705,7 +694,6 @@ const rows: readonly TranslationRow[] = [
 		"Al momento non c'è nessuno al tavolo. Tieni aperta questa pagina",
 		"Er zit nu niemand aan deze tafel. Houd deze pagina open",
 	],
-	["North", "Norte", "Norte", "Nord", "Nord", "Noord"],
 	[
 		"Not a valid stun: or stuns: URL in VITE_STUN_URLS: {url}",
 		"URL stun: o stuns: no válida en VITE_STUN_URLS: {url}",
@@ -1064,7 +1052,6 @@ const rows: readonly TranslationRow[] = [
 		"Esecuzione di {count} posto/i bot con {model}.",
 		"{count} botplaats(en) uitgevoerd met {model}.",
 	],
-	["S", "S", "S", "S", "S", "Z"],
 	[
 		"Save key",
 		"Guardar clave",
@@ -1180,7 +1167,6 @@ const rows: readonly TranslationRow[] = [
 		"Condivisione completata.",
 		"Delen voltooid.",
 	],
-	["South", "Sur", "Sul", "Sud", "Sud", "Zuid"],
 	[
 		"Storage",
 		"Almacenamiento",
@@ -1526,7 +1512,6 @@ const rows: readonly TranslationRow[] = [
 		"Ricezione video disattivata; {audio}",
 		"Video-ontvangst uit; {audio}",
 	],
-	["W", "O", "O", "O", "O", "W"],
 	[
 		"Wait between retries (seconds)",
 		"Espera entre reintentos (segundos)",
@@ -1560,7 +1545,6 @@ const rows: readonly TranslationRow[] = [
 		"In attesa del ritorno di {players}",
 		"Wachten tot {players} terug is",
 	],
-	["West", "Oeste", "Oeste", "Ouest", "Ovest", "West"],
 	["You", "Tú", "Você", "Vous", "Tu", "Jij"],
 	[
 		"Your hand",

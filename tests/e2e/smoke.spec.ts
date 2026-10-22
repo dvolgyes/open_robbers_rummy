@@ -25,9 +25,9 @@ test("one browser: create, three seats from one link, ordered messages, and a re
 		// The tabs share one browser, so active seats stay with their current tabs.
 		const guests: Page[] = [];
 		const order = [
-			{ seat: "N", choices: 3 },
-			{ seat: "E", choices: 2 },
-			{ seat: "S", choices: 1 },
+			{ seat: "1", choices: 3 },
+			{ seat: "2", choices: 2 },
+			{ seat: "3", choices: 1 },
 		] as const;
 		for (const { seat, choices } of order) {
 			const page = await player.page(link);
@@ -66,7 +66,7 @@ test("one browser: create, three seats from one link, ordered messages, and a re
 			await sendDraft(page);
 		}
 
-		const expected = [MESSAGE.W, MESSAGE.N, MESSAGE.E, MESSAGE.S];
+		const expected = [MESSAGE["4"], MESSAGE["1"], MESSAGE["2"], MESSAGE["3"]];
 		for (const page of [host, ...guests]) {
 			await expect(lines(page).locator(".text")).toHaveText(expected);
 			await expect(lines(page).locator(".receipt")).toHaveText(
@@ -75,12 +75,12 @@ test("one browser: create, three seats from one link, ordered messages, and a re
 			await expect(page.getByTestId("pending").locator("li")).toHaveCount(0);
 			await expect(page.getByTestId("banner")).toBeHidden();
 		}
-		// The first player opens hand 1. West asks for a reset; the three others approve, and the host deals a new
+		// The first player opens hand 1. Player 4 asks for a reset; the three others approve, and the host deals a new
 		// match, with a new random dealer.
 		const [north, east, south] = guests;
 		if (north === undefined || east === undefined || south === undefined)
 			throw new Error("a guest has no page");
-		const pages = { W: host, N: north, E: east, S: south };
+		const pages = { "4": host, "1": north, "2": east, "3": south };
 		const firstPage = async () => {
 			const [first] = await turnOrder(pages);
 			if (first === undefined) throw new Error("nobody plays first");

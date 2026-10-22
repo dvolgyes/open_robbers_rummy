@@ -17,12 +17,13 @@ const CLIENT = "AgICAgICAgICAgICAgICAg";
 const PEER = "0123456789AbCdEfGhIj";
 const ID = "123e4567-e89b-42d3-a456-426614174000";
 const ID2 = "123e4567-e89b-42d3-a456-426614174001";
-const AUTH: Authority = { term: 2, tag: `${HOLDER_N}.N`, inc: 1 };
-const OLD_AUTH: Authority = { term: 1, tag: `${HOLDER_E}.E`, inc: 1 };
+const AUTH: Authority = { term: 2, tag: `${HOLDER_N}.1`, inc: 1 };
+const OLD_AUTH: Authority = { term: 1, tag: `${HOLDER_E}.2`, inc: 1 };
 const POS = { rev: 3, lastAuth: OLD_AUTH };
 const EMPTY = { rev: 0, lastAuth: null };
 const CONFIG = {
-	names: { N: "player1", E: "player3", S: "player2", W: "player4" },
+	names: { "1": "player1", "2": "player3", "3": "player2", "4": "player4" },
+	table: { preset: "gamerules", jokers: 4, assist: true },
 };
 const PAYLOAD = { v: 1, roomId: TABLE, type: "chat", text: "hi" };
 const EVENT = { v: 1, roomId: TABLE, type: "event", seq: 4 };
@@ -38,7 +39,7 @@ function entry(seq: number, prevAuth: Authority | null, auth = AUTH): Sample {
 		auth,
 		prevAuth,
 		id: ID,
-		seat: "N",
+		seat: "1",
 		gen: 2,
 		kind: "cmd",
 		payload: PAYLOAD,
@@ -56,7 +57,7 @@ const ENTRY_5 = {
 	auth: AUTH,
 	prevAuth: AUTH,
 	id: ID2,
-	seat: "E",
+	seat: "2",
 	gen: 3,
 	kind: "seat",
 	op: { type: "claim", holder: HOLDER_E },
@@ -67,13 +68,13 @@ const ENTRY_5 = {
 const CTL: Case[] = [
 	[
 		"hello",
-		{ k: "hello", b: "p2p-v1", client: CLIENT, seat: "N", gen: 2, pos: POS },
+		{ k: "hello", b: "p2p-v2", client: CLIENT, seat: "1", gen: 2, pos: POS },
 		["b", "client"],
 	],
-	["hello (visitor)", { k: "hello", b: "p2p-v1", client: CLIENT }, ["b"]],
+	["hello (visitor)", { k: "hello", b: "p2p-v2", client: CLIENT }, ["b"]],
 	[
 		"welcome",
-		{ k: "welcome", status: "bound", auth: AUTH, seat: "N", gen: 2 },
+		{ k: "welcome", status: "bound", auth: AUTH, seat: "1", gen: 2 },
 		["status", "auth", "seat", "gen"],
 	],
 	[
@@ -84,18 +85,20 @@ const CTL: Case[] = [
 			config: CONFIG,
 			idleMs: 1000,
 			seats: [
-				{ seat: "N", available: false, online: true, mine: false },
-				{ seat: "E", available: true, online: false, mine: true },
-				{ seat: "S", available: true, online: false, mine: false },
-				{ seat: "W", available: false, online: false, mine: false },
+				{ seat: "1", available: false, online: true, mine: false },
+				{ seat: "2", available: true, online: false, mine: true },
+				{ seat: "3", available: true, online: false, mine: false },
+				{ seat: "4", available: false, online: false, mine: false },
+				{ seat: "5", available: false, online: false, mine: false },
+				{ seat: "6", available: false, online: false, mine: false },
 			],
 		},
 		["auth", "config", "idleMs", "seats"],
 	],
-	["claim-seat", { k: "claim-seat", req: 1, seat: "E" }, ["req", "seat"]],
+	["claim-seat", { k: "claim-seat", req: 1, seat: "2" }, ["req", "seat"]],
 	[
 		"seat-result (ok)",
-		{ k: "seat-result", req: 1, ok: true, seat: "E", gen: 3 },
+		{ k: "seat-result", req: 1, ok: true, seat: "2", gen: 3 },
 		["req", "ok", "seat", "gen"],
 	],
 	[
@@ -103,7 +106,7 @@ const CTL: Case[] = [
 		{ k: "seat-result", req: 1, ok: false, code: "taken" },
 		["req", "ok", "code"],
 	],
-	["release", { k: "release", req: 2, seat: "S" }, ["req", "seat"]],
+	["release", { k: "release", req: 2, seat: "3" }, ["req", "seat"]],
 	[
 		"release-result (ok)",
 		{ k: "release-result", req: 2, ok: true },
@@ -122,7 +125,7 @@ const CTL: Case[] = [
 			auth: AUTH,
 			pos: POS,
 			holder: HOLDER_N,
-			seat: "N",
+			seat: "1",
 			elig: true,
 		},
 		["role", "auth", "pos", "holder", "seat", "elig"],
@@ -136,7 +139,7 @@ const CTL: Case[] = [
 			seenAgoMs: 1200,
 			pos: POS,
 			holder: HOLDER_E,
-			seat: "E",
+			seat: "2",
 			elig: true,
 		},
 		["role", "auth", "seenAgoMs", "pos", "holder", "seat", "elig"],
@@ -169,7 +172,7 @@ const CTL: Case[] = [
 			k: "result",
 			id: ID,
 			status: "waiting",
-			reason: "Waiting for West to come back",
+			reason: "Waiting for Player 4 to come back",
 		},
 		["id", "status", "reason"],
 	],
@@ -180,12 +183,14 @@ const CTL: Case[] = [
 			k: "roster",
 			auth: AUTH,
 			seats: [
-				{ seat: "N", holder: HOLDER_N, gen: 2, acked: 3 },
-				{ seat: "E", holder: HOLDER_E, gen: 1, acked: 3 },
-				{ seat: "S", holder: null, gen: 0, acked: 0 },
-				{ seat: "W", holder: null, gen: 2, acked: 0 },
+				{ seat: "1", holder: HOLDER_N, gen: 2, acked: 3 },
+				{ seat: "2", holder: HOLDER_E, gen: 1, acked: 3 },
+				{ seat: "3", holder: null, gen: 0, acked: 0 },
+				{ seat: "4", holder: null, gen: 2, acked: 0 },
+				{ seat: "5", holder: null, gen: 0, acked: 0 },
+				{ seat: "6", holder: null, gen: 0, acked: 0 },
 			],
-			peers: [{ peer: PEER, seat: "N", gen: 2 }],
+			peers: [{ peer: PEER, seat: "1", gen: 2 }],
 			bots: [],
 		},
 		["auth", "seats", "peers"],
@@ -228,10 +233,12 @@ const LOG: Case[] = [
 			mode: "replace",
 			config: CONFIG,
 			seats: [
-				{ seat: "N", holder: HOLDER_N, gen: 2 },
-				{ seat: "E", holder: null, gen: 0 },
-				{ seat: "S", holder: null, gen: 0 },
-				{ seat: "W", holder: null, gen: 0 },
+				{ seat: "1", holder: HOLDER_N, gen: 2 },
+				{ seat: "2", holder: null, gen: 0 },
+				{ seat: "3", holder: null, gen: 0 },
+				{ seat: "4", holder: null, gen: 0 },
+				{ seat: "5", holder: null, gen: 0 },
+				{ seat: "6", holder: null, gen: 0 },
 			],
 			pos: POS,
 			idleMs: 0,
@@ -245,7 +252,7 @@ const CALL: Case[] = [
 		"call",
 		{
 			k: "call",
-			to: "E",
+			to: "2",
 			toGen: 1,
 			fromGen: 2,
 			msg: { type: "leave", session: ID },
@@ -439,7 +446,7 @@ describe("size and depth caps", () => {
 		if (!lobby) throw new Error("missing sample");
 		malformed(parseCtl, {
 			...lobby,
-			config: { ...CONFIG, names: { ...CONFIG.names, N: "x".repeat(41) } },
+			config: { ...CONFIG, names: { ...CONFIG.names, "1": "x".repeat(41) } },
 		});
 	});
 
@@ -502,7 +509,7 @@ describe("message rules", () => {
 
 	it.each([
 		["a host tag of another holder", { ...hostBeat, holder: HOLDER_E }],
-		["a host tag of another seat", { ...hostBeat, seat: "E" }],
+		["a host tag of another seat", { ...hostBeat, seat: "2" }],
 		["a host with a reported age", { ...hostBeat, seenAgoMs: 0 }],
 		["an ineligible host", { ...hostBeat, elig: false }],
 		[
@@ -515,7 +522,7 @@ describe("message rules", () => {
 		],
 		["an age without an authority", { ...followerBeat, auth: undefined }],
 		["a follower without a seat", { ...followerBeat, seat: undefined }],
-		["a visitor with a seat", { ...visitorBeat, seat: "S" }],
+		["a visitor with a seat", { ...visitorBeat, seat: "3" }],
 		["an eligible visitor", { ...visitorBeat, elig: true }],
 		["a null optional field", { ...visitorBeat, seat: null }],
 	])("beat rejects %s", (_label, message) => {
@@ -525,7 +532,7 @@ describe("message rules", () => {
 	it.each([
 		[
 			"a seat without its generation",
-			{ k: "hello", b: "p2p-v1", client: CLIENT, seat: "N" },
+			{ k: "hello", b: "p2p-v2", client: CLIENT, seat: "1" },
 		],
 		[
 			"a bound welcome without a seat",
@@ -551,7 +558,7 @@ describe("message rules", () => {
 			"an unknown seat code",
 			{ k: "seat-result", req: 1, ok: false, code: "nope" },
 		],
-		["request number 0", { k: "claim-seat", req: 0, seat: "E" }],
+		["request number 0", { k: "claim-seat", req: 0, seat: "2" }],
 		["a short nonce", { k: "ping", n: "abc" }],
 		[
 			"an upper-case command id",
@@ -564,16 +571,16 @@ describe("message rules", () => {
 	});
 
 	it.each([
-		["a binding of an empty seat", [{ peer: PEER, seat: "S", gen: 0 }]],
-		["a binding of an old generation", [{ peer: PEER, seat: "N", gen: 1 }]],
+		["a binding of an empty seat", [{ peer: PEER, seat: "3", gen: 0 }]],
+		["a binding of an old generation", [{ peer: PEER, seat: "1", gen: 1 }]],
 		[
 			"one peer bound twice",
 			[
-				{ peer: PEER, seat: "N", gen: 2 },
-				{ peer: PEER, seat: "E", gen: 1 },
+				{ peer: PEER, seat: "1", gen: 2 },
+				{ peer: PEER, seat: "2", gen: 1 },
 			],
 		],
-		["a bad peer id", [{ peer: "short", seat: "N", gen: 2 }]],
+		["a bad peer id", [{ peer: "short", seat: "1", gen: 2 }]],
 	])("roster rejects %s", (_label, peers) => {
 		malformed(parseCtl, { ...roster, peers });
 	});
@@ -582,8 +589,13 @@ describe("message rules", () => {
 		const seats = roster.seats as unknown[];
 		malformed(parseCtl, {
 			...roster,
-			seats: [seats[1], seats[0], seats[2], seats[3]],
+			seats: [seats[1], seats[0], ...seats.slice(2)],
 		});
+	});
+
+	it("roster rejects a list without the rows of seats 5 and 6", () => {
+		const seats = roster.seats as unknown[];
+		malformed(parseCtl, { ...roster, seats: seats.slice(0, 4) });
 	});
 
 	it.each([
@@ -623,7 +635,7 @@ describe("message rules", () => {
 	it("call rejects an invalid call message", () => {
 		malformed(parseCall, {
 			k: "call",
-			to: "E",
+			to: "2",
 			toGen: 1,
 			fromGen: 2,
 			msg: { type: "offer", session: ID },
