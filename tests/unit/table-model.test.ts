@@ -605,6 +605,108 @@ describe("why the pile cannot be taken", () => {
 	});
 });
 
+describe("the first meld minimum", () => {
+	const sevens = ["0-7H", "1-7H", "0-7S"];
+	const aces = ["0-AS", "1-AS", "0-AH"];
+	/** After the draw, the seat on turn holds three 7s (15 points), three aces (60) and two more cards. */
+	function unmelded(
+		teamScores: readonly [number, number] = [0, 0],
+	): MatchState {
+		const match = afterDraw(7);
+		const turn = match.hand.turn;
+		const own = cardsOf([...sevens, ...aces, "0-9D", "0-4C"]);
+		return {
+			...match,
+			scores: teamScores,
+			hand: {
+				...match.hand,
+				teamScores,
+				hands: match.hand.hands.map((cards, index) =>
+					index === turn ? own : cards,
+				),
+			},
+		};
+	}
+	function melded(match: MatchState, cards: readonly string[]): MatchState {
+		const step = applyAction(match.hand, match.hand.turn, {
+			type: "meld",
+			cards,
+		});
+		if (!step.ok) throw new Error(step.reason);
+		return { ...match, hand: step.hand };
+	}
+	const viewOf = (match: MatchState) =>
+		tableView(inputFor(stateOf(match, 1), turnOf(match)));
+	const ownSide = (match: MatchState) => teamOf(match.hand.turn);
+
+	it("shows each side's minimum until it melds, from its score at the deal", () => {
+		const match = unmelded([1500, -20]);
+		const view = viewOf(match);
+		expect(view.sides.map((side) => side.initialMeld)).toEqual([
+			"First meld: at least 90 points",
+			"First meld: at least 15 points",
+		]);
+		const minimum = ownSide(match) === 0 ? 90 : 15;
+		expect(view.prompt).toBe(
+			`Your turn: your side's first meld needs at least ${minimum} points. Meld, or discard.`,
+		);
+		expect(
+			viewOf(unmelded([3000, 0])).sides.map((side) => side.initialMeld),
+		).toEqual([
+			"First meld: at least 120 points",
+			"First meld: at least 50 points",
+		]);
+	});
+
+	it("counts the points melded this turn and says how many are missing", () => {
+		const match = melded(unmelded(), sevens);
+		const view = viewOf(match);
+		expect(view.sides[ownSide(match)]?.initialMeld).toBe(
+			"First meld: 15 of 50 points",
+		);
+		expect(view.prompt).toBe(
+			"Your turn: your side's first meld has 15 of the 50 points. Meld 35 more, or take back this turn's melds.",
+		);
+	});
+
+	it("says when the melds of the turn reach the minimum", () => {
+		const match = melded(melded(unmelded(), sevens), aces);
+		const view = viewOf(match);
+		expect(view.sides[ownSide(match)]?.initialMeld).toBe(
+			"First meld: 75 of 50 points",
+		);
+		expect(view.prompt).toBe(
+			"Your turn: your side's first meld has 75 points, enough for the 50. Meld more, or discard.",
+		);
+	});
+
+	it("shows no minimum for a side that has melded", () => {
+		const match = melded(melded(unmelded(), sevens), aces);
+		const step = applyAction(match.hand, match.hand.turn, {
+			type: "discard",
+			card: "0-4C",
+		});
+		if (!step.ok) throw new Error(step.reason);
+		const after = { ...match, hand: step.hand };
+		expect(viewOf(after).sides[ownSide(match)]?.initialMeld).toBe("");
+	});
+
+	it("tells a side that has melded only to meld, extend and discard", () => {
+		const match = afterDraw(7);
+		const turn = match.hand.turn;
+		const side = { melds: [], redThrees: [], initialMade: true };
+		const teams = match.hand.teams;
+		const made: MatchState = {
+			...match,
+			hand: {
+				...match.hand,
+				teams: teamOf(turn) === 0 ? [side, teams[1]] : [teams[0], side],
+			},
+		};
+		expect(viewOf(made).prompt).toBe("Your turn: meld, extend, then discard.");
+	});
+});
+
 /** The match after the seat on turn drew from the stock, so it can meld and discard. */
 function afterDraw(seed: number): MatchState {
 	const match = startMatch(seed);

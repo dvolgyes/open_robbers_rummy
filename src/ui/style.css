@@ -1219,6 +1219,18 @@ main[data-screen="table"] > .room {
 	font-size: 0.85rem;
 }
 
+/* Until the side melds, its first meld minimum shows under the melds. */
+.initial-meld {
+	grid-column: 1 / -1;
+	margin: 0;
+	font-size: 0.8rem;
+	cursor: help;
+}
+
+.initial-meld:empty {
+	display: none;
+}
+
 .red-three-cards {
 	color: var(--red-suit);
 	font-weight: 700;

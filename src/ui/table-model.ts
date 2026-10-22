@@ -5,6 +5,7 @@ import {
 	type Card,
 	CLASSIC_RULES,
 	type HandView,
+	initialMeldMinimum,
 	isBlack3,
 	isCanasta,
 	isRed3,
@@ -171,6 +172,11 @@ export interface SideView {
 	readonly redThrees: readonly CardView[];
 	/** The side has made its initial meld in this match, so the pile is no longer frozen by it. */
 	readonly initialMade: boolean;
+	/**
+	 * Until the side melds: its minimum for the first meld, and the points melded in its current turn, translated.
+	 * Empty once the side has melded.
+	 */
+	readonly initialMeld: string;
 }
 
 function meldView(meld: Meld, view: HandView, t: Translate): MeldView {
@@ -200,9 +206,25 @@ function sideViews(
 				view && team ? team.melds.map((meld) => meldView(meld, view, t)) : [],
 			redThrees: team ? team.redThrees.map((card) => cardView(card, t)) : [],
 			initialMade: team?.initialMade ?? false,
+			initialMeld:
+				view && team && !team.initialMade
+					? initialMeldLine(view, index, t)
+					: "",
 		};
 	};
 	return [side(0), side(1)];
+}
+
+/** The side's first meld minimum comes from its score at the deal; only the side on turn has melded points. */
+function initialMeldLine(view: HandView, side: 0 | 1, t: Translate): string {
+	const minimum = initialMeldMinimum(
+		view.rules.initialMeld,
+		view.teamScores[side],
+	);
+	const points = teamOf(view.turn) === side ? view.turnMeldPoints : 0;
+	return points > 0
+		? t("First meld: {points} of {minimum} points", { points, minimum })
+		: t("First meld: at least {minimum} points", { minimum });
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -741,7 +763,7 @@ function turnPrompt(
 	view: HandView,
 	t: Translate,
 ): string {
-	if (view.phase !== "draw") return t("Your turn: meld, extend, then discard.");
+	if (view.phase !== "draw") return playPrompt(view, t);
 	const actions = legalActions(match.hand, engineSeat(seat));
 	const canTake = actions.some((action) => action.type === "takePile");
 	if (view.stockCount > 0 && canTake)
@@ -758,6 +780,35 @@ function turnPrompt(
 			: t("Your turn: the stock is empty. End the hand.");
 	const hint = pileHint(view, t);
 	return hint === undefined ? turn : `${turn} ${hint}`;
+}
+
+/**
+ * After the draw, a side that has not melded sees its progress towards the first meld minimum. A side below the
+ * minimum can discard only after it takes back the melds of the turn.
+ */
+function playPrompt(view: HandView, t: Translate): string {
+	const side = teamOf(view.turn);
+	if (view.teams[side].initialMade)
+		return t("Your turn: meld, extend, then discard.");
+	const minimum = initialMeldMinimum(
+		view.rules.initialMeld,
+		view.teamScores[side],
+	);
+	const points = view.turnMeldPoints;
+	if (points === 0)
+		return t(
+			"Your turn: your side's first meld needs at least {minimum} points. Meld, or discard.",
+			{ minimum },
+		);
+	if (points < minimum)
+		return t(
+			"Your turn: your side's first meld has {points} of the {minimum} points. Meld {missing} more, or take back this turn's melds.",
+			{ points, minimum, missing: minimum - points },
+		);
+	return t(
+		"Your turn: your side's first meld has {points} points, enough for the {minimum}. Meld more, or discard.",
+		{ points, minimum },
+	);
 }
 
 /**

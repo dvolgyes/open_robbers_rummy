@@ -253,6 +253,25 @@ describe("table section", () => {
 		}
 	});
 
+	it("shows a side's first meld minimum until it melds, with the counting rule", () => {
+		const base = turnView(afterDraw(), 1);
+		const sides = [
+			{ ...base.sides[0], initialMeld: "First meld: 15 of 50 points" },
+			{ ...base.sides[1], initialMeld: "" },
+		] as const;
+		const section = mount([]);
+		section.render({ ...base, sides });
+		const lines = [
+			...section.element.querySelectorAll<HTMLElement>(".initial-meld"),
+		];
+		const shown = lines.filter((line) => line.getClientRects().length > 0);
+		expect(shown.map((line) => line.textContent)).toEqual([
+			"First meld: 15 of 50 points",
+		]);
+		expect(shown[0]?.title).toContain("only the top card counts");
+		section.element.remove();
+	});
+
 	it("offers to take the pile with a pair from the hand before any card is selected", () => {
 		const acted: Action[] = [];
 		const section = mount(acted);

@@ -216,14 +216,23 @@ export function tableSection(
 		const title = el("h4", { className: "side-title" });
 		const melds = el("div", { className: "melds" });
 		const redThrees = el("p", { className: "red-threes" });
+		const initialMeld = el("p", {
+			className: "initial-meld",
+			attrs: {
+				title: t(
+					"Only the card values count, not the bonuses. From the pile, only the top card counts. All melds of the turn add up.",
+				),
+			},
+		});
 		const node = el(
 			"section",
 			{ className: "side-block" },
 			title,
 			melds,
 			redThrees,
+			initialMeld,
 		);
-		return { node, title, melds, redThrees };
+		return { node, title, melds, redThrees, initialMeld };
 	};
 	const sideBlocks = [sideBlock(), sideBlock()] as const;
 	const centre = el(
@@ -775,6 +784,7 @@ export function tableSection(
 		cell.label.textContent = `${side.label} (${side.owner})`;
 		cell.score.textContent = String(side.score);
 		block.title.textContent = `${side.label} (${side.owner})`;
+		block.initialMeld.textContent = side.initialMeld;
 		block.melds.replaceChildren(
 			...(side.melds.length === 0
 				? [el("span", { className: "none" }, t("No melds yet"))]
