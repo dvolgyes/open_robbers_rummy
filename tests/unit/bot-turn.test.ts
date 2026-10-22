@@ -15,7 +15,8 @@ import {
 	parseChoice,
 } from "../../src/bot/strategy";
 import { chooseTurn, turnRequest } from "../../src/bot/turn";
-import { legalActions, startMatch } from "../../src/canasta";
+import { applyAction, legalActions, startMatch } from "../../src/canasta";
+import { mulberry32 } from "../../src/canasta/random";
 import { engineSeat, tableSeat } from "../../src/game/canasta";
 import type { Seat } from "../../src/protocol";
 
@@ -48,6 +49,65 @@ describe("heuristic ranking", () => {
 		const reset = scoreAction(match.hand, engine, { type: "resetTurn" });
 		const draw = scoreAction(match.hand, engine, { type: "draw" });
 		expect(reset).toBeLessThan(draw);
+	});
+});
+
+/** Plays one hand in which every seat takes the offered option that `pick` names; returns the outcome and resets. */
+function playOffered(
+	seed: number,
+	pick: (count: number) => number,
+): { ended: boolean; resets: number } {
+	let hand = startMatch(seed).hand;
+	let resets = 0;
+	for (let step = 0; step < 2000 && hand.outcome === null; step++) {
+		const choices = offeredChoices(hand, hand.turn);
+		const choice = choices[pick(choices.length)];
+		if (!choice) throw new Error(`seed ${seed}: no offered choice`);
+		if (choice.action.type === "resetTurn") resets++;
+		const next = applyAction(hand, hand.turn, choice.action);
+		if (!next.ok) throw new Error(`seed ${seed}: ${next.reason}`);
+		hand = next.hand;
+	}
+	return { ended: hand.outcome !== null, resets };
+}
+
+describe("offered choices", () => {
+	it("end every hand when each seat always takes option 0", () => {
+		for (let seed = 1; seed <= 40; seed++)
+			expect(
+				playOffered(seed, () => 0),
+				`seed ${seed}`,
+			).toEqual({
+				ended: true,
+				resets: 0,
+			});
+	});
+
+	it("end every hand when each seat takes a random option", () => {
+		const random = mulberry32(99);
+		for (let seed = 1; seed <= 40; seed++)
+			expect(
+				playOffered(seed, (count) => Math.floor(random() * count)),
+				`seed ${seed}`,
+			).toEqual({ ended: true, resets: 0 });
+	});
+
+	it("offer only resetTurn when the turn cannot end otherwise", () => {
+		// Seed 1, South: after a draw and a partial meld below the minimum, no discard is legal.
+		let hand = startMatch(1).hand;
+		for (let step = 0; step < 400; step++) {
+			const legal = legalActions(hand, hand.turn);
+			if (legal.length === 1 && legal[0]?.type === "resetTurn") break;
+			const best = rankActions(hand, hand.turn, legal)[0];
+			if (!best) throw new Error("no legal action");
+			const next = applyAction(hand, hand.turn, best);
+			if (!next.ok) throw new Error(next.reason);
+			hand = next.hand;
+		}
+		expect(legalActions(hand, hand.turn)).toEqual([{ type: "resetTurn" }]);
+		expect(offeredChoices(hand, hand.turn).map((c) => c.action)).toEqual([
+			{ type: "resetTurn" },
+		]);
 	});
 });
 

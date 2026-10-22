@@ -3,7 +3,6 @@ import {
 	type Card,
 	type Seat as EngineSeat,
 	type HandState,
-	legalActions,
 	type MatchState,
 	type TeamIndex,
 	teamOf,
@@ -12,7 +11,7 @@ import {
 import { tableSeat } from "../game/canasta";
 import { SEAT_NAMES, SEATS } from "../protocol";
 import { actionLabel, cardLabel, meldLabel } from "./canasta-text";
-import { rankActions } from "./heuristic";
+import { botActions } from "./heuristic";
 
 export const BOT_MODEL = "inception/mercury-3";
 export const BOT_FALLBACK_MODEL = "openai/gpt-6-luna";
@@ -101,7 +100,7 @@ function renderTemplate(
  */
 export function offeredChoices(hand: HandState, seat: EngineSeat): Choice[] {
 	const view = viewFor(hand, seat);
-	return rankActions(hand, seat, legalActions(hand, seat))
+	return botActions(hand, seat)
 		.slice(0, MAX_CHOICES)
 		.map((action, index) => ({
 			index,
