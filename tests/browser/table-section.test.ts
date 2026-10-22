@@ -10,8 +10,12 @@ import {
 } from "../../src/i18n";
 import { PROTOCOL_VERSION, SEATS } from "../../src/protocol";
 import type { RosterRow } from "../../src/ui/model";
+import "../../src/ui/style.css";
 import { tableSection } from "../../src/ui/table";
 import {
+	type CardView,
+	type MeldView,
+	type SideView,
 	type TableView,
 	type TableViewInput,
 	tableView,
@@ -189,6 +193,61 @@ describe("table section", () => {
 			: ["É-D (övék)", "K-Ny (miénk)"];
 		expect(texts(".side-title")).toEqual(expected);
 		expect(texts(".score-strip .side-label")).toEqual(expected);
+	});
+
+	it("shows the opponents' melds above the viewer's, each meld as columns of at most 8 cards", () => {
+		const card = (index: number): CardView => ({
+			id: `7C-${index}`,
+			rank: "7",
+			suit: "C",
+			text: "7♣",
+		});
+		const meld = (id: string, size: number): MeldView => ({
+			id,
+			rank: "7",
+			cards: Array.from({ length: size }, (_, index) => card(index)),
+			canasta: size >= 7,
+		});
+		const base = turnView(afterDraw(), 1);
+		for (const mineFirst of [true, false]) {
+			const side = (index: 0 | 1): SideView => ({
+				...base.sides[index],
+				mine: (index === 0) === mineFirst,
+				melds: [meld(`m${index}a`, 3), meld(`m${index}b`, 11)],
+			});
+			const sides = [side(0), side(1)] as const;
+			const section = mount([]);
+			section.render({ ...base, sides });
+			const blocks = [
+				...section.element.querySelectorAll<HTMLElement>(".side-block"),
+			];
+			expect(blocks.map((block) => block.dataset.mine)).toEqual([
+				"false",
+				"true",
+			]);
+			const [theirs, ours] = blocks.map((block) =>
+				block.getBoundingClientRect(),
+			);
+			expect(theirs?.bottom).toBeLessThanOrEqual(ours?.top ?? 0);
+			const long = section.element.querySelector('[data-meld="m0b"]');
+			const columns = [...(long?.querySelectorAll(".meld-column") ?? [])];
+			expect(
+				columns.map((column) => column.querySelectorAll(".pip").length),
+			).toEqual([8, 3]);
+			const pips = [...(columns[0]?.querySelectorAll(".pip") ?? [])].map(
+				(pip) => pip.getBoundingClientRect(),
+			);
+			for (const [index, rect] of pips.entries()) {
+				const above = pips[index - 1];
+				if (above !== undefined)
+					expect(rect.top).toBeGreaterThanOrEqual(above.bottom - 1);
+			}
+			const second = columns[1]?.getBoundingClientRect();
+			expect(second?.left).toBeGreaterThanOrEqual(
+				columns[0]?.getBoundingClientRect().right ?? Number.POSITIVE_INFINITY,
+			);
+			section.element.remove();
+		}
 	});
 
 	it("asks only for messages that every language translates", () => {

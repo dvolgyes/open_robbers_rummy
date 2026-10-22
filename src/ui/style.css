@@ -1024,11 +1024,11 @@ main[data-screen="table"] > .room {
 	grid-area: bottom;
 }
 
-/* The piles span the centre; the two sides sit next to each other where the width allows, so the felt stays low. */
+/* The piles on top, then the opponents' melds above the viewer's own. */
 .centre {
 	grid-area: centre;
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+	grid-template-columns: minmax(0, 1fr);
 	gap: 0.5rem;
 	align-items: start;
 	min-width: 0;
@@ -1096,9 +1096,13 @@ main[data-screen="table"] > .room {
 	display: none;
 }
 
+/* The side's name and its red threes share the first line, so the melds keep the height. */
 .side-block {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-items: baseline;
+	gap: 0.25rem 1rem;
 	min-width: 0;
-	height: 100%;
 	padding: 0.4rem 0.6rem;
 	border-radius: 0.4rem;
 	background: var(--card-bg);
@@ -1106,25 +1110,41 @@ main[data-screen="table"] > .room {
 }
 
 .side-title {
-	margin: 0 0 0.25rem;
+	margin: 0;
 	font-size: 0.95rem;
 }
 
 .melds {
+	grid-column: 1 / -1;
+	grid-row: 2;
 	display: flex;
 	flex-wrap: wrap;
+	align-items: flex-start;
 	gap: 0.3rem;
-	font-size: 0.9rem;
+	font-size: 0.8rem;
 }
 
+/* A meld is a vertical stack of its cards; a meld of more than 8 cards continues in a second column. */
 .meld {
 	display: inline-flex;
+	flex-direction: column;
 	align-items: center;
-	gap: 0.25rem;
-	padding: 0.1rem 0.35rem;
+	gap: 0.15rem;
+	padding: 0.15rem 0.25rem;
 	border: 1px solid var(--line);
 	border-radius: 0.3rem;
 	font-variant-numeric: tabular-nums;
+}
+
+.meld-cards {
+	display: flex;
+	gap: 0.15rem;
+}
+
+.meld-column {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
 }
 
 .meld.canasta {
@@ -1140,7 +1160,10 @@ main[data-screen="table"] > .room {
 }
 
 .red-threes {
-	margin: 0.25rem 0 0;
+	grid-row: 1;
+	grid-column: 2;
+	justify-self: end;
+	margin: 0;
 	font-size: 0.85rem;
 }
 
@@ -1246,6 +1269,10 @@ main[data-screen="table"] > .room {
 .red-threes .pip {
 	padding: 0;
 	border: none;
+}
+
+.meld .pip {
+	line-height: 1;
 }
 
 /* The sort control and the hint on the left, the actions on the right, in one row where they fit. */
@@ -1415,10 +1442,12 @@ body:has(main[data-screen="table"]) main {
 		grid-column: 3;
 	}
 
+	/* A centre taller than its rows, such as two sides with 8-card melds, starts below the partner and uses the free
+	 * space above the hand, which sits lower than the room controls in the last row. */
 	.room .centre {
 		grid-column: 2;
 		grid-row: 2 / -2;
-		align-self: center;
+		align-self: safe center;
 		align-content: center;
 		margin: 0;
 	}

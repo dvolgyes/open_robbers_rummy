@@ -109,6 +109,9 @@ function cardPips(cards: readonly CardView[]): Child[] {
 	);
 }
 
+/** A meld shows its cards in vertical columns of at most this many cards. */
+const MELD_COLUMN = 8;
+
 function labelNodes(label: Label): Child[] {
 	return label.map((part) =>
 		part.kind === "text" ? part.text : cardPip(part.card),
@@ -720,7 +723,21 @@ export function tableSection(
 				className: meld.canasta ? "meld canasta" : "meld",
 				attrs: { "data-meld": meld.id, "data-rank": meld.rank },
 			},
-			el("span", { className: "meld-cards" }, ...cardPips(meld.cards)),
+			el(
+				"span",
+				{ className: "meld-cards" },
+				...Array.from(
+					{ length: Math.ceil(meld.cards.length / MELD_COLUMN) },
+					(_, index) =>
+						el(
+							"span",
+							{ className: "meld-column" },
+							...meld.cards
+								.slice(index * MELD_COLUMN, (index + 1) * MELD_COLUMN)
+								.map((card) => cardPip(card)),
+						),
+				),
+			),
 			...(meld.canasta
 				? [el("span", { className: "canasta-mark" }, t("canasta"))]
 				: []),
@@ -732,6 +749,7 @@ export function tableSection(
 		const block = sideBlocks[index];
 		if (cell === undefined || block === undefined) return;
 		cell.node.dataset.mine = String(side.mine);
+		block.node.dataset.mine = String(side.mine);
 		cell.label.textContent = `${side.label} (${side.owner})`;
 		cell.score.textContent = String(side.score);
 		block.title.textContent = `${side.label} (${side.owner})`;
@@ -794,6 +812,11 @@ export function tableSection(
 		target.textContent = t("Target {score}", { score: view.target });
 
 		for (const [index, side] of view.sides.entries()) renderSide(side, index);
+		// The opponents' melds sit above the viewer's own.
+		const [first, second] = view.sides[0].mine
+			? [sideBlocks[1], sideBlocks[0]]
+			: sideBlocks;
+		centre.append(first.node, second.node);
 		stockCount.textContent = cardCount(view.stockCount);
 		pileTop.replaceChildren(
 			view.pile.top === undefined ? t("Empty") : cardPip(view.pile.top),
