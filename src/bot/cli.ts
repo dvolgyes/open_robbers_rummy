@@ -21,6 +21,7 @@ import type { RoomConfig, Seat } from "../protocol";
 import { isBotName, seatName, seatsOf } from "../protocol";
 import type { Action } from "../rummy";
 import { type SeatLocks, SeatMemory } from "../session";
+import { BotPacer, realTime } from "./pacing";
 import { chooseAction, neverPlay } from "./policy";
 import { actionPositionKey } from "./position";
 import { inlineThinker } from "./think";
@@ -164,6 +165,7 @@ async function run(options: Options): Promise<void> {
 	let strategyKey: string | undefined;
 	let sentKey: string | undefined;
 	let sentFailureCount = 0;
+	const pacer = new BotPacer(realTime);
 	const triedSeats = new Set<Seat>();
 	let startupTimer: NodeJS.Timeout | undefined;
 	let removeListener = (): void => {};
@@ -260,6 +262,7 @@ async function run(options: Options): Promise<void> {
 		);
 		if (!result.ok)
 			throw new Error(`could not queue game action (${result.code})`);
+		pacer.sent();
 		sentKey = position;
 		sentFailureCount = view.failures.length;
 		console.log(`Sent ${action.type} for ${seat}.`);
@@ -306,6 +309,7 @@ async function run(options: Options): Promise<void> {
 		const state = parseRummyState(view.table.state, identity.tableId);
 		const match = state?.match;
 		if (!state || !match || match.hand.outcome !== null) return;
+		pacer.observe(match);
 		if (view.outbox.length > 0) return;
 		const seat = view.seat;
 		const position = actionPositionKey(match.handNo, state.actions);
@@ -324,7 +328,17 @@ async function run(options: Options): Promise<void> {
 				? chooseAction(handView, engineSeat(seat), { maxNodes: 0 }, neverPlay)
 				: await thinker.choose(handView, engineSeat(seat), CLI_THINK_MS);
 			if (action === undefined) return;
-			await sendAction(match, state.actions, seat, position, action, view);
+			// Every viewer sees the last play for 5 s; `sendAction` checks the position again after the wait.
+			await pacer.ready();
+			if (stopped) return;
+			await sendAction(
+				match,
+				state.actions,
+				seat,
+				position,
+				action,
+				controller.view(),
+			);
 		} catch (error) {
 			await stop(new Error(describeFailure(error, [route.key])));
 		}

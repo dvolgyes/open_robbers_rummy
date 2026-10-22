@@ -6,19 +6,48 @@ import {
 	resetVotePayload,
 } from "../game/rummy";
 import type { TableController } from "../p2p/table";
-import { type RoomConfig, SEATS, type Seat } from "../protocol";
+import {
+	type JsonObject,
+	type RoomConfig,
+	SEATS,
+	type Seat,
+} from "../protocol";
+import { BotPacer, type BotTime, realTime } from "./pacing";
 import { actionPositionKey } from "./position";
 import type { Thinker } from "./think";
+
+/** The part of the table controller that the runner uses. */
+export interface BotTable {
+	readonly tableId: string;
+	view(): {
+		readonly hosting: boolean;
+		readonly ready: boolean;
+		readonly seat: Seat | null;
+		readonly table: {
+			readonly config: RoomConfig;
+			readonly state: JsonObject;
+		} | null;
+		readonly roster: { readonly bots: readonly Seat[] } | null;
+	};
+	onChange: TableController["onChange"];
+	activateBots: TableController["activateBots"];
+	send: TableController["send"];
+	sendBot: TableController["sendBot"];
+}
 
 export function configuredBotSeats(config: RoomConfig): Seat[] {
 	return SEATS.filter((seat) => config.botSetup?.seats.includes(seat) === true);
 }
 
-/** Runs host-managed bot decisions in the page that currently owns the host. */
+/**
+ * Runs host-managed bot decisions in the page that currently owns the host. A bot command waits until the last play
+ * was shown for 5 s (`BotPacer`); the search runs during that wait.
+ */
 export class HostBotRunner {
-	readonly #controller: TableController;
+	readonly #controller: BotTable;
 	readonly #thinker: Thinker;
 	readonly #onError: (detail: string) => void;
+	readonly #pacer: BotPacer;
 	readonly #processed = new Set<string>();
 	#unsubscribe: (() => void) | undefined;
 	#running = false;
@@ -28,13 +57,15 @@ export class HostBotRunner {
 	readonly #seatOverrides = new Map<Seat, boolean>();
 
 	constructor(
-		controller: TableController,
+		controller: BotTable,
 		thinker: Thinker,
 		onError: (detail: string) => void = () => {},
+		time: BotTime = realTime,
 	) {
 		this.#controller = controller;
 		this.#thinker = thinker;
 		this.#onError = onError;
+		this.#pacer = new BotPacer(time);
 	}
 
 	async start(requiredSeats: readonly Seat[] = []): Promise<boolean> {
@@ -144,6 +175,7 @@ export class HostBotRunner {
 			}
 		const match = state?.match;
 		if (!state || !match || match.hand.outcome !== null) return;
+		this.#pacer.observe(match);
 		const position = actionPositionKey(match.handNo, state.actions);
 		for (const seat of seats) {
 			// Only the seat whose turn it is has legal actions, so other seats are skipped here.
@@ -158,6 +190,7 @@ export class HostBotRunner {
 					handViewFor(match, seat),
 					engineSeat(seat),
 				);
+				await this.#pacer.ready();
 			} catch (error) {
 				this.#processed.delete(key);
 				throw error;
@@ -202,6 +235,7 @@ export class HostBotRunner {
 				? await this.#controller.send(payload)
 				: await this.#controller.sendBot(seat, payload);
 		if (!result.ok) throw new Error("host rejected local bot action");
+		this.#pacer.sent();
 		this.#rerun = true;
 	}
 }
