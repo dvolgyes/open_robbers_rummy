@@ -271,15 +271,6 @@ function applyTakePile(
 	}
 	const rest = hand.pile.slice(0, -1);
 	const cards = [...taken.rest, ...rest];
-	// One card left can be neither melded nor discarded without a canasta, so such a turn could never end.
-	if (
-		cards.length === 1 &&
-		hand.rules.goOutNeedsCanasta &&
-		!teamAt(teams, team).melds.some((meld) => isCanasta(meld, hand.rules))
-	)
-		return fail(
-			"the pickup would leave one card, which needs a canasta to go out",
-		);
 	const next: HandState = {
 		...hand,
 		hands: withHand(hand.hands, seat, cards),
@@ -373,18 +364,26 @@ function applyDiscard(hand: HandState, seat: Seat, id: string): Step {
 
 /** Melds or pickups may empty the hand, which is a going-out attempt. */
 function afterMove(hand: HandState, seat: Seat): Step {
-	if ((hand.hands[seat] ?? []).length === 0) return checkOut(hand, seat);
+	const left = (hand.hands[seat] ?? []).length;
+	if (left === 0) return checkOut(hand, seat);
+	// Without a canasta, the player must keep a card after the discard, so one card left can be neither melded nor discarded.
+	if (left === 1 && !canGoOut(hand, teamOf(seat)))
+		return fail(
+			"the move would leave one card, which needs a canasta to go out",
+		);
 	return succeed(hand);
+}
+
+function canGoOut(hand: HandState, team: TeamIndex): boolean {
+	return (
+		!hand.rules.goOutNeedsCanasta ||
+		teamAt(hand.teams, team).melds.some((meld) => isCanasta(meld, hand.rules))
+	);
 }
 
 function checkOut(hand: HandState, seat: Seat): Step {
 	const team = teamOf(seat);
-	if (
-		hand.rules.goOutNeedsCanasta &&
-		!teamAt(hand.teams, team).melds.some((meld) => isCanasta(meld, hand.rules))
-	) {
-		return fail("the side needs a canasta to go out");
-	}
+	if (!canGoOut(hand, team)) return fail("the side needs a canasta to go out");
 	if (!initialSatisfied(hand, team))
 		return fail("the side has not made its initial meld");
 	const concealed = teamAt(hand.turnStart.teams, team).melds.length === 0;

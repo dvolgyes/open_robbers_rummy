@@ -59,6 +59,9 @@ Evidence, checked on 2026-10-22:
     At an exhausted stock, `resetTurn` after a pickup declines the pile and ends the hand.
     Before this change, a pickup that the player could not complete left the turn between the pickup and `resetTurn` forever.
     The residual: a player can decline a pile that matches a meld of the side by taking it and taking it back, although Pagat requires that pickup.
+  - While the side has no canasta, a meld, an extension, or a pickup that leaves one card in the hand is refused.
+    Pagat: "It is against the rules in this case to meld all your cards except one."
+    Amended 2026-10-22: before this change, only the pickup was refused, and a player who melded down to one card could only take the turn back.
   - A last stock card that is a red three ends the hand when it is drawn, so its drawer may not meld or discard.
 
 ## Consequences

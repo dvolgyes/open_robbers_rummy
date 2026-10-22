@@ -422,7 +422,7 @@ describe("hand flow", () => {
 		const hand = scenario(base, {
 			turn: 1,
 			phase: "draw",
-			hands: [[], cardsById(["0-7H", "1-7H", "0-KS"]), [], []],
+			hands: [[], cardsById(["0-7H", "1-7H", "0-KS", "0-9D"]), [], []],
 			pile: cardsById(["0-AC", "1-AC", "0-AD", "0-7D"]),
 		});
 		const taken = applyAction(hand, 1, {
@@ -602,6 +602,43 @@ describe("hand flow", () => {
 			expect(taken.hand.teams[1].melds).toHaveLength(1);
 			expect(taken.hand.teams[1].melds[0]?.cards).toHaveLength(6);
 		});
+	});
+
+	it("refuses a meld or an extension that leaves one card while the side has no canasta", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			phase: "play",
+			hands: [[], cardsById(["0-KH", "0-KD", "0-KS", "0-9H", "0-9D"]), [], []],
+		});
+		const kings = applyAction(hand, 1, {
+			type: "meld",
+			cards: ["0-KH", "0-KD", "0-KS"],
+		});
+		if (!kings.ok) throw new Error(kings.reason);
+		const reason =
+			"the move would leave one card, which needs a canasta to go out";
+		expect(
+			applyAction(
+				scenario(base, {
+					turn: 1,
+					phase: "play",
+					hands: [[], cardsById(["0-KH", "0-KD", "0-KS", "0-9H"]), [], []],
+				}),
+				1,
+				{ type: "meld", cards: ["0-KH", "0-KD", "0-KS"] },
+			),
+		).toEqual({ ok: false, reason });
+		const joined = applyAction(
+			{ ...kings.hand, hands: [[], cardsById(["0-9H", "1-KH"]), [], []] },
+			1,
+			{
+				type: "extend",
+				meldId: kings.hand.teams[1].melds[0]?.id ?? "",
+				cards: ["1-KH"],
+			},
+		);
+		expect(joined).toEqual({ ok: false, reason });
 	});
 
 	it("refuses to go out without a canasta", () => {
