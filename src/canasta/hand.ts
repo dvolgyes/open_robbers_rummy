@@ -40,6 +40,11 @@ export interface HandSnapshot {
 	/** Card points toward the initial meld this turn: the cards from the current player's hand and the top pile card. */
 	readonly turnMeldPoints: number;
 	readonly turnActions: number;
+	/**
+	 * The ids of the cards that this turn put into the hand of the seat on turn, from the stock or from the pile.
+	 * Absent in a hand stored before the field existed, which means none.
+	 */
+	readonly turnTaken?: readonly string[];
 	readonly nextMeldNo: number;
 	readonly outcome: Outcome | null;
 }
@@ -114,6 +119,7 @@ export function newHand(input: NewHandInput): HandState {
 		teams,
 		turnMeldPoints: 0,
 		turnActions: 0,
+		turnTaken: [],
 		nextMeldNo: 1,
 		outcome: null,
 	};
@@ -207,6 +213,7 @@ function applyDraw(hand: HandState, seat: Seat): Step {
 		}),
 		phase: "play",
 		turnActions: 0,
+		turnTaken: drawn.drawn.map((card) => card.id),
 	};
 	const next: HandState = { ...afterDraw, turnStart: afterDraw };
 	// The last stock card is a red three, or only red threes were left: the player may not meld or discard, so the hand ends.
@@ -262,7 +269,8 @@ function applyTakePile(
 		if (!check.ok) return fail(check.reason);
 		teams = replaceMeld(teams, team, { ...existing, cards });
 	}
-	const cards = [...taken.rest, ...hand.pile.slice(0, -1)];
+	const rest = hand.pile.slice(0, -1);
+	const cards = [...taken.rest, ...rest];
 	// One card left can be neither melded nor discarded without a canasta, so such a turn could never end.
 	if (
 		cards.length === 1 &&
@@ -282,6 +290,7 @@ function applyTakePile(
 		turnMeldPoints: hand.turnMeldPoints + meldPoints(pileMeld),
 		phase: "play",
 		turnActions: hand.turnActions + 1,
+		turnTaken: rest.map((card) => card.id),
 	};
 	return afterMove(next, seat);
 }
@@ -404,6 +413,7 @@ function passTurn(hand: HandState, seat: Seat): HandState {
 		phase: "draw",
 		turnMeldPoints: 0,
 		turnActions: 0,
+		turnTaken: [],
 	};
 	const next: HandSnapshot =
 		base.stock.length === 0 && !canTakePile({ ...base, turnStart: base })

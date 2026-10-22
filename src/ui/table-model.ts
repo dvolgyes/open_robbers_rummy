@@ -560,6 +560,8 @@ export interface TableView {
 	readonly seats: readonly SeatView[];
 	/** The viewer's hand in engine order; the screen sorts it. */
 	readonly own: readonly CardView[];
+	/** The ids of the viewer's cards that this turn drew or took from the pile. */
+	readonly taken: readonly string[];
 	readonly stockCount: number;
 	readonly pile: PileView;
 	/** The legal actions of the viewer now; empty unless it is the viewer's turn and no command is in flight. */
@@ -613,6 +615,7 @@ function emptyView(
 		sides: sideViews([0, 0], input.seat, undefined, input.t ?? english),
 		seats: [],
 		own: [],
+		taken: [],
 		stockCount: 0,
 		pile: { top: undefined, count: 0, frozen: false },
 		options: [],
@@ -715,6 +718,7 @@ export function tableView(input: TableViewInput): TableView {
 			},
 		),
 		own: view.own.map((card) => cardView(card, t)),
+		taken: view.taken,
 		stockCount: view.stockCount,
 		pile: {
 			top: top === undefined ? undefined : cardView(top, t),

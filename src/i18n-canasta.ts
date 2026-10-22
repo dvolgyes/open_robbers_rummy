@@ -388,6 +388,17 @@ const rows: readonly CanastaRow[] = [
 		"Joker",
 	],
 	[
+		"New this turn",
+		"Neu in diesem Zug",
+		"Új ebben a körben",
+		"Ny i denne runden",
+		"Nueva en este turno",
+		"Nova nesta jogada",
+		"Nouvelle à ce tour",
+		"Nuova in questo turno",
+		"Nieuw in deze beurt",
+	],
+	[
 		"Sort by suit",
 		"Nach Farbe sortieren",
 		"Rendezés szín szerint",

@@ -21,6 +21,8 @@ export interface HandView {
 	readonly turnMeldPoints: number;
 	readonly turnActions: number;
 	readonly own: readonly Card[];
+	/** The ids of the viewer's cards that this turn drew or took from the pile; empty when it is not the viewer's turn. */
+	readonly taken: readonly string[];
 	readonly handCounts: readonly number[];
 	/** All hands, shown only after the hand is over. */
 	readonly revealed: readonly (readonly Card[])[] | null;
@@ -42,6 +44,7 @@ export function viewFor(hand: HandState, seat: Seat): HandView {
 		turnMeldPoints: hand.turnMeldPoints,
 		turnActions: hand.turnActions,
 		own: hand.hands[seat] ?? [],
+		taken: seat === hand.turn ? (hand.turnTaken ?? []) : [],
 		handCounts: hand.hands.map((cards) => cards.length),
 		revealed: hand.outcome === null ? null : hand.hands,
 		stockCount: hand.stock.length,

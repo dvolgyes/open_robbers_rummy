@@ -15,6 +15,7 @@
 	--card-bg: #ffffff;
 	--card-fg: #1d1d1b;
 	--red-suit: #c0262d;
+	--gold: #c8960c;
 	--call-green: #1f7a46;
 	--call-orange: #c75b00;
 	--tile-bg: #2f5f47;
@@ -1235,6 +1236,32 @@ main[data-screen="table"] > .room {
 	border-color: var(--accent);
 	box-shadow: inset 0 0 0 2px var(--accent);
 	transform: translateY(-0.35rem);
+}
+
+/* A card that this turn drew or took from the pile: a gold frame, and a star for a reader who does not see the colour. */
+.card.taken {
+	position: relative;
+	border-color: var(--gold);
+	box-shadow:
+		0 0 0 2px var(--gold),
+		0 0 0.6rem rgb(200 150 12 / 60%);
+}
+
+.card.taken.selected {
+	box-shadow:
+		inset 0 0 0 2px var(--accent),
+		0 0 0 2px var(--gold),
+		0 0 0.6rem rgb(200 150 12 / 60%);
+}
+
+.card.taken::after {
+	content: "★";
+	position: absolute;
+	top: 0.15rem;
+	right: 0.2rem;
+	color: var(--gold);
+	font-size: calc(var(--card-h) * 0.16);
+	line-height: 1;
 }
 
 .card:focus-visible {

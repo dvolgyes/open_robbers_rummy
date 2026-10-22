@@ -170,7 +170,25 @@ function isEngineSeat(value: unknown): value is EngineSeat {
 /** The engine's hand fields, checked for shape and for one card of each of the 108. */
 function parseHand(value: unknown): HandState | undefined {
 	if (!isJsonObject(value)) return undefined;
-	const { hands, stock, pile, teams, turn, dealer, phase, turnStart } = value;
+	const {
+		hands,
+		stock,
+		pile,
+		teams,
+		turn,
+		dealer,
+		phase,
+		turnStart,
+		turnTaken,
+	} = value;
+	if (
+		turnTaken !== undefined &&
+		!(
+			Array.isArray(turnTaken) &&
+			turnTaken.every((id) => typeof id === "string")
+		)
+	)
+		return undefined;
 	if (!Array.isArray(hands) || hands.length !== 4) return undefined;
 	const handCards = hands.map(parseCards);
 	const stockCards = parseCards(stock);

@@ -186,6 +186,16 @@ describe("canasta module: replicated state", () => {
 		expect(module.isState(copy as JsonObject, ROOM)).toBe(false);
 	});
 
+	it("reads a hand stored without the cards taken this turn, and rejects a malformed list", () => {
+		const copy = JSON.parse(JSON.stringify(started())) as {
+			match: { hand: { turnTaken?: unknown } };
+		};
+		delete copy.match.hand.turnTaken;
+		expect(module.isState(copy as JsonObject, ROOM)).toBe(true);
+		copy.match.hand.turnTaken = [7];
+		expect(module.isState(copy as JsonObject, ROOM)).toBe(false);
+	});
+
 	it("rejects a state for another room", () => {
 		expect(module.isState(started(), "other-room")).toBe(false);
 	});

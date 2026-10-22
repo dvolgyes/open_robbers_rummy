@@ -15,6 +15,7 @@ import {
 	type Seat,
 	scoreHand,
 	validateMeld,
+	viewFor,
 } from "../../src/canasta";
 
 const byId = (id: string): Card => {
@@ -546,6 +547,61 @@ describe("hand flow", () => {
 		expect(reset.hand.phase).toBe("draw");
 		expect(reset.hand.pile).toHaveLength(2);
 		expect(reset.hand.hands[1]).toHaveLength(3);
+	});
+});
+
+describe("cards taken this turn", () => {
+	it("shows the drawn card to the seat on turn only, until its turn ends", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			hands: [[], cardsById(["0-KH", "1-KH", "0-KS", "0-9H"]), [], []],
+			stock: cardsById(["0-3H", "0-4C", "0-6C"]),
+		});
+		expect(viewFor(hand, 1).taken).toEqual([]);
+		const drawn = applyAction(hand, 1, { type: "draw" });
+		if (!drawn.ok) throw new Error(drawn.reason);
+		// The red three goes to the table, so only its replacement is new in the hand.
+		expect(viewFor(drawn.hand, 1).taken).toEqual(["0-4C"]);
+		expect(viewFor(drawn.hand, 0).taken).toEqual([]);
+		expect(viewFor(drawn.hand, 3).taken).toEqual([]);
+		const melded = applyAction(drawn.hand, 1, {
+			type: "meld",
+			cards: ["0-KH", "1-KH", "0-KS"],
+		});
+		if (!melded.ok) throw new Error(melded.reason);
+		const reset = applyAction(melded.hand, 1, { type: "resetTurn" });
+		if (!reset.ok) throw new Error(reset.reason);
+		expect(viewFor(reset.hand, 1).taken).toEqual(["0-4C"]);
+		const discarded = applyAction(reset.hand, 1, {
+			type: "discard",
+			card: "0-9H",
+		});
+		if (!discarded.ok) throw new Error(discarded.reason);
+		expect(viewFor(discarded.hand, 1).taken).toEqual([]);
+		expect(viewFor(discarded.hand, 2).taken).toEqual([]);
+	});
+
+	it("shows the pile cards that a pickup put into the hand, and forgets them when the pickup is taken back", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			hands: [[], cardsById(["0-7H", "1-7H", "0-KS"]), [], []],
+			pile: cardsById(["0-9C", "0-QD", "0-7D"]),
+		});
+		const taken = applyAction(hand, 1, {
+			type: "takePile",
+			cards: ["0-7H", "1-7H"],
+		});
+		if (!taken.ok) throw new Error(taken.reason);
+		// The top card went into the meld; the rest of the pile is in the hand.
+		expect(viewFor(taken.hand, 1).taken).toEqual(["0-9C", "0-QD"]);
+		expect(viewFor(taken.hand, 2).taken).toEqual([]);
+		const reset = applyAction(taken.hand, 1, { type: "resetTurn" });
+		if (!reset.ok) throw new Error(reset.reason);
+		expect(viewFor(reset.hand, 1).taken).toEqual([]);
 	});
 });
 

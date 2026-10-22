@@ -327,13 +327,14 @@ export function tableSection(
 		paintHand();
 	}
 
-	function cardButton(card: CardView): HTMLButtonElement {
+	function cardButton(card: CardView, taken: boolean): HTMLButtonElement {
 		const chosen = selected.has(card.id);
 		const node = button(card.text, () => toggleCard(card.id), {
-			className: `card${isRed(card.suit) ? " red" : ""}${card.suit === null ? " joker" : ""}${chosen ? " selected" : ""}`,
+			className: `card${isRed(card.suit) ? " red" : ""}${card.suit === null ? " joker" : ""}${chosen ? " selected" : ""}${taken ? " taken" : ""}`,
 			attrs: {
 				"data-card": card.id,
 				"aria-pressed": String(chosen),
+				...(taken ? { title: t("New this turn") } : {}),
 			},
 		});
 		return node;
@@ -353,14 +354,18 @@ export function tableSection(
 		const key = JSON.stringify([
 			order,
 			view.own,
+			view.taken,
 			[...selected],
 			offered,
 			view.yourTurn,
 		]);
 		if (key === paintedKey) return;
 		paintedKey = key;
+		const taken = new Set(view.taken);
 		ownHand.replaceChildren(
-			...sortHand(view.own, order).map((card) => cardButton(card)),
+			...sortHand(view.own, order).map((card) =>
+				cardButton(card, taken.has(card.id)),
+			),
 		);
 		sortButton.textContent = t(
 			order === "rank" ? "Sort by suit" : "Sort by rank",

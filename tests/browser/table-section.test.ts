@@ -250,6 +250,32 @@ describe("table section", () => {
 		}
 	});
 
+	it("frames the cards that this turn drew or took, and only those", () => {
+		const hu = translator("hu");
+		const section = mount([], hu);
+		const match = afterDraw();
+		const view = turnView(match, 1, { t: hu });
+		const drawnId = match.hand.turnTaken?.[0];
+		expect(drawnId).toBeDefined();
+		section.render(view);
+		const cards = [
+			...section.element.querySelectorAll<HTMLButtonElement>(
+				".own-hand button.card",
+			),
+		];
+		const marked = cards.filter((card) => card.classList.contains("taken"));
+		expect(marked.map((card) => card.dataset.card)).toEqual([drawnId]);
+		expect(marked[0]?.title).toBe("Új ebben a körben");
+		const plain = cards.find((card) => !card.classList.contains("taken"));
+		expect(plain).toBeDefined();
+		const frame = (card: Element | undefined) =>
+			card === undefined ? "" : getComputedStyle(card).boxShadow;
+		expect(frame(marked[0])).not.toBe(frame(plain));
+		expect(getComputedStyle(marked[0] as Element, "::after").content).not.toBe(
+			"none",
+		);
+	});
+
 	it("asks only for messages that every language translates", () => {
 		const asked = new Set<string>();
 		const english = translator("en");
