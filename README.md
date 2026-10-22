@@ -53,7 +53,7 @@ In each turn, a player does these steps:
 The table offers only legal actions.
 Select cards in your hand to see the melds, extensions, and discards that use them.
 
-![A hand in progress, with the score strip, the stock and the discard pile, both sides' melds, and the player's hand.](docs/images/gameplay-hand.png)
+![A hand in progress: the felt with the stock, the discard pile, both sides' melds and the player's hand on the left, and the score strip, the call and the room controls on the right.](docs/images/gameplay-hand.png)
 
 The main rules, in short:
 

@@ -810,7 +810,8 @@ button.call-join[data-in-call="true"] {
 }
 /*
  * Table screen: one column, the table above the footer with the room controls and the drawer.
- * The page has no fixed canvas, so the table works from a 390px phone up.
+ * The page has no fixed canvas, so the table works from a 390px phone up. A wide landscape screen
+ * puts the parts outside the felt in a second column (see the rule at the end of this file).
  */
 
 main[data-screen="table"] > .room {
@@ -1300,6 +1301,54 @@ main[data-screen="table"] > .room {
 
 	.room-control-row {
 		flex-wrap: wrap;
+	}
+}
+
+/*
+ * Wide landscape screen, such as 16:9: the felt fills the left column, and the scores, the status, the call
+ * and the room controls stack in a column on its right. The stage and the table give their children to the
+ * room grid. The side column fills the auto rows in order; the last row takes the rest of the felt's height,
+ * so a short side column does not spread out.
+ */
+@media (min-width: 64rem) and (orientation: landscape) {
+	main:has(> .room) {
+		max-width: 100rem;
+	}
+
+	main[data-screen="table"] > .room {
+		grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+		grid-template-rows: repeat(12, auto) 1fr;
+		gap: 0 1rem;
+	}
+
+	.room > .stage,
+	.room .canasta-table {
+		display: contents;
+	}
+
+	.room > *,
+	.room > .stage > *,
+	.room .canasta-table > * {
+		grid-column: 2;
+		margin-bottom: 0.6rem;
+	}
+
+	.room .canasta-table > .felt {
+		grid-column: 1;
+		grid-row: 1 / -1;
+		align-self: start;
+		margin-bottom: 0;
+	}
+
+	/* The two scores share the first line of the narrow column; the hand details go below them. */
+	.score-strip .side ~ .side {
+		margin-left: auto;
+	}
+
+	.score-strip .meta {
+		order: 1;
+		flex-basis: 100%;
+		margin-left: 0;
 	}
 }
 

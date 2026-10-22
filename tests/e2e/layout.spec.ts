@@ -188,6 +188,36 @@ async function expectFit(
 	}
 }
 
+/** The parts outside the felt: the scores, the call dock, and the room controls with the drawer. */
+const SIDE_PARTS: Readonly<Record<string, string>> = {
+	scores: '[data-testid="score-strip"]',
+	dock: ".dock",
+	footer: ".room-footer",
+};
+
+/**
+ * On a wide landscape window the parts outside the felt sit in a column to its right, so a 16:9 screen
+ * shows the whole table; on a phone the dock and the footer sit below the felt.
+ */
+async function expectSideParts(
+	page: Page,
+	place: "right" | "below",
+): Promise<void> {
+	const rects = await measure(page, { felt: ".felt", ...SIDE_PARTS });
+	const felt = shown(rects, "felt");
+	if (place === "right") {
+		for (const name of Object.keys(SIDE_PARTS))
+			expect(shown(rects, name).x, `${name} right of the felt`).toBeGreaterThan(
+				right(felt) - SUBPIXEL,
+			);
+		return;
+	}
+	for (const name of ["dock", "footer"])
+		expect(shown(rects, name).y, `${name} below the felt`).toBeGreaterThan(
+			bottom(felt) - SUBPIXEL,
+		);
+}
+
 /** The viewer's own hand and its action buttons. */
 const OWN_PARTS = {
 	"own hand": ".own-hand",
@@ -234,8 +264,10 @@ test("1: desktop, first hand: each of the four viewers sits at the bottom, with 
 	// also on a low laptop window.
 	await expect(tab.E.getByTestId("action-draw")).toBeVisible();
 	await expectFit(tab.E, OWN_PARTS);
+	await expectSideParts(tab.E, "right");
 	await tab.E.setViewportSize(LOW_LAPTOP);
 	await expectFit(tab.E, OWN_PARTS);
+	await expectSideParts(tab.E, "right");
 	await tab.E.setViewportSize({ width: 1280, height: 720 });
 });
 
@@ -255,6 +287,7 @@ test("2: a phone shows the table without sideways scroll, with the own hand and 
 		await test.step(`${size.width}×${size.height}`, async () => {
 			const page = phoneTab as Page;
 			await expectRotation(page, "N");
+			await expectSideParts(page, "below");
 			await page.locator(".own-hand").scrollIntoViewIfNeeded();
 			const view = await page.evaluate(() => ({
 				innerWidth: window.innerWidth,
