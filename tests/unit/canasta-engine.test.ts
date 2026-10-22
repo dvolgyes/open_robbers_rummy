@@ -135,10 +135,26 @@ describe("meld validation", () => {
 		).toBe(false);
 	});
 
-	it("never melds threes", () => {
+	it("accepts three or four black threes, with no wild card", () => {
 		expect(
-			validateMeld(cardsById(["0-3C", "0-3S", "1-3C"]), CLASSIC_RULES).ok,
-		).toBe(false);
+			validateMeld(cardsById(["0-3C", "0-3S", "1-3C"]), CLASSIC_RULES),
+		).toEqual({ ok: true, rank: "3" });
+		expect(
+			validateMeld(cardsById(["0-3C", "0-3S", "1-3C", "1-3S"]), CLASSIC_RULES)
+				.ok,
+		).toBe(true);
+		expect(
+			validateMeld(cardsById(["0-3C", "0-3S", "0-2H"]), CLASSIC_RULES),
+		).toEqual({
+			ok: false,
+			reason: "a meld of black threes cannot hold wild cards",
+		});
+	});
+
+	it("never melds red threes", () => {
+		expect(
+			validateMeld(cardsById(["0-3H", "0-3D", "1-3H"]), CLASSIC_RULES),
+		).toEqual({ ok: false, reason: "red threes cannot be melded" });
 	});
 
 	it("rejects a card that does not match the meld rank", () => {
@@ -725,6 +741,90 @@ describe("hand flow", () => {
 		expect(result).toMatchObject({
 			ok: false,
 			reason: "the side needs a canasta to go out",
+		});
+	});
+
+	describe("black threes", () => {
+		const threes = ["0-3C", "0-3S", "1-3C"];
+		const canasta: Meld = {
+			id: "m1",
+			rank: "K",
+			team: 1,
+			cards: cardsById([
+				"0-KH",
+				"0-KD",
+				"0-KS",
+				"0-KC",
+				"1-KH",
+				"1-KD",
+				"1-KS",
+			]),
+		};
+		/** Seat 1 has drawn; its side has made its initial meld, with or without a canasta. */
+		const holding = (own: readonly string[], melds: Meld[] = [canasta]) =>
+			scenario(newHand({ teamScores: [0, 0], dealer: 0, seed: 1 }), {
+				turn: 1,
+				phase: "play",
+				hands: [[], cardsById(own), [], []],
+				teams: [
+					{ melds: [], redThrees: [], initialMade: false },
+					{ melds, redThrees: [], initialMade: true },
+				],
+				nextMeldNo: 2,
+				meldedSeats: [1, 3],
+			});
+
+		it("may be melded by a player who goes out in this turn", () => {
+			const melded = applyAction(holding([...threes, "0-9H"]), 1, {
+				type: "meld",
+				cards: threes,
+			});
+			if (!melded.ok) throw new Error(melded.reason);
+			expect(melded.hand.teams[1].melds.at(-1)?.rank).toBe("3");
+			const out = applyAction(melded.hand, 1, {
+				type: "discard",
+				card: "0-9H",
+			});
+			if (!out.ok) throw new Error(out.reason);
+			expect(out.hand.outcome).toEqual({
+				kind: "out",
+				seat: 1,
+				concealed: false,
+			});
+			const lastMeld = applyAction(holding(threes), 1, {
+				type: "meld",
+				cards: threes,
+			});
+			expect(lastMeld.ok && lastMeld.hand.outcome?.kind).toBe("out");
+		});
+
+		it("cannot be melded by a player who keeps more cards than the discard", () => {
+			const hand = holding([...threes, "0-9H", "0-9D"]);
+			expect(applyAction(hand, 1, { type: "meld", cards: threes })).toEqual({
+				ok: false,
+				reason: "black threes can be melded only when going out",
+			});
+			expect(legalActions(hand, 1)).not.toContainEqual({
+				type: "meld",
+				cards: threes,
+			});
+		});
+
+		it("cannot be melded while the side has no canasta", () => {
+			const kings: Meld = { ...canasta, cards: canasta.cards.slice(0, 3) };
+			expect(
+				applyAction(holding([...threes, "0-9H"], [kings]), 1, {
+					type: "meld",
+					cards: threes,
+				}).ok,
+			).toBe(false);
+		});
+
+		it("are offered as a meld when they let the player go out", () => {
+			expect(legalActions(holding([...threes, "0-9H"]), 1)).toContainEqual({
+				type: "meld",
+				cards: threes,
+			});
 		});
 	});
 

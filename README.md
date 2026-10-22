@@ -69,6 +69,7 @@ The main rules, in short:
   Each red 3 scores 100 for its side, or subtracts 100 if the side has not melded in that hand.
   All four red 3s on one side score 800.
 - A black 3 discard blocks the next player from taking the pile.
+  Black 3s can be melded only by a player who goes out in that turn: three or four of them, with no wild card.
 - To take the pile, a player melds its top card: with two matching cards from the hand, with one matching card and a wild card, or on a meld of the side.
 - A pile with a wild card in it is frozen.
   The pile is also frozen for a side that has not melded yet.

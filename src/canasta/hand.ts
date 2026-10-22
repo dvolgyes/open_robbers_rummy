@@ -312,6 +312,7 @@ function applyMeld(hand: HandState, seat: Seat, ids: readonly string[]): Step {
 	if (!check.ok) return fail(check.reason);
 	const team = teamOf(seat);
 	if (hasMeldOfRank(hand.teams, team, check.rank)) return fail(SECOND_MELD);
+	if (blackThreesStay(check.rank, taken.rest)) return fail(BLACK_THREES);
 	const meld: Meld = {
 		id: `m${hand.nextMeldNo}`,
 		rank: check.rank,
@@ -348,6 +349,7 @@ function applyExtend(
 	const cards = [...existing.cards, ...taken.picked];
 	const check = validateMeld(cards, hand.rules, existing.rank);
 	if (!check.ok) return fail(check.reason);
+	if (blackThreesStay(check.rank, taken.rest)) return fail(BLACK_THREES);
 	const next: HandState = {
 		...hand,
 		hands: withHand(hand.hands, seat, taken.rest),
@@ -533,6 +535,15 @@ function takeFromHand(
 const SECOND_MELD =
 	"the side already has a meld of this rank; add the cards to it";
 
+/**
+ * Black threes are melded only by a player who goes out in this turn. The meld may leave one card, the discard
+ * that goes out; other melds come first.
+ */
+function blackThreesStay(rank: string, rest: readonly Card[]): boolean {
+	return rank === "3" && rest.length > 1;
+}
+const BLACK_THREES = "black threes can be melded only when going out";
+
 /** A side has at most one meld of each rank; cards of that rank join it through `extend`. */
 function hasMeldOfRank(teams: Teams, team: TeamIndex, rank: string): boolean {
 	return teamAt(teams, team).melds.some((meld) => meld.rank === rank);
@@ -593,9 +604,7 @@ function pickupCandidates(hand: HandState, seat: Seat): Action[] {
 function meldCandidates(hand: HandState, seat: Seat): Action[] {
 	const cards = hand.hands[seat] ?? [];
 	const ranks = new Set(
-		cards
-			.filter((card) => !isWild(card) && card.rank !== "3")
-			.map((card) => card.rank),
+		cards.filter((card) => !isWild(card)).map((card) => card.rank),
 	);
 	const actions: Action[] = [];
 	for (const rank of ranks) {

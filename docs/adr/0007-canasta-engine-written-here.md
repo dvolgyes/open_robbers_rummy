@@ -39,6 +39,9 @@ Evidence, checked on 2026-10-22:
     A side with all four red threes scores 800, or -800 without a meld.
   - A black three may be discarded at any time.
     Discarding it blocks the next player from taking the pile.
+  - A player who goes out in this turn may meld three or four black threes, with no wild card.
+    The engine accepts this meld only when it leaves the player at most one card, the discard that goes out, so the player lays the other melds first.
+    Amended 2026-10-22: before this change, the engine refused every meld of threes.
   - A pile that contains a wild card is frozen, and a frozen pile cannot be extended.
     A side that has not made its initial meld is also blocked from the pile, so it can take the pile only with two natural cards from its hand.
     Amended 2026-10-22: a frozen pile can go onto a meld of the side when the player adds a natural pair of that rank from the hand.

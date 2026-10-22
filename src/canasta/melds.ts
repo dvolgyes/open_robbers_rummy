@@ -1,4 +1,4 @@
-import { type Card, cardPoints, isWild, type Rank } from "./cards";
+import { type Card, cardPoints, isRed3, isWild, type Rank } from "./cards";
 import type { CanastaRules } from "./rules";
 
 export type TeamIndex = 0 | 1;
@@ -17,7 +17,8 @@ export type MeldCheck =
 
 /**
  * Validates a complete meld: at least three cards, at least two naturals of one rank, and at most
- * `maxWildsPerMeld` wilds. Threes are not melded in this ruleset.
+ * `maxWildsPerMeld` wilds. Red threes are never melded, and a meld of black threes holds no wild card; the hand
+ * allows a meld of black threes only when the player goes out.
  * An extension is validated by passing the existing cards together with the new ones.
  */
 export function validateMeld(
@@ -38,8 +39,15 @@ export function validateMeld(
 			reason: "the natural cards of a meld must share one rank",
 		};
 	}
-	if (first.rank === "3")
-		return { ok: false, reason: "threes cannot be melded" };
+	if (first.rank === "3") {
+		if (naturals.some(isRed3))
+			return { ok: false, reason: "red threes cannot be melded" };
+		if (wilds > 0)
+			return {
+				ok: false,
+				reason: "a meld of black threes cannot hold wild cards",
+			};
+	}
 	if (expectedRank !== undefined && first.rank !== expectedRank) {
 		return {
 			ok: false,
