@@ -763,7 +763,7 @@ function emptyView(
 
 /**
  * The frames on the viewer's cards in its turn. Gold marks the cards that the draw or the pickup gave, until the
- * next action. After it, green marks the natural cards that can extend a meld of the side; a wild card fits almost
+ * next action. After it, red marks the natural cards that can extend a meld of the side; a wild card fits almost
  * every meld, so it gets no frame.
  */
 function handFrames(

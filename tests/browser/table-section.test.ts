@@ -272,7 +272,7 @@ describe("table section", () => {
 		section.element.remove();
 	});
 
-	it("frames new cards in gold and cards that fit a meld in green, each with a mark and a title", () => {
+	it("frames new cards in gold and cards that fit a meld in red, each with a mark and a title", () => {
 		const base = turnView(afterDraw(), 1);
 		const [first, second] = base.own;
 		if (first === undefined || second === undefined)
