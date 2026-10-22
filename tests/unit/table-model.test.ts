@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+	type Action,
 	applyAction,
 	buildDecks,
 	type Card,
 	CLASSIC_RULES,
 	isBlack3,
 	isWild,
+	legalActions,
 	type MatchState,
 	type Meld,
 	scoreHand,
@@ -632,6 +634,95 @@ describe("melds on the table", () => {
 			"K",
 			"A",
 		]);
+	});
+});
+
+describe("frames on the cards of the hand", () => {
+	/** After the draw of the 9 of diamonds, the seat on turn holds 7s, a K, a 2 and a joker; its side has a meld of 7s. */
+	function drewNine(): MatchState {
+		const match = afterDraw(7);
+		const turn = match.hand.turn;
+		const side = {
+			melds: [
+				{
+					id: "m1",
+					rank: "7" as const,
+					team: teamOf(turn),
+					cards: cardsOf(["1-7C", "1-7D", "0-7D"]),
+				},
+			],
+			redThrees: [],
+			initialMade: true,
+		};
+		const teams = match.hand.teams;
+		const own = cardsOf(["0-7H", "1-7H", "0-KS", "0-2C", "0-JK0", "0-9D"]);
+		const hand = {
+			...match.hand,
+			teams: teamOf(turn) === 0 ? [side, teams[1]] : [teams[0], side],
+			hands: match.hand.hands.map((cards, index) =>
+				index === turn ? own : cards,
+			),
+			turnTaken: ["0-9D"],
+		} as MatchState["hand"];
+		return { ...match, hand: { ...hand, turnStart: hand } };
+	}
+	const viewOf = (match: MatchState) =>
+		tableView(inputFor(stateOf(match, 1), turnOf(match)));
+	function acted(match: MatchState, action: Action): MatchState {
+		const step = applyAction(match.hand, match.hand.turn, action);
+		if (!step.ok) throw new Error(step.reason);
+		return { ...match, hand: step.hand };
+	}
+
+	it("frames the drawn cards in gold until the first action after the draw, and nothing green before it", () => {
+		const view = viewOf(drewNine());
+		expect(view.taken).toEqual(["0-9D"]);
+		expect(view.fits).toEqual([]);
+	});
+
+	it("after the first action, frames in green the natural cards that fit a meld of the side, not the wild cards", () => {
+		const match = acted(drewNine(), {
+			type: "extend",
+			meldId: "m1",
+			cards: ["0-7H"],
+		});
+		const view = viewOf(match);
+		expect(view.taken).toEqual([]);
+		expect(view.fits).toEqual(["1-7H"]);
+	});
+
+	it("takes back the green frames and shows the gold again when the turn is reset", () => {
+		const match = acted(
+			acted(drewNine(), { type: "extend", meldId: "m1", cards: ["0-7H"] }),
+			{ type: "resetTurn" },
+		);
+		const view = viewOf(match);
+		expect(view.taken).toEqual(["0-9D"]);
+		expect(view.fits).toEqual([]);
+	});
+
+	it("keeps the gold on the cards from the pile until the first action after the pickup", () => {
+		const match = pairPickupMatch();
+		const pickup = legalActions(match.hand, match.hand.turn).find(
+			(action) => action.type === "takePile",
+		);
+		if (pickup === undefined) throw new Error("no pickup");
+		const taken = acted(match, pickup);
+		expect(viewOf(taken).taken.length).toBeGreaterThan(0);
+		expect(viewOf(taken).fits).toEqual([]);
+		const meld = legalActions(taken.hand, taken.hand.turn).find(
+			(action) => action.type === "meld" || action.type === "extend",
+		);
+		if (meld === undefined) throw new Error("no meld after the pickup");
+		expect(viewOf(acted(taken, meld)).taken).toEqual([]);
+	});
+
+	it("shows no frames to a player who is not on turn", () => {
+		const match = drewNine();
+		const other = SEATS.find((seat) => seat !== turnOf(match)) ?? "N";
+		const view = tableView(inputFor(stateOf(match, 1), other));
+		expect(view.taken).toEqual([]);
+		expect(view.fits).toEqual([]);
 	});
 });
 

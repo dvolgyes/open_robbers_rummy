@@ -272,6 +272,29 @@ describe("table section", () => {
 		section.element.remove();
 	});
 
+	it("frames new cards in gold and cards that fit a meld in green, each with a mark and a title", () => {
+		const base = turnView(afterDraw(), 1);
+		const [first, second] = base.own;
+		if (first === undefined || second === undefined)
+			throw new Error("no cards");
+		const section = mount([]);
+		section.render({ ...base, taken: [first.id], fits: [second.id] });
+		const card = (id: string) =>
+			section.element.querySelector<HTMLElement>(`[data-card="${id}"]`);
+		expect(card(first.id)?.className).toContain("taken");
+		expect(card(first.id)?.title).toBe("New this turn");
+		expect(card(second.id)?.className).toContain("fits");
+		expect(card(second.id)?.title).toBe("Fits a meld of your side");
+		const frame = (id: string) => getComputedStyle(card(id) as Element);
+		expect(frame(second.id).borderTopColor).not.toBe(
+			frame(first.id).borderTopColor,
+		);
+		expect(
+			getComputedStyle(card(second.id) as Element, "::after").content,
+		).not.toBe("none");
+		section.element.remove();
+	});
+
 	it("offers to take the pile with a pair from the hand before any card is selected", () => {
 		const acted: Action[] = [];
 		const section = mount(acted);

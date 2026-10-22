@@ -353,14 +353,19 @@ export function tableSection(
 		paintHand();
 	}
 
-	function cardButton(card: CardView, taken: boolean): HTMLButtonElement {
+	function cardButton(
+		card: CardView,
+		taken: boolean,
+		fits: boolean,
+	): HTMLButtonElement {
 		const chosen = selected.has(card.id);
 		const node = button(card.text, () => toggleCard(card.id), {
-			className: `card${isRed(card.suit) ? " red" : ""}${card.suit === null ? " joker" : ""}${chosen ? " selected" : ""}${taken ? " taken" : ""}`,
+			className: `card${isRed(card.suit) ? " red" : ""}${card.suit === null ? " joker" : ""}${chosen ? " selected" : ""}${taken ? " taken" : ""}${fits ? " fits" : ""}`,
 			attrs: {
 				"data-card": card.id,
 				"aria-pressed": String(chosen),
 				...(taken ? { title: t("New this turn") } : {}),
+				...(fits ? { title: t("Fits a meld of your side") } : {}),
 			},
 		});
 		return node;
@@ -381,6 +386,7 @@ export function tableSection(
 			order,
 			view.own,
 			view.taken,
+			view.fits,
 			[...selected],
 			offered,
 			view.yourTurn,
@@ -388,9 +394,10 @@ export function tableSection(
 		if (key === paintedKey) return;
 		paintedKey = key;
 		const taken = new Set(view.taken);
+		const fits = new Set(view.fits);
 		ownHand.replaceChildren(
 			...sortHand(view.own, order).map((card) =>
-				cardButton(card, taken.has(card.id)),
+				cardButton(card, taken.has(card.id), fits.has(card.id)),
 			),
 		);
 		sortButton.textContent = t(

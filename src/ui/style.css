@@ -16,6 +16,7 @@
 	--card-fg: #1d1d1b;
 	--red-suit: #c0262d;
 	--gold: #c8960c;
+	--fit: #1f9a4f;
 	--call-green: #1f7a46;
 	--call-orange: #c75b00;
 	--tile-bg: #2f5f47;
@@ -1324,6 +1325,30 @@ main[data-screen="table"] > .room {
 	right: 0.2rem;
 	color: var(--gold);
 	font-size: calc(var(--card-h) * 0.16);
+	line-height: 1;
+}
+
+/* After the first action of the turn, a natural card that can extend a meld of the side: a green frame and a plus. */
+.card.fits {
+	position: relative;
+	border-color: var(--fit);
+	box-shadow: 0 0 0 2px var(--fit);
+}
+
+.card.fits.selected {
+	box-shadow:
+		inset 0 0 0 2px var(--accent),
+		0 0 0 2px var(--fit);
+}
+
+.card.fits::after {
+	content: "+";
+	position: absolute;
+	top: 0.1rem;
+	right: 0.2rem;
+	color: var(--fit);
+	font-size: calc(var(--card-h) * 0.18);
+	font-weight: 700;
 	line-height: 1;
 }
 

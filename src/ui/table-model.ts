@@ -2,6 +2,7 @@ import { cardsById } from "../bot/canasta-text";
 import {
 	type Action,
 	actionsWithCards,
+	applyAction,
 	type Card,
 	CLASSIC_RULES,
 	type HandView,
@@ -694,8 +695,10 @@ export interface TableView {
 	readonly seats: readonly SeatView[];
 	/** The viewer's hand in engine order; the screen sorts it. */
 	readonly own: readonly CardView[];
-	/** The ids of the viewer's cards that this turn drew or took from the pile. */
+	/** The ids of the viewer's cards that the draw or the pickup of this turn gave, until the next action. */
 	readonly taken: readonly string[];
+	/** After that action, the ids of the viewer's natural cards that can extend a meld of its side. */
+	readonly fits: readonly string[];
 	readonly stockCount: number;
 	readonly pile: PileView;
 	/** The legal actions of the viewer now; empty unless it is the viewer's turn and no command is in flight. */
@@ -750,6 +753,7 @@ function emptyView(
 		seats: [],
 		own: [],
 		taken: [],
+		fits: [],
 		stockCount: 0,
 		pile: { top: undefined, count: 0, frozen: false },
 		options: [],
@@ -757,6 +761,40 @@ function emptyView(
 		winner: "",
 		lines: [],
 	};
+}
+
+/**
+ * The frames on the viewer's cards in its turn. Gold marks the cards that the draw or the pickup gave, until the
+ * next action. After it, green marks the natural cards that can extend a meld of the side; a wild card fits almost
+ * every meld, so it gets no frame.
+ */
+function handFrames(
+	match: MatchState,
+	seat: Seat,
+	view: HandView,
+): Pick<TableView, "taken" | "fits"> {
+	const hand = match.hand;
+	const turn = engineSeat(seat);
+	if (view.phase !== "play" || view.outcome !== null || hand.turn !== turn)
+		return { taken: [], fits: [] };
+	// A pickup is the first action of its turn; a draw is not an action, because the turn cannot take it back.
+	const pickedUp = hand.turnStart.phase === "draw";
+	if (hand.turnActions === (pickedUp ? 1 : 0))
+		return { taken: view.taken, fits: [] };
+	const melds = view.teams[teamOf(turn)].melds;
+	const fits = view.own.filter(
+		(card) =>
+			!isWild(card) &&
+			melds.some(
+				(meld) =>
+					applyAction(hand, turn, {
+						type: "extend",
+						meldId: meld.id,
+						cards: [card.id],
+					}).ok,
+			),
+	);
+	return { taken: [], fits: fits.map((card) => card.id) };
 }
 
 /** What the viewer on turn can do now; when the pile cannot be taken before the draw, the prompt says why. */
@@ -946,7 +984,7 @@ export function tableView(input: TableViewInput): TableView {
 			},
 		),
 		own: view.own.map((card) => cardView(card, t)),
-		taken: view.taken,
+		...handFrames(match, seat, view),
 		stockCount: view.stockCount,
 		pile: {
 			top: top === undefined ? undefined : cardView(top, t),

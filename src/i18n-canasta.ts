@@ -459,6 +459,17 @@ const rows: readonly CanastaRow[] = [
 		"Nieuw in deze beurt",
 	],
 	[
+		"Fits a meld of your side",
+		"Passt zu einer Auslage eurer Seite",
+		"Illik a kirakásotok egyikéhez",
+		"Passer til en kombinasjon på siden deres",
+		"Encaja en una combinación de tu equipo",
+		"Encaixa num jogo da sua equipa",
+		"Va sur une combinaison de votre camp",
+		"Si aggiunge a una combinazione della vostra coppia",
+		"Past bij een combinatie van jullie kant",
+	],
+	[
 		"Sort by suit",
 		"Nach Farbe sortieren",
 		"Rendezés szín szerint",
