@@ -162,6 +162,64 @@ describe("hand flow", () => {
 		expect(hand.hands.map((cards) => cards.length)).toEqual([11, 11, 11, 11]);
 	});
 
+	it("turns more starter cards while the top one is wild or a red three, and freezes the pile for both sides", () => {
+		const starters = Array.from({ length: 400 }, (_, seed) =>
+			newHand({ teamScores: [0, 0], dealer: 0, seed }),
+		).filter((hand) => hand.pile.length > 1);
+		const under = starters.flatMap((hand) => hand.pile.slice(0, -1));
+		expect(under.some(isWild)).toBe(true);
+		expect(under.some(isRed3)).toBe(true);
+		for (const hand of starters) {
+			expect(cardTotal(hand)).toBe(108);
+			const top = hand.pile.at(-1);
+			expect(top !== undefined && !isWild(top) && !isRed3(top)).toBe(true);
+			expect(
+				hand.pile.slice(0, -1).every((card) => isWild(card) || isRed3(card)),
+			).toBe(true);
+			const melded = scenario(hand, {
+				teams: [
+					{ ...hand.teams[0], initialMade: true },
+					{ ...hand.teams[1], initialMade: true },
+				],
+			});
+			expect(viewFor(melded, 0).pileFrozen).toBe(true);
+			expect(viewFor(melded, 1).pileFrozen).toBe(true);
+		}
+	});
+
+	it("puts a red three from the pile with the taker's red threes, with no replacement card", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			hands: [[], cardsById(["0-7H", "1-7H", "0-2S", "0-KS", "0-9D"]), [], []],
+			pile: cardsById(["0-3H", "0-7D"]),
+			teams: [
+				{ ...base.teams[0], redThrees: [] },
+				{ melds: [], redThrees: [], initialMade: true },
+			],
+		});
+		expect(
+			applyAction(hand, 1, { type: "takePile", cards: ["0-7H", "0-2S"] }),
+		).toEqual({
+			ok: false,
+			reason: "a frozen pile needs two natural cards from your hand",
+		});
+		const taken = applyAction(hand, 1, {
+			type: "takePile",
+			cards: ["0-7H", "1-7H"],
+		});
+		if (!taken.ok) throw new Error(taken.reason);
+		expect(taken.hand.teams[1].redThrees.map((card) => card.id)).toEqual([
+			"0-3H",
+		]);
+		expect(taken.hand.hands[1]?.map((card) => card.id).sort()).toEqual(
+			["0-2S", "0-9D", "0-KS"].sort(),
+		);
+		expect(taken.hand.stock).toHaveLength(hand.stock.length);
+		expect(taken.hand.turnTaken).toEqual([]);
+	});
+
 	it("deals the same hand for the same seed", () => {
 		const first = newHand({ teamScores: [0, 0], dealer: 2, seed: 99 });
 		const second = newHand({ teamScores: [0, 0], dealer: 2, seed: 99 });

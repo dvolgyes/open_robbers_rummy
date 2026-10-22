@@ -42,6 +42,10 @@ Evidence, checked on 2026-10-22:
     Amended 2026-10-22: a frozen pile can go onto a meld of the side when the player adds a natural pair of that rank from the hand.
     Pagat says that this meld "could be the same rank as an existing meld belonging to your partnership, in which case the melds are then merged".
     Before this change, the engine refused every frozen pickup onto a meld.
+  - When the starter card of the pile is a wild card or a red three, more cards are turned onto it until the top card is neither.
+    The card under the top freezes the pile against both sides.
+    A player who takes such a pile puts the red three with the side's red threes and draws no replacement card.
+    Amended 2026-10-22: before this change, a red three starter went to the bottom of the stock, and a wild starter stayed as the only pile card.
   - A side has at most one meld of each rank.
     Pagat: "It is not allowed for one partnership to have two separate melds of the same rank."
     A new meld or a pickup of a rank that the side already melded is refused, and the same cards are offered as an extension of that meld.

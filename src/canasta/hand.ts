@@ -102,7 +102,7 @@ export function newHand(input: NewHandInput): HandState {
 		teamRed[teamOf(seat)].push(...dealt.redThrees);
 		stock = dealt.rest;
 	}
-	const starter = turnStarter(stock);
+	const starter = turnStarters(stock);
 	const teams: Teams = [
 		{ melds: [], redThrees: teamRed[0], initialMade: false },
 		{ melds: [], redThrees: teamRed[1], initialMade: false },
@@ -115,7 +115,7 @@ export function newHand(input: NewHandInput): HandState {
 		phase: "draw",
 		hands,
 		stock: starter.rest,
-		pile: [starter.card],
+		pile: starter.pile,
 		teams,
 		turnMeldPoints: 0,
 		turnActions: 0,
@@ -144,16 +144,24 @@ function drawFromStock(
 	return { drawn, redThrees, rest: stock.slice(index) };
 }
 
-/** The starter becomes the first pile card. A red three is put back at the bottom of the stock. */
-function turnStarter(stock: readonly Card[]): { card: Card; rest: Card[] } {
-	let rest = [...stock];
-	for (;;) {
-		const [card, ...others] = rest;
-		if (card === undefined)
-			throw new Error("the stock ran out before a starter card was found");
-		if (!isRed3(card)) return { card, rest: others };
-		rest = [...others, card];
+/** Starts the pile with the top stock card, and turns more cards onto it while the top one freezes the pile. */
+function turnStarters(stock: readonly Card[]): { pile: Card[]; rest: Card[] } {
+	const pile: Card[] = [];
+	for (const card of stock) {
+		pile.push(card);
+		if (!freezesPile(card)) return { pile, rest: stock.slice(pile.length) };
 	}
+	throw new Error("the stock ran out before a starter card was found");
+}
+
+/** A wild card or a red three in the pile freezes it against both sides. */
+function freezesPile(card: Card): boolean {
+	return isWild(card) || isRed3(card);
+}
+
+/** Whether the side can take the pile only with a natural pair from the hand. */
+export function pileFrozenFor(hand: HandState, team: TeamIndex): boolean {
+	return hand.pile.some(freezesPile) || !initialSatisfied(hand, team);
 }
 
 export function applyAction(hand: HandState, seat: Seat, action: Action): Step {
@@ -235,9 +243,8 @@ function applyTakePile(
 	if (isWild(top) || isBlack3(top))
 		return fail("the top card of the pile cannot be picked up");
 	const team = teamOf(seat);
-	// A pile with a wild card is frozen, and so is the pile of a side that has not made its initial meld.
 	// A frozen pile can still go onto a meld of the side, but only with the natural pair that this check asks for.
-	const frozen = hand.pile.some(isWild) || !initialSatisfied(hand, team);
+	const frozen = pileFrozenFor(hand, team);
 	const taken = takeFromHand(hand.hands[seat] ?? [], ids);
 	if (!taken.ok) return taken;
 	if (frozen && (taken.picked.length < 2 || taken.picked.some(isWild)))
@@ -269,13 +276,18 @@ function applyTakePile(
 		if (!check.ok) return fail(check.reason);
 		teams = replaceMeld(teams, team, { ...existing, cards });
 	}
-	const rest = hand.pile.slice(0, -1);
+	// A red three that started the pile goes to the side's red threes, and no card replaces it.
+	const rest = hand.pile.slice(0, -1).filter((card) => !isRed3(card));
+	const redThrees = hand.pile.filter(isRed3);
 	const cards = [...taken.rest, ...rest];
 	const next: HandState = {
 		...hand,
 		hands: withHand(hand.hands, seat, cards),
 		pile: [],
-		teams,
+		teams: withTeam(teams, team, {
+			...teamAt(teams, team),
+			redThrees: [...teamAt(teams, team).redThrees, ...redThrees],
+		}),
 		nextMeldNo,
 		// The top card counts toward the initial meld; the rest of the pile does not.
 		turnMeldPoints: hand.turnMeldPoints + meldPoints(pileMeld),
