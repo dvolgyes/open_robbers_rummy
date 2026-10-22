@@ -24,16 +24,20 @@ import {
 	SEAT_NAMES,
 	SOUND,
 	setCallRelayOnly,
+	TILE_NAMES,
 } from "./call-probe";
 import type { CallReceived, CallView, Harness } from "./harness/main";
 import { Player, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
 	createRoom,
+	expectSeat,
+	openDrawer,
 	pick,
 	rosterSeat,
 	type SeatKey,
-	YOU,
+	TURN_ORDER,
+	takeTurn,
 } from "./room";
 
 /**
@@ -83,16 +87,16 @@ async function openHarness(browser: Browser): Promise<HarnessPage> {
 	page.on("console", (message) => consoleTexts.push(message.text()));
 	page.on("pageerror", (error) => harnessErrors.push(error.message));
 	await page.goto(HARNESS);
-	await page.waitForFunction(() => window.lbHarness !== undefined);
+	await page.waitForFunction(() => window.ocHarness !== undefined);
 	return { context, page };
 }
 
 function harnessView(page: Page): Promise<TableView | null> {
-	return page.evaluate(() => (window.lbHarness as Harness).view());
+	return page.evaluate(() => (window.ocHarness as Harness).view());
 }
 
 function callView(page: Page): Promise<CallView> {
-	return page.evaluate(() => (window.lbHarness as Harness).callView());
+	return page.evaluate(() => (window.ocHarness as Harness).callView());
 }
 
 /**
@@ -108,7 +112,7 @@ async function readyPeers(page: Page): Promise<number> {
 /** The harness page takes `seat` from the lobby and waits until its commands reach the host. */
 async function takeSeat(page: Page, seat: Seat): Promise<void> {
 	await page.evaluate(
-		(key) => (window.lbHarness as Harness).openTable(key),
+		(key) => (window.ocHarness as Harness).openTable(key),
 		tableKey,
 	);
 	await expect
@@ -118,7 +122,7 @@ async function takeSeat(page: Page, seat: Seat): Promise<void> {
 		.toBe(true);
 	expect(
 		await page.evaluate(
-			(chosen) => (window.lbHarness as Harness).choose(chosen),
+			(chosen) => (window.ocHarness as Harness).choose(chosen),
 			seat,
 		),
 	).toEqual({ ok: true });
@@ -143,7 +147,7 @@ function raw(
 ): Promise<void> {
 	return page.evaluate(
 		([to, toGen, fromGen, msg]) =>
-			(window.lbHarness as Harness).callRaw(to, toGen, fromGen, msg),
+			(window.ocHarness as Harness).callRaw(to, toGen, fromGen, msg),
 		[to, toGen, fromGen, msg] as const,
 	);
 }
@@ -245,24 +249,6 @@ async function expectAt(at: number): Promise<void> {
 		await expect(table(page)).toHaveAttribute("data-at", String(at));
 }
 
-async function bid(seat: SeatKey, at: number, code: string): Promise<void> {
-	await expectAt(at);
-	await tab[seat]
-		.getByTestId("bid-box")
-		.locator(`button[data-call="${code}"]`)
-		.click();
-}
-
-/** In the tab of `seat`, plays the first card that the tab offers from the hand of `from`. */
-async function play(seat: SeatKey, from: SeatKey, at: number): Promise<void> {
-	await expectAt(at);
-	await tab[seat]
-		.getByTestId(`hand-${from}`)
-		.locator("button.card:enabled")
-		.first()
-		.click();
-}
-
 // Addresses in the text a person or a report could see: IPv4, IPv6 (full or with "::"), and the mDNS names that
 // browsers give as host candidates.
 const ADDRESS_PATTERNS = [
@@ -336,13 +322,15 @@ test("1: West, North and East join with audio; South's seat is held by a modifie
 	tableKey = key;
 	south = await openHarness(browser);
 	await takeSeat(south.page, "S");
-	// The tiles come with the first board, which the hosting page deals once all four seats are present.
+	// The tiles come with the first hand, which the hosting page deals once all four seats are present.
 	for (const seat of IN_CALL)
-		await expect(table(tab[seat])).toHaveAttribute("data-phase", "auction");
+		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play");
 	for (const seat of IN_CALL) await joinWith(tab[seat], "Audio only");
 	await expectConnected(IN_CALL);
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "S")).toHaveText("South · Not in call");
+		await expect(caption(tab[seat], "S")).toHaveText(
+			"S - player2 · Not in call",
+		);
 });
 
 test("2: frames from a page without a seat, or for another generation, of an unknown type, or without a target reach the browsers and change nothing", async ({
@@ -351,7 +339,7 @@ test("2: frames from a page without a seat, or for another generation, of an unk
 	const page = await openHarness(browser);
 	visitor = page;
 	await page.page.evaluate(
-		(key) => (window.lbHarness as Harness).openTable(key),
+		(key) => (window.ocHarness as Harness).openTable(key),
 		tableKey,
 	);
 	await expect
@@ -515,10 +503,12 @@ test("4: a valid join from South opens links; after South goes and its seat is r
 	};
 	// The positive control: South's own join through call signaling reaches each in-call seat. North and East
 	// make the first offer to South (the earlier seat offers); West waits for South's offer.
-	await south.page.evaluate(() => (window.lbHarness as Harness).callOpen());
-	await south.page.evaluate(() => (window.lbHarness as Harness).callSend(null));
+	await south.page.evaluate(() => (window.ocHarness as Harness).callOpen());
+	await south.page.evaluate(() => (window.ocHarness as Harness).callSend(null));
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "S")).not.toHaveText("South · Not in call");
+		await expect(caption(tab[seat], "S")).not.toHaveText(
+			"S - player2 · Not in call",
+		);
 	for (const seat of ["N", "E"] as const)
 		await expect
 			.poll(async () => (await counts(tab[seat])).peers)
@@ -526,7 +516,7 @@ test("4: a valid join from South opens links; after South goes and its seat is r
 	await expect
 		.poll(async () => {
 			const received: readonly CallReceived[] = await south.page.evaluate(() =>
-				(window.lbHarness as Harness).callReceived(),
+				(window.ocHarness as Harness).callReceived(),
 			);
 			return [...new Set(received.map((message) => message.from))].sort();
 		})
@@ -534,13 +524,13 @@ test("4: a valid join from South opens links; after South goes and its seat is r
 
 	// The old holder's stored status is in the call, with audio.
 	const stored: SubmitResult = await south.page.evaluate(() =>
-		(window.lbHarness as Harness).sendMedia(1, false),
+		(window.ocHarness as Harness).sendMedia(1, false),
 	);
 	expect(stored).toEqual({ ok: true });
 	await expect
 		.poll(async () => {
 			const records: CallRecords = await south.page.evaluate(() =>
-				(window.lbHarness as Harness).media(),
+				(window.ocHarness as Harness).media(),
 			);
 			return records.S?.prefs.inCall;
 		})
@@ -548,9 +538,12 @@ test("4: a valid join from South opens links; after South goes and its seat is r
 
 	await south.context.close();
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "S")).toHaveText("South · Not in call", {
-			timeout: GONE_MS,
-		});
+		await expect(caption(tab[seat], "S")).toHaveText(
+			"S - player2 · Not in call",
+			{
+				timeout: GONE_MS,
+			},
+		);
 	for (const seat of ["N", "E"] as const)
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(2);
 	await expect(rosterSeat(tab.W, "S")).toHaveAttribute(
@@ -560,6 +553,7 @@ test("4: a valid join from South opens links; after South goes and its seat is r
 			timeout: GONE_MS,
 		},
 	);
+	await openDrawer(tab.W);
 	await tab.W.getByTestId("release-S").click();
 	await tab.W.getByTestId("confirm-release-S").click();
 	await expect(rosterSeat(tab.W, "S")).toHaveAttribute("data-state", "free");
@@ -578,7 +572,9 @@ test("4: a valid join from South opens links; after South goes and its seat is r
 	});
 	expect(await requestsFor(tab.S, "audio")).toBe(0);
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "S")).toHaveText("South · Not in call");
+		await expect(caption(tab[seat], "S")).toHaveText(
+			"S - player2 · Not in call",
+		);
 
 	await joinWith(tab.S, "Audio only");
 	await expectConnected(SEATS);
@@ -588,7 +584,9 @@ test("5: when one player leaves, the other three pairs keep their sound", async 
 	await leaveButton(tab.S).click();
 	for (const seat of IN_CALL) {
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(2);
-		await expect(caption(tab[seat], "S")).toHaveText("South · Not in call");
+		await expect(caption(tab[seat], "S")).toHaveText(
+			"S - player2 · Not in call",
+		);
 	}
 	for (const seat of IN_CALL) {
 		const growth = await peerAudioGrowth(tab[seat]);
@@ -612,16 +610,19 @@ test("6: leaving the room during the call ends the tracks and the links; back in
 		})
 		.toEqual({ openPeers: 0, liveTracks: 0 });
 	for (const seat of ["W", "N"] as const) {
-		await expect(caption(tab[seat], "E")).toHaveText("East · Not in call", {
-			timeout: GONE_MS,
-		});
+		await expect(caption(tab[seat], "E")).toHaveText(
+			"E - player3 · Not in call",
+			{
+				timeout: GONE_MS,
+			},
+		);
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(1);
 	}
 
 	await tab.E.evaluate((hash) => {
 		location.hash = hash;
 	}, new URL(link).hash);
-	await expect(tab.E.getByTestId("you")).toHaveText(YOU.E, {
+	await expectSeat(tab.E, "E", {
 		timeout: CONNECT_MS,
 	});
 	// East joined with audio in test 1 and did not leave the call, so its stored status brings it back.
@@ -629,12 +630,14 @@ test("6: leaving the room during the call ends the tracks and the links; back in
 	await expectConnected(IN_CALL);
 });
 
-test("7: a browser limited to relays gets Retry for each of its pairs, the other pairs connect, and its player still bids and plays", async () => {
+test("7: a browser limited to relays gets Retry for each of its pairs, the other pairs connect, and its player still plays", async () => {
 	test.setTimeout(240_000);
 	await leaveButton(tab.N).click();
 	await expect(joinButton(tab.N)).toBeVisible();
 	for (const seat of ["W", "E"] as const)
-		await expect(caption(tab[seat], "N")).toHaveText("North · Not in call");
+		await expect(caption(tab[seat], "N")).toHaveText(
+			"N - player1 · Not in call",
+		);
 	await setCallRelayOnly(tab.N, true);
 	await joinWith(tab.S, "Audio only");
 	const others = ["W", "E", "S"] as const;
@@ -650,10 +653,10 @@ test("7: a browser limited to relays gets Retry for each of its pairs, the other
 			`North offers Retry for ${seat}`,
 		).toBeVisible({ timeout: UNAVAILABLE_WITHIN_MS });
 		await expect(caption(tab.N, seat)).toHaveText(
-			`${SEAT_NAMES[seat]} · Direct connection unavailable`,
+			`${TILE_NAMES[seat]} · Direct connection unavailable`,
 		);
 		await expect(caption(tab[seat], "N")).toHaveText(
-			"North · Direct connection unavailable",
+			"N - player1 · Direct connection unavailable",
 			{ timeout: UNAVAILABLE_WITHIN_MS },
 		);
 	}
@@ -663,17 +666,11 @@ test("7: a browser limited to relays gets Retry for each of its pairs, the other
 			names(...others.filter((other) => other !== seat)),
 		);
 
-	// Board 1 (dealt in test 1): North opens 1♣, the others pass, East leads, and North plays from dummy and hand.
-	await bid("N", 0, "1C");
-	await bid("E", 1, "P");
-	await bid("S", 2, "P");
-	await bid("W", 3, "P");
-	for (const page of Object.values(tab))
-		await expect(table(page)).toHaveAttribute("data-phase", "play");
-	await play("E", "E", 4);
-	await play("N", "S", 5);
-	await play("W", "W", 6);
-	await play("N", "N", 7);
+	// Hand 1 (dealt in test 1): each seat takes one turn, and North acts over its relay-only links.
+	for (const [index, seat] of TURN_ORDER.entries()) {
+		await expectAt(index * 2);
+		await takeTurn(tab[seat], index * 2);
+	}
 	await expectAt(8);
 });
 

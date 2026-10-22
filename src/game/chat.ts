@@ -48,6 +48,16 @@ export function chatPayload(roomId: string, text: string): JsonObject {
 	return { v: PROTOCOL_VERSION, roomId, type: "chat", text };
 }
 
+/** Chat commands, as opposed to table actions and call status. */
+export function isChatCommand(payload: unknown): boolean {
+	return isObject(payload) && payload.type === "chat";
+}
+
+/** Chat events (`{fromName, text}`): every other event has a `kind`. */
+export function isChatEvent(event: JsonObject): boolean {
+	return event.kind === undefined;
+}
+
 export interface ChatEvent {
 	readonly seq: number;
 	readonly commandId: string;

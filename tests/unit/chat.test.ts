@@ -99,7 +99,7 @@ describe("chatModule.apply", () => {
 		).toBe(false);
 		expect(
 			chatModule.apply(
-				{ ...initial(), game: "bridge" },
+				{ ...initial(), game: "canasta" },
 				CONTEXT,
 				chatPayload(ROOM_ID, "hi"),
 			).ok,

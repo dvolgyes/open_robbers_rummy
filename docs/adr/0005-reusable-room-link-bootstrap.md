@@ -1,6 +1,8 @@
 # ADR 0005: Reusable room links bootstrap an expired room
 
 Status: accepted (2026-10-20).
+Amended on 2026-10-22: a page that has a host's lobby claims the host seat from that host and never seeds a table.
+Before this note, a new browser that chose the configured host seat from a live host's lobby started a second table with itself as host, and the live host then refused it as superseded.
 
 ## Context
 

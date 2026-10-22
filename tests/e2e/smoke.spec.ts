@@ -8,10 +8,10 @@ import {
 	pick,
 	picks,
 	sendDraft,
-	YOU,
+	takeTurn,
 } from "./room";
 
-test("one browser: create, three seats from one link, ordered messages", async ({
+test("one browser: create, three seats from one link, ordered messages, and a reset vote", async ({
 	browser,
 	baseURL,
 }) => {
@@ -31,9 +31,12 @@ test("one browser: create, three seats from one link, ordered messages", async (
 		for (const { seat, choices } of order) {
 			const page = await player.page(link);
 			if (choices === 1) {
-				await expect(page.getByTestId("you")).toHaveText(YOU[seat], {
-					timeout: CONNECT_MS,
-				});
+				await expect(
+					page
+						.getByTestId("roster")
+						.locator(`li[data-seat="${seat}"]`)
+						.getByText("You", { exact: true }),
+				).toBeAttached({ timeout: CONNECT_MS });
 			} else {
 				await expect(
 					page.getByRole("heading", { name: "Choose your seat" }),
@@ -45,6 +48,8 @@ test("one browser: create, three seats from one link, ordered messages", async (
 		}
 
 		for (const page of [host, ...guests]) {
+			// The players and the connection note sit in the drawer, which is closed by default.
+			await page.getByTestId("room-drawer").locator("summary").first().click();
 			await expect(
 				page.getByTestId("roster").locator('li[data-state="online"]'),
 			).toHaveCount(4, { timeout: CONNECT_MS });
@@ -69,6 +74,27 @@ test("one browser: create, three seats from one link, ordered messages", async (
 			await expect(page.getByTestId("pending").locator("li")).toHaveCount(0);
 			await expect(page.getByTestId("banner")).toBeHidden();
 		}
+		// East opens hand 1. West asks for a reset; the three others approve, and the host deals a new match.
+		const east = guests[1];
+		if (east === undefined) throw new Error("East has no page");
+		await takeTurn(east, 0);
+		await host.getByTestId("reset").click();
+		await expect(host.getByTestId("reset-decision")).toContainText(
+			"to approve the reset",
+		);
+		for (const page of guests) {
+			const decision = page.getByTestId("reset-decision");
+			await expect(decision).toContainText("asks to reset the game");
+			await decision.getByRole("button", { name: "Approve reset" }).click();
+		}
+		for (const page of [host, ...guests]) {
+			const table = page.getByTestId("table");
+			await expect(table).toHaveAttribute("data-hand", "1");
+			await expect(table).toHaveAttribute("data-at", "0");
+			await expect(page.getByTestId("reset-decision")).toBeHidden();
+			await expect(lines(page).locator(".text")).toHaveText(expected);
+		}
+		await takeTurn(east, 0);
 		expect(player.errors).toEqual([]);
 		expect(player.supabaseRequests).toBe(0);
 	} finally {

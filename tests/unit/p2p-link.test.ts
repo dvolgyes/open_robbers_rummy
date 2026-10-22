@@ -52,8 +52,8 @@ describe("parseRoute", () => {
 
 	it("reads the table link that it writes", () => {
 		expect(parseRoute(tableFragment(KEY))).toEqual({ kind: "table", key: KEY });
-		const link = tableLink("https://example.org/bridge/?x=1#old", KEY);
-		expect(link).toBe(`https://example.org/bridge/?x=1#v=p2p-v1&k=${KEY}`);
+		const link = tableLink("https://example.org/canasta/?x=1#old", KEY);
+		expect(link).toBe(`https://example.org/canasta/?x=1#v=p2p-v1&k=${KEY}`);
 		expect(parseRoute(new URL(link).hash)).toEqual({ kind: "table", key: KEY });
 	});
 

@@ -10,6 +10,7 @@ import {
 	rejoinButton,
 	requestsFor,
 	SEAT_NAMES,
+	TILE_NAMES,
 	toggle,
 } from "./call-probe";
 import { Player, reportNetwork } from "./player";
@@ -17,10 +18,10 @@ import {
 	CONNECT_MS,
 	createRoom,
 	expectBanner,
+	expectSeat,
 	hostRows,
 	pick,
 	type SeatKey,
-	YOU,
 } from "./room";
 
 /**
@@ -60,7 +61,7 @@ function heard(viewer: SeatKey, other: SeatKey): string {
 		: SWITCHES[other].send
 			? "Audio only"
 			: "Mic off";
-	return `${SEAT_NAMES[other]} · ${text}`;
+	return `${TILE_NAMES[other]} · ${text}`;
 }
 
 /** Each seat in `seats` shows its own switches, and the stored switches of every other seat in `seats`. */
@@ -109,7 +110,7 @@ async function crash(seat: SeatKey): Promise<void> {
 
 async function reopen(seat: SeatKey): Promise<void> {
 	tab[seat] = await players[seat].page(link);
-	await expect(tab[seat].getByTestId("you")).toHaveText(YOU[seat], {
+	await expectSeat(tab[seat], seat, {
 		timeout: CONNECT_MS,
 	});
 }
@@ -156,12 +157,12 @@ test("1: four browsers join the call; North turns its microphone off, and East s
 	}
 	// South is the last free seat, so its page takes it without a picker.
 	tab.S = await players.S.page(link);
-	await expect(tab.S.getByTestId("you")).toHaveText(YOU.S, {
+	await expectSeat(tab.S, "S", {
 		timeout: CONNECT_MS,
 	});
-	// The tiles come with the first board, which the hosting page deals once all four seats are present.
+	// The tiles come with the first hand, which the hosting page deals once all four seats are present.
 	for (const seat of SEATS)
-		await expect(table(tab[seat])).toHaveAttribute("data-phase", "auction");
+		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play");
 	for (const seat of SEATS) await joinWith(tab[seat], "Audio only");
 	await toggle(tab.N, "Send mic audio").click();
 	await toggle(tab.E, "Hear others: receive audio").click();
@@ -175,9 +176,12 @@ test("2: a player whose tab crashes comes back in the call with its switches, an
 	await crash("N");
 	const others = ["W", "E", "S"] as const;
 	for (const seat of others)
-		await expect(caption(tab[seat], "N")).toHaveText("North · Not in call", {
-			timeout: GONE_MS,
-		});
+		await expect(caption(tab[seat], "N")).toHaveText(
+			"N - player1 · Not in call",
+			{
+				timeout: GONE_MS,
+			},
+		);
 	await expectConnected(others);
 
 	await reopen("N");
@@ -193,9 +197,12 @@ test("3: the host's tab crashes; the call goes on, another player becomes the ho
 	await crash("W");
 	const others = ["N", "E", "S"] as const;
 	for (const seat of others)
-		await expect(caption(tab[seat], "W")).toHaveText("West · Not in call", {
-			timeout: GONE_MS,
-		});
+		await expect(caption(tab[seat], "W")).toHaveText(
+			"W - player4 · Not in call",
+			{
+				timeout: GONE_MS,
+			},
+		);
 	await expectBanner(tab.E, "waiting-for-host");
 	// The host change does not touch the call between the other seats.
 	await expectConnected(others);
@@ -220,7 +227,7 @@ test("4: a browser that must ask for the microphone again offers Rejoin the call
 	// The browser forgets the microphone permission, as after "Allow this time".
 	await tab.S.context().clearPermissions();
 	await tab.S.reload();
-	await expect(tab.S.getByTestId("you")).toHaveText(YOU.S, {
+	await expectSeat(tab.S, "S", {
 		timeout: CONNECT_MS,
 	});
 	await expect(rejoinButton(tab.S)).toBeVisible({ timeout: CONNECT_MS });
@@ -233,9 +240,12 @@ test("4: a browser that must ask for the microphone again offers Rejoin the call
 	});
 	expect(await requestsFor(tab.S, "audio")).toBe(0);
 	for (const seat of ["W", "N", "E"] as const)
-		await expect(caption(tab[seat], "S")).toHaveText("South · Not in call", {
-			timeout: GONE_MS,
-		});
+		await expect(caption(tab[seat], "S")).toHaveText(
+			"S - player2 · Not in call",
+			{
+				timeout: GONE_MS,
+			},
+		);
 
 	await tab.S.context().grantPermissions(["microphone"]);
 	await rejoinButton(tab.S).click();

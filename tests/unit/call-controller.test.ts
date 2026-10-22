@@ -300,6 +300,22 @@ describe("CallController (call/layout plan §4.5)", () => {
 		expect(east.remote("N")?.peerSendsVideo).toBe(false);
 	});
 
+	it("accepts the confirmed camera when Send camera was turned on before Join", async () => {
+		north.call.setSwitch("send", "video", true);
+		north.call.setSwitch("receive", "video", true);
+		expect(north.call.view.requested.inCall).toBe(false);
+		const camera = north.prepareCamera();
+		north.call.join(presetById("both").switches);
+		east.join("both");
+		await settle();
+		for (const player of [north, east]) player.open?.setConnection("connected");
+		north.grant("audio");
+		await settle(10);
+		expect(north.call.view.requested.send.video).toBe(true);
+		expect(north.call.view.camera).toBe("on");
+		expect(north.sendingVideo).toBe(asTrack(camera));
+	});
+
 	it("sends the camera to a desktop that receives video, and stops it at once on Send camera off", async () => {
 		await connected("both", "both");
 		const mic = north.grant("audio");

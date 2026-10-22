@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { dealPayload } from "../../src/game/bridge";
 import { chatModule, chatPayload } from "../../src/game/chat";
+import type { GameModule } from "../../src/game/module";
 import type { Authority } from "../../src/p2p/authority";
 import { HostEngine, type HostStop } from "../../src/p2p/host-engine";
 import { deriveHolder, makeTag } from "../../src/p2p/keys";
@@ -32,6 +32,16 @@ import {
 	VirtualClock,
 } from "./fake-mesh";
 import { CONFIG, commandId, TABLE } from "./p2p-fixtures";
+
+/** The chat module, plus one random command, so the host-only rule can be tested without a game. */
+const RANDOM_CHAT_MODULE: GameModule = {
+	...chatModule,
+	isRandomCommand: (payload) =>
+		typeof payload === "object" &&
+		payload !== null &&
+		"type" in payload &&
+		payload.type === "deal",
+};
 
 const HOST = peerId("host");
 const EAST = peerId("east");
@@ -86,7 +96,7 @@ class Rig {
 			log: this.log,
 			auth: this.auth,
 			self: HOST,
-			module: chatModule,
+			module: RANDOM_CHAT_MODULE,
 			send: this.sent,
 			clock: this.clock,
 			newId: () => commandId(this.#next++),
@@ -648,14 +658,14 @@ describe("commands", () => {
 			k: "cmd",
 			id: commandId(10),
 			gen,
-			payload: dealPayload(TABLE, 1),
+			payload: { type: "deal" },
 		});
 		expect(rig.to(EAST)).toEqual([
 			{
 				k: "result",
 				id: commandId(10),
 				status: "rejected",
-				reason: "only the host can deal boards",
+				reason: "only the host can deal",
 			},
 		]);
 		expect(rig.log.seqOf(commandId(10))).toBeUndefined();

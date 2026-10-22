@@ -1,4 +1,9 @@
-import { actionPayload, engineSeat, parseCanastaState } from "../game/canasta";
+import {
+	actionPayload,
+	engineSeat,
+	parseCanastaState,
+	resetVotePayload,
+} from "../game/canasta";
 import type { TableController } from "../p2p/table";
 import { type BotModel, type RoomConfig, SEATS, type Seat } from "../protocol";
 import {
@@ -179,6 +184,25 @@ export class HostBotRunner {
 			view.roster?.bots ?? configuredBotSeats(config),
 		);
 		const state = parseCanastaState(view.table.state, this.#controller.tableId);
+		// A bot approves a reset that asks its seat; the game waits until every asked seat answers.
+		const reset = state?.reset;
+		if (reset)
+			for (const seat of seats) {
+				const voteKey = `reset:${reset.id}:${seat}`;
+				if (
+					!reset.required.includes(seat) ||
+					reset.approved.includes(seat) ||
+					this.#processed.has(voteKey)
+				)
+					continue;
+				this.#processed.add(voteKey);
+				await this.#send(
+					seat,
+					resetVotePayload(this.#controller.tableId, reset.id, true),
+					view.seat,
+				);
+				return;
+			}
 		const match = state?.match;
 		if (!state || !match || match.settled || match.winner !== null) return;
 		for (const seat of seats) {

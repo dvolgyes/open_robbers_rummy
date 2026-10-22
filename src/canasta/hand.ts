@@ -408,7 +408,7 @@ function applyReset(hand: HandState): Step {
 }
 
 /** A side's first meld: the points from its current player's hand this turn meet the threshold for its score. */
-function initialSatisfied(hand: HandState, team: TeamIndex): boolean {
+export function initialSatisfied(hand: HandState, team: TeamIndex): boolean {
 	if (teamAt(hand.teams, team).initialMade) return true;
 	return (
 		hand.turnMeldPoints >=

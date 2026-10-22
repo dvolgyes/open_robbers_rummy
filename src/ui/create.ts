@@ -1,10 +1,11 @@
+import type { Bookmark } from "../bookmark";
 import {
 	normalizeHostApiKey,
 	readHostApiKey,
 	writeHostApiKey,
 } from "../bot/host-key";
 import type { HostBotSettings } from "../bot/host-runner";
-import { bridgeModule } from "../game/bridge";
+import { canastaModule } from "../game/canasta";
 import { newCommandId } from "../ids";
 import { newTableKey } from "../p2p/link";
 import { CANNOT_STORE, createTable, tableIdentity } from "../p2p/table";
@@ -17,7 +18,6 @@ import {
 	SEATS,
 	type Seat,
 } from "../protocol";
-import type { Bookmark } from "./bookmark";
 import type { AppDeps, Dispose } from "./deps";
 import { el } from "./dom";
 import { checkCreateFields, DEFAULT_CREATE_FIELDS, storageText } from "./model";
@@ -74,21 +74,6 @@ export function showCreate(
 		);
 	});
 
-	const scoring = el(
-		"select",
-		{ attrs: { name: "scoring" } },
-		el("option", { attrs: { value: "duplicate" } }, deps.t("Duplicate")),
-		el(
-			"option",
-			{ attrs: { value: "chicago", disabled: "" } },
-			deps.t("Chicago (later)"),
-		),
-		el(
-			"option",
-			{ attrs: { value: "rubber", disabled: "" } },
-			deps.t("Rubber (later)"),
-		),
-	);
 	const apiKey = el("input", {
 		attrs: {
 			type: "password",
@@ -154,7 +139,6 @@ export function showCreate(
 			),
 			el("tbody", {}, ...rows),
 		),
-		el("label", {}, `${deps.t("Scoring")}: `, scoring),
 		errors,
 		submit,
 		el(
@@ -264,7 +248,7 @@ export function showCreate(
 			identity,
 			seat,
 			config,
-			module: bridgeModule,
+			module: canastaModule,
 			newId: newCommandId,
 			clock: deps.clock,
 			memory: deps.memory,

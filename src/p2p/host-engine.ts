@@ -719,13 +719,11 @@ export class HostEngine {
 				: this.#result(peer, id, "invalid");
 		}
 		if (table.rev >= MAX_LOG_ENTRIES) return this.#result(peer, id, "full");
-		if (command.payload.type === "deal" && bound.seat !== this.#deps.log.seat)
-			return this.#result(
-				peer,
-				id,
-				"rejected",
-				"only the host can deal boards",
-			);
+		if (
+			this.#deps.module.isRandomCommand?.(command.payload) === true &&
+			bound.seat !== this.#deps.log.seat
+		)
+			return this.#result(peer, id, "rejected", "only the host can deal");
 		// 4. The game rules, then the envelope and the size limits.
 		const seq = table.rev + 1;
 		const holder = seatRow(table, bound.seat).holder;

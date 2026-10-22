@@ -23,6 +23,38 @@ repos:
         language: pygrep
         entry: '\.(innerHTML|outerHTML)\s*[+]?=|insertAdjacentHTML|document\.write'
         files: ^src/.*\.ts$
+      # Module boundaries (ADR 0008): canasta <- game <- p2p, bot <- ui; call and the shared root files stay below game.
+      - id: layer-canasta
+        name: src/canasta imports nothing outside itself
+        language: pygrep
+        entry: '(from|import\()\s*"\.\./'
+        files: ^src/canasta/.*\.ts$
+      - id: layer-call
+        name: src/call does not import the game, p2p, bot or ui layers
+        language: pygrep
+        entry: '(from|import\()\s*"\.\./(canasta|game|p2p|bot|ui)/'
+        files: ^src/call/.*\.ts$
+      - id: layer-game
+        name: src/game does not import p2p, bot or ui
+        language: pygrep
+        entry: '(from|import\()\s*"\.\./(p2p|bot|ui)/'
+        files: ^src/game/.*\.ts$
+      - id: layer-p2p
+        name: src/p2p reaches the rules only through src/game, and does not import bot or ui
+        language: pygrep
+        entry: '(from|import\()\s*"\.\./(canasta|bot|ui)/'
+        files: ^src/p2p/.*\.ts$
+      - id: layer-bot
+        name: src/bot does not import ui
+        language: pygrep
+        entry: '(from|import\()\s*"\.\./ui/'
+        files: ^src/bot/.*\.ts$
+      - id: layer-shared
+        name: shared files in src/ import no layer folder (main.ts is the entry point)
+        language: pygrep
+        entry: '(from|import\()\s*"\./(canasta|call|game|p2p|bot|ui)/'
+        files: ^src/[^/]+\.ts$
+        exclude: ^src/main\.ts$
       - id: typecheck
         name: tsc --noEmit
         language: system

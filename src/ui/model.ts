@@ -1,5 +1,4 @@
-import { isChatCommand, isChatEvent } from "../game/bridge";
-import { parseChatEvent } from "../game/chat";
+import { isChatCommand, isChatEvent, parseChatEvent } from "../game/chat";
 import { englishTranslator as english, type Translate } from "../i18n";
 import type { ElectionView, HostBlock } from "../p2p/election";
 import type { MeshDiagnostics } from "../p2p/mesh";

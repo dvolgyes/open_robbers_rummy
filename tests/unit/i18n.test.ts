@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+	catalogKeys,
 	detectLocale,
 	type Locale,
 	translatedMessageKeys,
 	translator,
 } from "../../src/i18n";
-import { additionalCatalogs } from "../../src/i18n-translations";
 
 const newLocales = [
 	"es",
@@ -35,47 +35,7 @@ describe("localization", () => {
 		expect(new Set(expected).size).toBe(expected.length);
 
 		for (const locale of newLocales) {
-			expect(Object.keys(additionalCatalogs[locale]).sort()).toEqual(expected);
-		}
-	});
-
-	it("translates bridge terms and substitutes message values", () => {
-		const cases = [
-			["es", "Palo de triunfo", "Contrato: faltan 2 / 13"],
-			["pt", "Naipe de trunfo", "Contrato: faltam 2 / 13"],
-			["fr", "Couleur d'atout", "Contrat : 2 / 13 nécessaires"],
-			["it", "Colore d'atout", "Contratto: servono 2 / 13"],
-			["nl", "Troefkleur", "Contract: 2 / 13 nodig"],
-		] as const satisfies readonly (readonly [Locale, string, string])[];
-
-		for (const [locale, trump, contract] of cases) {
-			const t = translator(locale);
-			expect(t("Trump suit")).toBe(trump);
-			expect(
-				t("Contract needs {needed} / {remaining}", {
-					needed: 2,
-					remaining: 13,
-				}),
-			).toBe(contract);
-		}
-	});
-
-	it("translates declarer and dummy in every supported language", () => {
-		const roles = [
-			["de", "Alleinspieler", "Tisch"],
-			["hu", "Felvevő", "Asztal"],
-			["no", "Spillefører", "Blindemann"],
-			["es", "Declarante", "Muerto"],
-			["pt", "Declarante", "Morto"],
-			["fr", "Déclarant", "Mort"],
-			["it", "Dichiarante", "Morto"],
-			["nl", "Leider", "Blinde"],
-		] as const satisfies readonly (readonly [Locale, string, string])[];
-
-		for (const [locale, declarer, dummy] of roles) {
-			const t = translator(locale);
-			expect(t("Declarer")).toBe(declarer);
-			expect(t("Dummy")).toBe(dummy);
+			expect([...catalogKeys(locale)].sort()).toEqual(expected);
 		}
 	});
 
@@ -98,5 +58,19 @@ describe("localization", () => {
 		][]) {
 			expect(translator(locale)("Enable autoplay (bot)")).toBe(label);
 		}
+	});
+
+	it("translates the canasta table texts, with their values, in each language", () => {
+		expect(translator("de")("{count} cards", { count: 3 })).toBe("3 Karten");
+		expect(translator("hu")("Hand {number}", { number: 2 })).toBe(
+			"2. leosztás",
+		);
+		expect(translator("fr")("{side} went out.", { side: "N-S" })).toBe(
+			"N-S est sorti.",
+		);
+		for (const locale of ["de", "hu", "no", ...newLocales] as const)
+			expect(
+				translator(locale)("Your turn: draw from the stock, or take the pile."),
+			).not.toBe("Your turn: draw from the stock, or take the pile.");
 	});
 });

@@ -143,6 +143,8 @@ export class CallMesh {
 	#waiting: Waiting[] = [];
 	readonly #replies = new Map<Seat, ReturnType<typeof setTimeout>>();
 	readonly #vanishing = new Map<Seat, ReturnType<typeof setTimeout>>();
+	/** Returned peers that have not answered their greeting yet. */
+	readonly #greeted = new Map<Seat, ReturnType<typeof setTimeout>>();
 	#silence: ReturnType<typeof setTimeout> | undefined;
 	#heard = new Set<Seat>();
 	#problem: FailureCode | undefined;
@@ -353,7 +355,9 @@ export class CallMesh {
 
 	/**
 	 * A seat that comes back online may have missed every message meanwhile, for example after a network change:
-	 * one addressed `resync`, which also restarts a stuck link from the impolite side.
+	 * one addressed `resync`, which also restarts a stuck link from the impolite side. A known peer that does not
+	 * answer it within `SILENCE_MS` left the call meanwhile, for example by a reload that kept its seat, so it is
+	 * forgotten: its old link would only show a failed connection.
 	 */
 	#greetReturned(
 		previous: CallRoomSnapshot | undefined,
@@ -363,7 +367,23 @@ export class CallMesh {
 		if (self === undefined || !this.#joined?.announced) return;
 		for (const seat of returnedSeats(previous, snapshot, self.seat)) {
 			this.#announce("resync", seat);
+			this.#awaitAnswer(seat);
 		}
+	}
+
+	#awaitAnswer(seat: Seat): void {
+		const peer = this.#peers.get(seat);
+		if (peer === undefined) return;
+		clearTimeout(this.#greeted.get(seat));
+		this.#greeted.set(
+			seat,
+			setTimeout(() => {
+				this.#greeted.delete(seat);
+				if (this.#peers.get(seat) !== peer) return;
+				this.#forget(seat);
+				this.#emit();
+			}, SILENCE_MS),
+		);
 	}
 
 	/** A send can be lost silently: one addressed `resync` per seat that stays silent, never more. */
@@ -427,6 +447,8 @@ export class CallMesh {
 		if (joined === undefined) return;
 		const { from, fromGen, message } = envelope;
 		this.#heard.add(from);
+		clearTimeout(this.#greeted.get(from));
+		this.#greeted.delete(from);
 		const known = this.#peers.get(from);
 		const current = known?.session === message.session ? known : undefined;
 		switch (message.type) {
@@ -592,6 +614,8 @@ export class CallMesh {
 		this.#peers.delete(seat);
 		clearTimeout(this.#vanishing.get(seat));
 		this.#vanishing.delete(seat);
+		clearTimeout(this.#greeted.get(seat));
+		this.#greeted.delete(seat);
 	}
 
 	/** Replaces call presence (ADR 0003): a peer that stays offline at its generation leaves the call. */

@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { Player, reportNetwork } from "./player";
-import { CONNECT_MS, createRoom, YOU } from "./room";
+import { CONNECT_MS, createRoom, expectSeat } from "./room";
 
 /**
  * The last free seat needs no choice: a page that opens the table link when three seats are taken takes the
- * fourth seat by itself. When all four seats are present, the hosting page deals the first board.
+ * fourth seat by itself. When all four seats are present, the hosting page deals the first hand.
  */
 test.describe.configure({ mode: "serial" });
 
@@ -25,7 +25,7 @@ test.afterAll(async () => {
 	for (const player of players) await player.close();
 });
 
-test("the last free seat is taken by the page that opens the link, and the first board is dealt", async () => {
+test("the last free seat is taken by the page that opens the link, and the first hand is dealt", async () => {
 	test.setTimeout(240_000);
 	const [creator, north, east, south] = players as [
 		Player,
@@ -44,18 +44,18 @@ test("the last free seat is taken by the page that opens the link, and the first
 			timeout: CONNECT_MS,
 		});
 		await page.getByTestId(`pick-${seat}`).click();
-		await expect(page.getByTestId("you")).toHaveText(YOU[seat]);
+		await expectSeat(page, seat);
 	}
 
 	// Only South is free: this page takes it without a picker.
 	const page = await south.page(link);
-	await expect(page.getByTestId("you")).toHaveText(YOU.S, {
+	await expectSeat(page, "S", {
 		timeout: CONNECT_MS,
 	});
 	await expect(page.getByTestId("pick-S")).toHaveCount(0);
 
-	// All four seats are present, so the host deals board 1 automatically.
-	await expect(page.getByTestId("table")).toHaveAttribute("data-board", "1", {
+	// All four seats are present, so the host deals hand 1 automatically.
+	await expect(page.getByTestId("table")).toHaveAttribute("data-hand", "1", {
 		timeout: CONNECT_MS,
 	});
 });

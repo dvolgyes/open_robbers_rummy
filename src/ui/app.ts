@@ -1,17 +1,17 @@
-import { parseRoute, tableFragment } from "../p2p/link";
 import {
 	bookmarkQuery,
 	parseBookmark,
 	parseRoomSetup,
 	parseSelectedPlayer,
 	selectedPlayerQuery,
-} from "./bookmark";
+} from "../bookmark";
+import { parseRoute, tableFragment } from "../p2p/link";
 import { showCreate } from "./create";
 import type { AppDeps, Dispose, Navigation } from "./deps";
 import { copyToClipboard, el } from "./dom";
 import { showLinkProblem, showTable } from "./join";
 
-const LOCALE_STORAGE_KEY = "opentrick.locale";
+const LOCALE_STORAGE_KEY = "open_canasta.locale";
 
 function languageControl(deps: AppDeps): HTMLElement {
 	const select = el("select", {

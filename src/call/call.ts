@@ -188,9 +188,16 @@ export class CallController {
 		this.#media.selectVideoDevice(deviceId);
 	}
 
-	/** Holds the preview track locally until a subsequent explicit Send video action. */
+	/**
+	 * Holds the preview track locally until a subsequent explicit Send video action. Outside the call the Send
+	 * camera switch only chooses what Join starts with, so it does not refuse the track.
+	 */
 	prepareVideo(track: MediaStreamTrack): boolean {
-		if (this.#form !== "desktop" || this.#prefs.send.video) return false;
+		if (
+			this.#form !== "desktop" ||
+			(this.#prefs.inCall && this.#prefs.send.video)
+		)
+			return false;
 		return this.#media.prepareVideo(track);
 	}
 

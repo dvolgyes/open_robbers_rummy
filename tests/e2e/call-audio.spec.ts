@@ -3,10 +3,12 @@ import {
 	type CallProbe,
 	callFrames,
 	caption,
+	chooseMode,
 	counts,
 	cutGameLinks,
 	directions,
 	expectAudioArrives,
+	expectNoteUnseen,
 	installCallProbe,
 	joinButton,
 	joinWith,
@@ -21,11 +23,12 @@ import {
 	SOUND,
 	senderFlow,
 	setCaptureDelay,
+	TILE_NAMES,
 	timeWhen,
 	toggle,
 } from "./call-probe";
 import { type ContextOptions, Player, reportNetwork } from "./player";
-import { CONNECT_MS, createRoom, pick, type SeatKey, YOU } from "./room";
+import { CONNECT_MS, createRoom, expectSeat, pick, type SeatKey } from "./room";
 
 /**
  * The audio call between real browsers (call/layout plan C5a and C5b), on one P2P table through the public
@@ -134,7 +137,7 @@ async function openTab(seat: SeatKey, url: string): Promise<void> {
 /** Reloads the tab and waits until it holds its seat again. */
 async function reload(seat: SeatKey): Promise<void> {
 	await tab[seat].reload();
-	await expect(tab[seat].getByTestId("you")).toHaveText(YOU[seat], {
+	await expectSeat(tab[seat], seat, {
 		timeout: CONNECT_MS,
 	});
 }
@@ -178,13 +181,13 @@ test("1: without Join, the table makes no call activity", async () => {
 		await expect(note(page)).toHaveText("");
 		await expect(joinButton(page)).toBeEnabled();
 	}
-	// The tiles come with the first board. Outside the call nobody's call status is known, so they show names.
-	// The hosting page deals the first board by itself, so there is no click here.
+	// The tiles come with the first hand. Outside the call nobody's call status is known, so they show names.
+	// The hosting page deals the first hand by itself, so there is no click here.
 	await expect(tab.W.getByTestId("table")).toHaveAttribute(
 		"data-phase",
-		"auction",
+		"play",
 	);
-	await expect(caption(tab.W, "N")).toHaveText("North");
+	await expect(caption(tab.W, "N")).toHaveText("N - player1");
 	// The absence of activity needs time to show: the game links carry beats meanwhile.
 	await tab.W.waitForTimeout(4_000);
 	for (const seat of SEATS) {
@@ -208,7 +211,7 @@ test("2: two seats on Audio only hear each other, and the call stores only its s
 	const table = tab.W.getByTestId("table");
 	const before = {
 		phase: await table.getAttribute("data-phase"),
-		board: await table.getAttribute("data-board"),
+		hand: await table.getAttribute("data-hand"),
 		at: await table.getAttribute("data-at"),
 	};
 	const logged = (await loggedTypes(tab.W)).length;
@@ -217,8 +220,8 @@ test("2: two seats on Audio only hear each other, and the call stores only its s
 	await joinWith(tab.N, "Audio only");
 	await expect(note(tab.W)).toHaveText(/Connected to North\./);
 	await expect(note(tab.N)).toHaveText(/Connected to West\./);
-	await expect(caption(tab.W, "N")).toHaveText("North · Audio only");
-	await expect(caption(tab.N, "W")).toHaveText("West · Audio only");
+	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Audio only");
+	await expect(caption(tab.N, "W")).toHaveText("W - player4 · Audio only");
 	await expect(toggle(tab.W, "Send mic audio")).toHaveAttribute(
 		"data-actual",
 		"on",
@@ -250,7 +253,7 @@ test("2: two seats on Audio only hear each other, and the call stores only its s
 		.toEqual(["media", "media"]);
 	expect({
 		phase: await table.getAttribute("data-phase"),
-		board: await table.getAttribute("data-board"),
+		hand: await table.getAttribute("data-hand"),
 		at: await table.getAttribute("data-at"),
 	}).toEqual(before);
 });
@@ -261,13 +264,13 @@ test("3: Send off and Hear off change one direction, and each side shows the res
 		"aria-pressed",
 		"false",
 	);
-	await expect(caption(tab.W, "N")).toHaveText("North · Mic off");
+	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Mic off");
 	await toggle(tab.N, "Send mic audio").click();
 	await expect(toggle(tab.N, "Send mic audio")).toHaveAttribute(
 		"aria-pressed",
 		"true",
 	);
-	await expect(caption(tab.W, "N")).toHaveText("North · Audio only");
+	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Audio only");
 
 	await toggle(tab.W, "Hear others: receive audio").click();
 	await expect(toggle(tab.W, "Hear others: receive audio")).toHaveAttribute(
@@ -278,13 +281,15 @@ test("3: Send off and Hear off change one direction, and each side shows the res
 		"data-play",
 		"off",
 	);
-	await expect(caption(tab.W, "N")).toHaveText("North · Audio reception off");
+	await expect(caption(tab.W, "N")).toHaveText(
+		"N - player1 · Audio reception off",
+	);
 	await toggle(tab.W, "Hear others: receive audio").click();
 	await expect(tab.W.getByTestId("audio-N")).toHaveAttribute(
 		"data-play",
 		"playing",
 	);
-	await expect(caption(tab.W, "N")).toHaveText("North · Audio only");
+	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Audio only");
 	await expectAudioArrives(tab.W);
 });
 
@@ -293,8 +298,8 @@ test("4: Listen only needs no microphone, and a refused microphone stays out of 
 	await expect(note(tab.E)).toHaveText(
 		/Connected to (North, West|West, North)\./,
 	);
-	await expect(caption(tab.E, "W")).toHaveText("West · Audio only");
-	await expect(caption(tab.W, "E")).toHaveText("East · Mic off");
+	await expect(caption(tab.E, "W")).toHaveText("W - player4 · Audio only");
+	await expect(caption(tab.W, "E")).toHaveText("E - player3 · Mic off");
 	await expectAudioArrives(tab.E);
 	expect((await counts(tab.E)).captures).toBe(0);
 
@@ -305,10 +310,10 @@ test("4: Listen only needs no microphone, and a refused microphone stays out of 
 	await expect(note(tab.E)).toContainText(
 		"The browser blocks the microphone: others cannot hear you.",
 	);
-	await expect(note(tab.E)).toBeHidden();
+	await expectNoteUnseen(tab.E);
 	expect((await counts(tab.E)).captures).toBe(1);
 	// The others still reach East; only East's sending failed.
-	await expect(caption(tab.W, "E")).toHaveText("East · Mic off");
+	await expect(caption(tab.W, "E")).toHaveText("E - player3 · Mic off");
 	await expectAudioArrives(tab.E);
 });
 
@@ -322,8 +327,8 @@ test("5: Leave stops the microphone and the connections, and the others see Not 
 			return { openPeers: north.openPeers, liveTracks: north.liveTracks };
 		})
 		.toEqual({ openPeers: 0, liveTracks: 0 });
-	await expect(caption(tab.W, "N")).toHaveText("North · Not in call");
-	await expect(caption(tab.E, "N")).toHaveText("North · Not in call");
+	await expect(caption(tab.W, "N")).toHaveText("N - player1 · Not in call");
+	await expect(caption(tab.E, "N")).toHaveText("N - player1 · Not in call");
 	await expect(note(tab.W)).toHaveText(/Connected to East\./);
 });
 
@@ -334,7 +339,7 @@ test("6: after East's game links and trackers are cut for longer than 10 s, the 
 	await players.E.network.block();
 	expect(await cutGameLinks(tab.E)).toBe(3);
 	// Without game links East is offline for the others; after 10 s each side drops the call link.
-	await expect(caption(tab.W, "E")).toHaveText("East · Not in call", {
+	await expect(caption(tab.W, "E")).toHaveText("E - player3 · Not in call", {
 		timeout: 30_000,
 	});
 	await expect
@@ -348,32 +353,27 @@ test("6: after East's game links and trackers are cut for longer than 10 s, the 
 	console.error(
 		`cut: the call came back ${Date.now() - cut} ms after the trackers returned`,
 	);
-	await expect(caption(tab.W, "E")).toHaveText("East · Mic off");
-	await expect(caption(tab.E, "W")).toHaveText("West · Audio only");
+	await expect(caption(tab.W, "E")).toHaveText("E - player3 · Mic off");
+	await expect(caption(tab.E, "W")).toHaveText("W - player4 · Audio only");
 	await expectAudioArrives(tab.E);
 });
 
-test("7: the keyboard opens and closes the Join choices, and focus returns to Join", async () => {
+test("7: outside the call, the keyboard reaches the switches from Join and changes them", async () => {
 	const captures = (await counts(tab.N)).captures;
 	const join = joinButton(tab.N);
+	const mic = toggle(tab.N, "Send mic audio");
 	await join.focus();
-	await tab.N.keyboard.press("Enter");
-	const chooser = tab.N.getByTestId("call-chooser");
-	await expect(chooser).toBeVisible();
-	await expect(join).toHaveAttribute("aria-expanded", "true");
-	await expect(
-		chooser.getByRole("radio", { name: "Audio only", exact: true }),
-	).toBeFocused();
-	// The mode radios are one Tab stop; the next one is the first switch.
+	// The switches follow Join in the panel, so the next Tab stop is the first switch.
 	await tab.N.keyboard.press("Tab");
-	await expect(
-		chooser.getByRole("checkbox", { name: "Send mic audio", exact: true }),
-	).toBeFocused();
-	await tab.N.keyboard.press("Escape");
-	await expect(chooser).toBeHidden();
-	await expect(join).toBeFocused();
-	await expect(join).toHaveAttribute("aria-expanded", "false");
-	// Opening and closing the choices starts nothing.
+	await expect(mic).toBeFocused();
+	const before = await mic.getAttribute("aria-pressed");
+	const flipped = before === "true" ? "false" : "true";
+	await tab.N.keyboard.press("Space");
+	await expect(mic).toHaveAttribute("aria-pressed", flipped);
+	await tab.N.keyboard.press("Space");
+	await expect(mic).toHaveAttribute("aria-pressed", before ?? "false");
+	await expect(leaveButton(tab.N)).toHaveCount(0);
+	// Outside the call, a switch only chooses what Join starts with; it starts nothing.
 	expect((await counts(tab.N)).captures).toBe(captures);
 });
 
@@ -392,7 +392,7 @@ test("8: a reload joins the call again with the stored switches; a page outside 
 	await expect(note(tab.W)).toHaveText(/Connected to East\./, {
 		timeout: 30_000,
 	});
-	await expect(caption(tab.E, "W")).toHaveText("West · Audio only");
+	await expect(caption(tab.E, "W")).toHaveText("W - player4 · Audio only");
 	await expectAudioArrives(tab.E);
 	expect(await counts(tab.W)).toMatchObject({ captures: 1, liveTracks: 1 });
 
@@ -416,18 +416,10 @@ test("9: four seats join within one second, each hears the other three, and the 
 		await expect(joinButton(tab[seat])).toBeVisible();
 	}
 	await players.E.grantPermissions(["microphone"]);
-	// All four open their choices first, so that the four confirmations fall within one second.
-	for (const seat of SEATS) {
-		await joinButton(tab[seat]).click();
-		await tab[seat]
-			.getByTestId("call-chooser")
-			.getByRole("radio", { name: "Audio only", exact: true })
-			.check();
-	}
+	// All four set their switches first, so that the four Join clicks fall within one second.
+	for (const seat of SEATS) await chooseMode(tab[seat], "Audio only");
 	const start = Date.now();
-	await Promise.all(
-		SEATS.map((seat) => tab[seat].getByTestId("call-confirm").click()),
-	);
+	await Promise.all(SEATS.map((seat) => joinButton(tab[seat]).click()));
 	expect(Date.now() - start).toBeLessThan(1_000);
 
 	for (const seat of SEATS) {
@@ -487,8 +479,10 @@ test("10: when one seat stops hearing, the other seats still hear each other", a
 		);
 	}
 	// The label names the viewer's own reception; West still hears South.
-	await expect(caption(tab.S, "W")).toHaveText("West · Audio reception off");
-	await expect(caption(tab.W, "S")).toHaveText("South · Audio only");
+	await expect(caption(tab.S, "W")).toHaveText(
+		"W - player4 · Audio reception off",
+	);
+	await expect(caption(tab.W, "S")).toHaveText("S - player2 · Audio only");
 	await expect
 		.poll(() => directions(tab.S, "audio"))
 		.toEqual(["sendonly", "sendonly", "sendonly"]);
@@ -556,12 +550,12 @@ test("11: Send off while the microphone request is pending stops the late track 
 	expect(late).toEqual({ state: "ended", attached: false });
 	expect((await counts(tab.E)).liveTracks).toBe(0);
 	await expect(send).toHaveAttribute("data-actual", "off");
-	await expect(caption(tab.W, "E")).toHaveText("East · Mic off");
+	await expect(caption(tab.W, "E")).toHaveText("E - player3 · Mic off");
 
 	await setCaptureDelay(tab.E, 0);
 	await send.click();
 	await expect(send).toHaveAttribute("data-actual", "on");
-	await expect(caption(tab.W, "E")).toHaveText("East · Audio only");
+	await expect(caption(tab.W, "E")).toHaveText("E - player3 · Audio only");
 	expect((await counts(tab.E)).liveTracks).toBe(1);
 });
 
@@ -595,7 +589,7 @@ test("12: rapid toggles at two seats at once end in each seat's last choice", as
 			openPeers: 3,
 		});
 		await expect(caption(tab.E, seat)).toHaveText(
-			`${SEAT_NAMES[seat]} · Mic off`,
+			`${TILE_NAMES[seat]} · Mic off`,
 		);
 	}
 	// West still hears East and South, and nothing from North, whose microphone is off.
@@ -610,7 +604,7 @@ test("12: rapid toggles at two seats at once end in each seat's last choice", as
 			"on",
 		);
 		await expect(caption(tab.E, seat)).toHaveText(
-			`${SEAT_NAMES[seat]} · Audio only`,
+			`${TILE_NAMES[seat]} · Audio only`,
 		);
 		expect((await counts(tab[seat])).liveTracks).toBe(1);
 	}
@@ -668,7 +662,9 @@ test("13: a reload joins the call again, and the peers drop the old link at once
 	for (const seat of peers) {
 		const log = await peerLog(tab[seat]);
 		expect(log.filter((peer) => peer.closedAt === null)).toHaveLength(3);
-		await expect(caption(tab[seat], "N")).toHaveText("North · Audio only");
+		await expect(caption(tab[seat], "N")).toHaveText(
+			"N - player1 · Audio only",
+		);
 	}
 	expect(await counts(tab.N)).toMatchObject({
 		captures: 1,
@@ -704,7 +700,7 @@ test("14: a tab that vanishes without leaving is out of the call 10 s after its 
 	);
 	const gone = await timeWhen(
 		async () =>
-			(await caption(tab.W, "S").textContent()) === "South · Not in call",
+			(await caption(tab.W, "S").textContent()) === "S - player2 · Not in call",
 		30_000,
 	);
 	console.error(
@@ -712,7 +708,9 @@ test("14: a tab that vanishes without leaving is out of the call 10 s after its 
 	);
 	expect(gone - offline).toBeLessThanOrEqual(10_000 + 1_500);
 	for (const seat of ["W", "N", "E"] as const) {
-		await expect(caption(tab[seat], "S")).toHaveText("South · Not in call");
+		await expect(caption(tab[seat], "S")).toHaveText(
+			"S - player2 · Not in call",
+		);
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(2);
 	}
 });

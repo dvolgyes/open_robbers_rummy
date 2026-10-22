@@ -1,4 +1,3 @@
-import { botSeatClaims } from "../bot/seats";
 import type { CallRoomSnapshot } from "../call/mesh";
 import type { CallTransport } from "../call/signaling";
 import type { GameModule } from "../game/module";
@@ -9,6 +8,7 @@ import {
 	type Seat,
 } from "../protocol";
 import type { MaybeStorage, SeatLocks, SeatMemory } from "../session";
+import { botSeatClaims } from "./bot-seats";
 import { MeshCallTransport } from "./call-transport";
 import {
 	ConnectionChecks,
@@ -466,10 +466,13 @@ export class TableController {
 			if (this.#heldElsewhere.has(seat)) return refused("held-elsewhere");
 			const opened = await this.#openSeat(seat);
 			if (!opened.ok) return this.#openFailed(opened.code);
+			// A host's lobby means the table is live: the seat is claimed from that host, never seeded as a second
+			// table (ADR 0005).
 			if (
 				this.#bootstrapAllowed &&
 				this.#deps.bootstrap?.host === seat &&
-				opened.seated.log.table === null
+				opened.seated.log.table === null &&
+				this.#replication?.follower.lobby === null
 			) {
 				const seeded = await this.#seedHost(opened.seated, seat);
 				if (seeded) {

@@ -43,4 +43,9 @@ export interface GameModule {
 		context: ApplyContext,
 		payload: unknown,
 	): ApplyResult;
+	/**
+	 * True for a command whose result is random, such as a shuffle. Only the host may send it, because followers
+	 * cannot recompute the result. Omit when the game has no random commands.
+	 */
+	isRandomCommand?(payload: unknown): boolean;
 }

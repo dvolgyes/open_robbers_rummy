@@ -17,9 +17,11 @@ import {
 	startMatch,
 	viewFor,
 } from "../canasta";
+import { isCommandId } from "../ids";
 import {
 	isObject as isJsonObject,
 	isNonNegativeInteger,
+	isSeat,
 	type JsonObject,
 	PROTOCOL_VERSION,
 	SEAT_NAMES,
@@ -44,6 +46,9 @@ import type { ApplyContext, ApplyResult, GameModule } from "./module";
  *   `at` is the number of accepted actions before it. A command chosen on an older view of the table is
  *   rejected, so a delayed command never lands in a later position. All four seats must be present.
  * - `{type: "next-hand"}`: after a hand is settled, deals the next one. All four seats must be present.
+ * - `{type: "reset-request"}`, `{type: "reset-vote", requestId, approve}` and `{type: "reset-cancel", requestId}`:
+ *   a reset clears the scores and ends the match once every other present player approves it. The host then
+ *   deals a new match. While a reset waits for answers, the game is blocked.
  *
  * When a hand ends, the host settles its score in the same command, so the table never shows an unsettled
  * finished hand.
@@ -55,11 +60,23 @@ export type CanastaState = {
 	readonly game: "canasta";
 	readonly messages: number;
 	readonly match: MatchState | null;
+	/** Matches started at this table. A reset ends a match, so the host keys its start command by this count. */
+	readonly matches: number;
 	/** Accepted actions in the current hand. */
 	readonly actions: number;
+	/** A reset request that waits for answers. */
+	readonly reset: ResetRequest | null;
 	/** Each seat's latest call status. */
 	readonly media: CallRecords;
 };
+
+/** A request to clear the scores and start a new match. Every seat in `required` must approve it. */
+export interface ResetRequest {
+	readonly id: string;
+	readonly requester: Seat;
+	readonly required: readonly Seat[];
+	readonly approved: readonly Seat[];
+}
 
 /** Engine seats are numbered 0 to 3 in the order of `SEATS`, so partners N-S and E-W share a team. */
 export function engineSeat(seat: Seat): EngineSeat {
@@ -199,19 +216,43 @@ function parseMatch(value: unknown): MatchState | undefined {
 	return value as unknown as MatchState;
 }
 
+function isSeatList(value: unknown): value is Seat[] {
+	return (
+		Array.isArray(value) &&
+		value.every(isSeat) &&
+		new Set(value).size === value.length
+	);
+}
+
+function parseResetRequest(value: unknown): ResetRequest | null | undefined {
+	if (value === undefined || value === null) return null;
+	if (!isJsonObject(value)) return undefined;
+	const { id, requester, required, approved } = value;
+	if (!isCommandId(id) || !isSeat(requester)) return undefined;
+	if (!isSeatList(required) || required.length === 0) return undefined;
+	if (required.includes(requester) || !isSeatList(approved)) return undefined;
+	if (!approved.every((seat) => required.includes(seat))) return undefined;
+	if (approved.length === required.length) return undefined;
+	return { id, requester, required, approved };
+}
+
 /** Returns the table state, or undefined when the value is not a canasta table of this room. */
 export function parseCanastaState(
 	value: unknown,
 	roomId: string,
 ): CanastaState | undefined {
 	if (!isJsonObject(value)) return undefined;
-	const { v, game, messages, match, actions, media } = value;
+	const { v, game, messages, matches, match, actions, reset, media } = value;
 	if (v !== PROTOCOL_VERSION || game !== "canasta") return undefined;
 	if (value.roomId !== roomId) return undefined;
 	if (!isNonNegativeInteger(messages) || !isNonNegativeInteger(actions))
 		return undefined;
+	if (!isNonNegativeInteger(matches)) return undefined;
 	const parsedMatch = match === null ? null : parseMatch(match);
 	if (parsedMatch === undefined) return undefined;
+	const parsedReset = parseResetRequest(reset);
+	if (parsedReset === undefined) return undefined;
+	if (parsedReset !== null && parsedMatch === null) return undefined;
 	const parsedMedia = parseCallRecords(media);
 	if (parsedMedia === undefined) return undefined;
 	return {
@@ -219,8 +260,10 @@ export function parseCanastaState(
 		roomId,
 		game: "canasta",
 		messages,
+		matches,
 		match: parsedMatch,
 		actions,
+		reset: parsedReset,
 		media: parsedMedia,
 	};
 }
@@ -278,6 +321,7 @@ function applyStart(
 	randomBelow: RandomBelow,
 ): ApplyResult {
 	if (table.match !== null) return reject("the match has already started");
+	if (table.reset) return RESET_WAITING;
 	const waiting = absence(SEATS, present);
 	if (waiting) return waiting;
 	const seed = randomBelow(2 ** 32);
@@ -286,6 +330,7 @@ function applyStart(
 		{ kind: "start", handNo: match.handNo },
 		{
 			...table,
+			matches: table.matches + 1,
 			match,
 			actions: 0,
 		},
@@ -299,6 +344,7 @@ function applyTableAction(
 ): ApplyResult {
 	const match = table.match;
 	if (match === null) return reject("the match has not started");
+	if (table.reset) return RESET_WAITING;
 	if (match.settled || match.winner !== null)
 		return reject("this hand is over; deal the next one");
 	if (payload.hand !== match.handNo || payload.at !== table.actions)
@@ -326,6 +372,7 @@ function applyNextHand(
 ): ApplyResult {
 	const match = table.match;
 	if (match === null) return reject("the match has not started");
+	if (table.reset) return RESET_WAITING;
 	if (!match.settled) return reject("the hand is not over");
 	if (match.winner !== null) return reject("the match is over");
 	const waiting = absence(SEATS, present);
@@ -336,6 +383,89 @@ function applyNextHand(
 		{ kind: "next-hand", handNo: step.match.handNo },
 		{ ...table, match: step.match, actions: 0 },
 	);
+}
+
+const RESET_WAITING: ApplyResult = {
+	ok: false,
+	reason: "a reset request is waiting for answers",
+};
+
+/** Ends the match and clears the scores; the chat and the call status stay. */
+function resetMatch(table: CanastaState): CanastaState {
+	return { ...table, match: null, actions: 0, reset: null };
+}
+
+function applyResetRequest(
+	table: CanastaState,
+	context: ApplyContext,
+): ApplyResult {
+	if (table.reset) return RESET_WAITING;
+	if (table.match === null) return reject("the match has not started");
+	const present = [...new Set(context.present)];
+	if (!present.includes(context.seat))
+		return reject("your seat is not present at the table");
+	const required = SEATS.filter(
+		(seat) => seat !== context.seat && present.includes(seat),
+	);
+	if (required.length === 0)
+		return accept(
+			{ kind: "reset-applied", requester: context.seat },
+			resetMatch(table),
+		);
+	const reset: ResetRequest = {
+		id: context.commandId,
+		requester: context.seat,
+		required,
+		approved: [],
+	};
+	return accept(
+		{ kind: "reset-requested", requester: context.seat, required },
+		{ ...table, reset },
+	);
+}
+
+function applyResetVote(
+	table: CanastaState,
+	context: ApplyContext,
+	payload: JsonObject,
+): ApplyResult {
+	const pending = table.reset;
+	if (!pending || payload.requestId !== pending.id)
+		return reject("there is no matching reset request");
+	if (!pending.required.includes(context.seat))
+		return reject("your seat is not asked to approve this reset");
+	if (typeof payload.approve !== "boolean")
+		return reject("reset decision must accept or reject");
+	if (pending.approved.includes(context.seat))
+		return reject("your seat has already approved this reset");
+	if (!payload.approve)
+		return accept(
+			{ kind: "reset-rejected", by: context.seat },
+			{ ...table, reset: null },
+		);
+	const approved = [...pending.approved, context.seat];
+	if (pending.required.every((seat) => approved.includes(seat)))
+		return accept(
+			{ kind: "reset-applied", requester: pending.requester },
+			resetMatch(table),
+		);
+	return accept(
+		{ kind: "reset-approved", by: context.seat },
+		{ ...table, reset: { ...pending, approved } },
+	);
+}
+
+function applyResetCancel(
+	table: CanastaState,
+	context: ApplyContext,
+	payload: JsonObject,
+): ApplyResult {
+	const pending = table.reset;
+	if (!pending || payload.requestId !== pending.id)
+		return reject("there is no matching reset request");
+	if (pending.requester !== context.seat)
+		return reject("only the requester can cancel this reset");
+	return accept({ kind: "reset-cancelled" }, { ...table, reset: null });
 }
 
 function applyChat(
@@ -377,8 +507,10 @@ export function createCanastaModule(randomBelow: RandomBelow): GameModule {
 				roomId,
 				game: "canasta",
 				messages: 0,
+				matches: 0,
 				match: null,
 				actions: 0,
+				reset: null,
 				media: {},
 			};
 			return state as unknown as JsonObject;
@@ -407,9 +539,23 @@ export function createCanastaModule(randomBelow: RandomBelow): GameModule {
 					return applyTableAction(table, context, payload);
 				case "next-hand":
 					return applyNextHand(table, context.present);
+				case "reset-request":
+					return applyResetRequest(table, context);
+				case "reset-vote":
+					return applyResetVote(table, context, payload);
+				case "reset-cancel":
+					return applyResetCancel(table, context, payload);
 				default:
 					return reject("unknown command type");
 			}
+		},
+		isRandomCommand(payload) {
+			return (
+				typeof payload === "object" &&
+				payload !== null &&
+				"type" in payload &&
+				(payload.type === "start" || payload.type === "next-hand")
+			);
 		},
 	};
 }
@@ -441,19 +587,34 @@ export function nextHandPayload(roomId: string): JsonObject {
 	return { v: PROTOCOL_VERSION, roomId, type: "next-hand" };
 }
 
+export function resetRequestPayload(roomId: string): JsonObject {
+	return { v: PROTOCOL_VERSION, roomId, type: "reset-request" };
+}
+
+export function resetVotePayload(
+	roomId: string,
+	requestId: string,
+	approve: boolean,
+): JsonObject {
+	return {
+		v: PROTOCOL_VERSION,
+		roomId,
+		type: "reset-vote",
+		requestId,
+		approve,
+	};
+}
+
+export function resetCancelPayload(
+	roomId: string,
+	requestId: string,
+): JsonObject {
+	return { v: PROTOCOL_VERSION, roomId, type: "reset-cancel", requestId };
+}
+
 /** Start, action and next-hand commands, as opposed to chat and call status. */
 export function isTableCommand(payload: unknown): boolean {
 	return isJsonObject(payload) && TABLE_COMMANDS.includes(payload.type);
-}
-
-/** Chat commands, as opposed to table actions and call status. */
-export function isChatCommand(payload: unknown): boolean {
-	return isJsonObject(payload) && payload.type === "chat";
-}
-
-/** Chat events (`{fromName, text}`): every other event has a `kind`. */
-export function isChatEvent(event: JsonObject): boolean {
-	return event.kind === undefined;
 }
 
 /** The hand from one seat's point of view, for the table screen. */

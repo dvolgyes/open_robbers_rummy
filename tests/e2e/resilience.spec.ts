@@ -1,15 +1,19 @@
 import { expect, type Page, test } from "@playwright/test";
+import { BUTTON_MS, HOST_LOST_MS } from "../../src/p2p/limits";
 import { Player, type RigOptions, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
 	createRoom,
 	expectBanner,
+	expectSeat,
 	MESSAGE,
+	openDrawer,
 	pick,
+	picks,
 	type SeatKey,
 	sendDraft,
+	takeTurn,
 	texts,
-	YOU,
 } from "./room";
 
 /**
@@ -75,7 +79,7 @@ test.afterEach(async ({}, testInfo) => {
 	for (const player of current.splice(0)) await player.close();
 });
 
-test("a tracker outage keeps the table: messages, the deal and the auction go on; a newcomer finds the table afterwards", async () => {
+test("a tracker outage keeps the table: messages, the deal and the play go on; a newcomer finds the table afterwards", async () => {
 	test.setTimeout(180_000);
 	const seats = ["W", "N", "E", "S"] as const satisfies readonly SeatKey[];
 	const browsers = {} as Record<SeatKey, Player>;
@@ -91,10 +95,12 @@ test("a tracker outage keeps the table: messages, the deal and the auction go on
 		});
 		await pick(tab[seat], seat);
 	}
-	for (const seat of seats)
+	for (const seat of seats) {
+		await openDrawer(tab[seat]);
 		await expect(tab[seat].getByTestId("all-connected")).toBeVisible({
 			timeout: CONNECT_MS,
 		});
+	}
 
 	for (const seat of seats) await browsers[seat].network.block();
 	const cutAt = Date.now();
@@ -105,18 +111,18 @@ test("a tracker outage keeps the table: messages, the deal and the auction go on
 		for (const other of seats)
 			await expect(texts(tab[other])).toHaveText(expected);
 	}
-	// The hosting page deals the first board by itself, so there is no click here.
+	// The hosting page deals the first hand by itself, so there is no click here.
 	for (const seat of seats)
 		await expect(tab[seat].getByTestId("table")).toHaveAttribute(
 			"data-phase",
-			"auction",
+			"play",
 		);
-	// Board 1: North deals and calls first.
-	await tab.N.getByTestId("bid-box").locator('button[data-call="1C"]').click();
+	// Hand 1: North deals, so East takes the first turn.
+	await takeTurn(tab.E, 0);
 	for (const seat of seats)
 		await expect(tab[seat].getByTestId("table")).toHaveAttribute(
 			"data-at",
-			"1",
+			"2",
 		);
 	// Longer than a host loss (6 s) and the roster coalesce: nobody counts as gone without the trackers.
 	await expect
@@ -146,7 +152,7 @@ test("a browser that does not store data cannot create a table, but it can take 
 	const create = await blocked.page("./");
 	await expect(
 		create.getByText(
-			"This browser does not allow storing data, so it cannot create a table.",
+			"This browser does not allow storing data, so it cannot create a table",
 		),
 	).toBeVisible();
 	await expect(create.getByTestId("create")).toBeDisabled();
@@ -164,9 +170,13 @@ test("a browser that does not store data cannot create a table, but it can take 
 	await expect(texts(page)).toHaveText([MESSAGE.N, MESSAGE.W]);
 
 	await creator.close({ runBeforeUnload: false });
-	await expectBanner(page, "waiting-for-host");
+	await expectBanner(page, "waiting-for-host", {
+		timeout: HOST_LOST_MS + 10_000,
+	});
 	const become = page.getByTestId("become-host");
-	await expect(become).toBeVisible({ timeout: 30_000 });
+	await expect(become).toBeVisible({
+		timeout: HOST_LOST_MS + BUTTON_MS + 10_000,
+	});
 	await expect(become).toBeDisabled();
 	await expect(page.getByTestId("banner")).toContainText(
 		"This browser cannot store the table",
@@ -200,30 +210,36 @@ test("a damaged key opens an empty table: nobody is there", async () => {
 	const creator = await west.page("./");
 	const link = await createRoom(creator);
 	// The same length and alphabet, the first key character changed: another table. The last character holds
-	// only 4 key bits, so a change there can make the link not valid instead.
-	const at = link.indexOf("k=") + 2;
+	// only 4 key bits, so a change there can make the link not valid instead. The search starts at the fragment,
+	// because a query name can also end in "k=" (bot_fallback=).
+	const at = link.indexOf("k=", link.indexOf("#")) + 2;
 	const first = link[at] === "A" ? "B" : "A";
 	const damaged = `${link.slice(0, at)}${first}${link.slice(at + 1)}`;
 	const page = await (await openBrowser("visitor")).page(damaged);
 	await expect(
 		page.getByText("Nobody is at this table right now. Keep this page open"),
 	).toBeVisible({ timeout: CONNECT_MS });
-	await expect(page.getByTestId("pick-N")).toHaveCount(0);
+	// The link carries the full setup, so the empty table offers all four seats (ADR 0005). The real table, where
+	// West is taken, would offer three.
+	await expect(picks(page)).toHaveCount(4);
 	// The real table is unaffected.
-	await expect(creator.getByTestId("you")).toHaveText(YOU.W);
+	await expectSeat(creator, "W");
 });
 
-test("a table without activity for 24 h expires and stays expired", async () => {
+test("a table without activity for 24 h expires and stays expired; the full room link starts it again", async () => {
 	const west = await openBrowser("west");
 	const page = await west.page("./");
 	const link = await createRoom(page);
+	// Without the setup query the link has only the key, so nothing can start the table again (ADR 0005).
+	const keyOnly = new URL(link);
+	keyOnly.search = "";
 	await sendDraft(page);
 	await page.goto("./");
 	expect(await ageStoredTables(page)).toBe(1);
-	await page.goto(link);
+	await page.goto(keyOnly.toString());
 	await expect(
 		page.getByRole("heading", {
-			name: "This game has expired or is no longer available",
+			name: "The game has expired or is no longer available",
 		}),
 	).toBeVisible({ timeout: CONNECT_MS });
 	await expect(
@@ -233,11 +249,21 @@ test("a table without activity for 24 h expires and stays expired", async () => 
 	await page.reload();
 	await expect(
 		page.getByRole("heading", {
-			name: "This game has expired or is no longer available",
+			name: "The game has expired or is no longer available",
 		}),
 	).toBeVisible({ timeout: CONNECT_MS });
 	await page.getByRole("button", { name: "Create new game" }).click();
 	await expect(page.getByTestId("create")).toBeVisible();
+	// The room link carries the names and the host seat: it clears the tombstone, offers all four seats, and the
+	// host seat starts a fresh table (ADR 0005).
+	await page.goto(link);
+	await expect(picks(page)).toHaveCount(4, { timeout: CONNECT_MS });
+	await pick(page, "W");
+	await expectSeat(page, "W");
+	await expect(page.getByTestId("table")).toHaveAttribute(
+		"data-phase",
+		"waiting",
+	);
 });
 
 test("no uncaught errors and no request to the old backend", () => {

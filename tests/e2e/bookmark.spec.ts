@@ -7,7 +7,7 @@ test.describe.configure({ mode: "serial" });
 
 const BOOKMARK_QUERY = "east=zsdh&west=dvolgyes&host=east";
 const TABLE_LINK =
-	/^http:\/\/localhost:\d+\/\?north=player1&east=zsdh&south=player2&west=dvolgyes&host=east&bot_seats=&bot_model=inception%2Fmercury-3&bot_fallback=openai%2Fgpt-6-luna&bot_retries=5&bot_delay_ms=5000#v=p2p-v1&k=[A-Za-z0-9_-]{43}$/;
+	/^http:\/\/localhost:\d+\/\?north=player1&east=zsdh&south=player2&west=dvolgyes&host=east&bot_seats=&bot_model=inception%2Fmercury-3&bot_fallback=openai%2Fgpt-6-luna&bot_retries=5&bot_delay_ms=3000&bot_models=[^&#]+#v=p2p-v1&k=[A-Za-z0-9_-]{43}$/;
 
 const players: Player[] = [];
 let owner: Player;
@@ -48,9 +48,9 @@ test("the create screen is prefilled from the bookmark, with the host seat chose
 test("create opens the game and selects the host seat in the page URL", async () => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 	await page.getByTestId("create").click();
-	await expect(page).toHaveTitle("Bridge: zsdh (E)");
+	await expect(page).toHaveTitle("Open Canasta: zsdh (E)");
 	await expect(page).toHaveURL(
-		/\?north=player1&east=zsdh&south=player2&west=dvolgyes&host=east&bot_seats=&bot_model=inception%2Fmercury-3&bot_fallback=openai%2Fgpt-6-luna&bot_retries=5&bot_delay_ms=5000&selected_player=E#v=p2p-v1&k=[A-Za-z0-9_-]{43}$/,
+		/\?north=player1&east=zsdh&south=player2&west=dvolgyes&host=east&bot_seats=&bot_model=inception%2Fmercury-3&bot_fallback=openai%2Fgpt-6-luna&bot_retries=5&bot_delay_ms=3000&bot_models=[^&#]+&selected_player=E#v=p2p-v1&k=[A-Za-z0-9_-]{43}$/,
 	);
 	await expect(page.getByRole("textbox", { name: "Table link" })).toHaveCount(
 		0,
@@ -74,7 +74,7 @@ test("the other players see the names and can choose a seat from the shared URL"
 
 test("reloading the selected-player address seats the host again", async () => {
 	await page.reload();
-	await expect(page).toHaveTitle("Bridge: zsdh (E)", {
+	await expect(page).toHaveTitle("Open Canasta: zsdh (E)", {
 		timeout: CONNECT_MS,
 	});
 	await expect(page.getByTestId("pick-E")).toHaveCount(0);

@@ -9,7 +9,7 @@ import {
 	type RoomConfig,
 	SEATS,
 	type Seat,
-} from "../protocol";
+} from "./protocol";
 
 export const SELECTED_PLAYER_PARAM = "selected_player";
 

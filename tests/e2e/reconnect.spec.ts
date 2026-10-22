@@ -1,17 +1,20 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { BUTTON_MS, HOST_LOST_MS, SEAT_GRACE_MS } from "../../src/p2p/limits";
 import { freeze } from "./lifecycle";
 import { Player, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
 	createRoom,
 	expectBanner,
+	expectSeat,
 	hostRows,
-	lines,
+	openDrawer,
+	ownLink,
 	pick,
 	rosterSeat,
 	type SeatKey,
+	takeTurn,
 	texts,
-	YOU,
 } from "./room";
 
 /**
@@ -19,17 +22,15 @@ import {
  * test builds on the table of the tests before it. Every person has their own browser. A crash closes the tab
  * without unload handlers; a reopen is a new tab of the same browser, so its stored replica and seat come back.
  * Every check of the transcript compares the whole list, so a message that is missing, doubled or out of order
- * fails it (R3).
+ * fails it (R3). A game action that a modified tab sends while a seat is away is in p2p-mesh.spec.ts (R4).
  */
 test.describe.configure({ mode: "serial" });
 
 const SEATS = ["W", "N", "E", "S"] as const satisfies readonly SeatKey[];
-/** Board 1: North deals and declares 1♣, so South is dummy. */
-const DUMMY = "S";
 /** A seat shows offline 20 s after its last beat; a beat comes every 10 s, plus the 1 s roster coalesce. */
 const QUIET_MS = 35_000;
-/** The become-host button shows at 10 s without a host; the automatic volunteer starts at 30 s. */
-const BUTTON_LATEST_MS = 30_000;
+/** The host counts as lost HOST_LOST_MS after its last beat; the become-host button shows BUTTON_MS later. */
+const BUTTON_LATEST_MS = HOST_LOST_MS + BUTTON_MS + 10_000;
 
 const players = {} as Record<SeatKey, Player>;
 const tab = {} as Record<SeatKey, Page>;
@@ -40,10 +41,18 @@ const expected: string[] = [];
 
 const table = (page: Page): Locator => page.getByTestId("table");
 const prompt = (page: Page): Locator => page.getByTestId("table-prompt");
-const deal = (page: Page): Locator => page.getByTestId("deal");
-const playable = (page: Page): Locator => page.locator("button.card:enabled");
-const refusals = (page: Page): Locator =>
-	page.getByTestId("table-actions").locator('li[data-state="not-accepted"]');
+/** The move buttons; the action bar and the action note are not moves. */
+const actions = (page: Page): Locator => page.locator("[data-action]");
+
+/** The cards of the seat's own hand, sorted, so the order of the hand display does not matter. */
+async function handCards(page: Page): Promise<string[]> {
+	const cards = await page
+		.locator(".own-hand button.card")
+		.evaluateAll((nodes) =>
+			nodes.map((node) => node.getAttribute("data-card") ?? ""),
+		);
+	return cards.sort();
+}
 
 function openSeats(): SeatKey[] {
 	return SEATS.filter((seat) => open.has(seat));
@@ -54,28 +63,48 @@ async function crash(seat: SeatKey): Promise<void> {
 	open.delete(seat);
 }
 
+/**
+ * After a crash the player opens the shared link in a new tab. The host still counts the crashed page as connected
+ * for a while, so it refuses the own URL of the seat; once it sees the seat offline, the lobby offers the seat
+ * again after the seat grace, and the page of the same browser takes it, because it is the only seat on offer.
+ */
 async function reopen(seat: SeatKey): Promise<void> {
 	tab[seat] = await players[seat].page(link);
-	await expect(tab[seat].getByTestId("you")).toHaveText(YOU[seat], {
-		timeout: CONNECT_MS,
+	await expectSeat(tab[seat], seat, {
+		timeout: HOST_LOST_MS + SEAT_GRACE_MS + CONNECT_MS,
 	});
 	open.add(seat);
 }
 
-/** Types the text into the seat's message box and clicks Send. A send clears the box, so each message is typed. */
+/**
+ * When no host is reachable, the shared link opens the seat picker with all four seats (ADR 0005), so a crashed
+ * player reopens with their own URL, which names the seat. No host holds a link to the crashed page.
+ */
+async function reopenOwn(seat: SeatKey): Promise<void> {
+	tab[seat] = await players[seat].page(ownLink(link, seat));
+	await expectSeat(tab[seat], seat, { timeout: CONNECT_MS });
+	open.add(seat);
+}
+
+/**
+ * Types the text into the seat's message box and clicks Send. A send clears the box, so each message is typed.
+ * A reopened tab starts with the drawer closed, so the drawer opens first.
+ */
 async function type(seat: SeatKey, text: string): Promise<void> {
+	await openDrawer(tab[seat]);
 	await tab[seat].getByRole("textbox", { name: "Message" }).fill(text);
 	await tab[seat].getByTestId("send").click();
 }
 
-/** Sends a message and waits until the sender's transcript shows it; the message joins the expected transcript. */
+/**
+ * Sends a message and waits until the sender's transcript shows it after the earlier messages; the message joins
+ * the expected transcript. The sender first waits for the earlier messages, which can still be on their way to it.
+ */
 async function say(seat: SeatKey, text: string): Promise<void> {
-	const before = await lines(tab[seat]).count();
+	await expect(texts(tab[seat])).toHaveText(expected, { timeout: CONNECT_MS });
 	await type(seat, text);
-	await expect(lines(tab[seat])).toHaveCount(before + 1, {
-		timeout: CONNECT_MS,
-	});
 	expected.push(text);
+	await expect(texts(tab[seat])).toHaveText(expected, { timeout: CONNECT_MS });
 }
 
 async function expectTranscripts(): Promise<void> {
@@ -100,16 +129,12 @@ async function commonHost(): Promise<SeatKey> {
 	return seat;
 }
 
-/** Every open tab shows the board at the position: the number of calls and cards made. */
-async function expectAt(board: number, at: number): Promise<void> {
+/** Every open tab shows hand 1 at the position: the number of game actions taken in it. */
+async function expectAt(at: number): Promise<void> {
 	for (const seat of openSeats()) {
-		await expect(table(tab[seat])).toHaveAttribute(
-			"data-board",
-			String(board),
-			{
-				timeout: CONNECT_MS,
-			},
-		);
+		await expect(table(tab[seat])).toHaveAttribute("data-hand", "1", {
+			timeout: CONNECT_MS,
+		});
 		await expect(table(tab[seat])).toHaveAttribute("data-at", String(at), {
 			timeout: CONNECT_MS,
 		});
@@ -136,23 +161,23 @@ async function actor(): Promise<SeatKey> {
 	return seat;
 }
 
-/** At the position, the seat asked to act clicks the call. Returns that seat. */
-async function call(board: number, at: number, code: string): Promise<SeatKey> {
-	await expectAt(board, at);
+/** At the position, the seat asked to act draws and discards. Returns that seat. */
+async function turn(at: number): Promise<SeatKey> {
+	await expectAt(at);
 	const seat = await actor();
-	await tab[seat]
-		.getByTestId("bid-box")
-		.locator(`button[data-call="${code}"]`)
-		.click();
+	await takeTurn(tab[seat], at);
 	return seat;
 }
 
-/** At the position on board 1, the seat asked to act plays the first card its tab offers. Returns that seat. */
-async function playFirst(at: number): Promise<SeatKey> {
-	await expectAt(1, at);
-	const seat = await actor();
-	await playable(tab[seat]).first().click();
-	return seat;
+/** Every open tab names the absent player, and no tab offers a game action. */
+async function expectWaitingFor(name: string): Promise<void> {
+	for (const seat of openSeats()) {
+		await expect(prompt(tab[seat])).toHaveText(
+			`Waiting for ${name} to come back`,
+			{ timeout: CONNECT_MS },
+		);
+		await expect(actions(tab[seat])).toHaveCount(0);
+	}
 }
 
 test.beforeAll(async ({ browser, baseURL }) => {
@@ -176,7 +201,7 @@ test.afterAll(async () => {
 	for (const player of Object.values(players)) await player.close();
 });
 
-test("1: four browsers sit down at one table", async () => {
+test("1: four browsers sit down at one table, and the first hand is dealt", async () => {
 	tab.W = await players.W.page("./");
 	link = await createRoom(tab.W);
 	open.add("W");
@@ -190,17 +215,21 @@ test("1: four browsers sit down at one table", async () => {
 	}
 	// South is the last free seat, so its page takes it without a picker.
 	tab.S = await players.S.page(link);
-	await expect(tab.S.getByTestId("you")).toHaveText(YOU.S, {
+	await expectSeat(tab.S, "S", {
 		timeout: CONNECT_MS,
 	});
 	open.add("S");
-	for (const seat of SEATS)
+	for (const seat of SEATS) {
+		await openDrawer(tab[seat]);
 		await expect(tab[seat].getByTestId("all-connected")).toBeVisible({
 			timeout: CONNECT_MS,
 		});
+	}
+	await expectAt(0);
 });
 
 test("2: a follower that crashes, or reloads, gets the messages it missed, each once and in order", async () => {
+	test.setTimeout(180_000);
 	await crash("N");
 	for (const seat of ["W", "E", "S"] as const)
 		await say(seat, `${seat}: North is away`);
@@ -210,7 +239,7 @@ test("2: a follower that crashes, or reloads, gets the messages it missed, each 
 	const reloading = tab.E.reload();
 	await say("S", "S: East reloads");
 	await reloading;
-	await expect(tab.E.getByTestId("you")).toHaveText(YOU.E, {
+	await expectSeat(tab.E, "E", {
 		timeout: CONNECT_MS,
 	});
 	await expectTranscripts();
@@ -219,112 +248,83 @@ test("2: a follower that crashes, or reloads, gets the messages it missed, each 
 	await expectTranscripts();
 });
 
-test("3: a deal waits while a player is away, also when a tab forces it; it goes through after the player returns (R4)", async () => {
+test("3: a turn waits while a player is away; it goes on after the player returns (R4)", async () => {
+	test.setTimeout(180_000);
 	await crash("S");
-	for (const seat of openSeats()) {
-		await expect(prompt(tab[seat])).toHaveText(
-			"Waiting for South to come back",
-			{ timeout: CONNECT_MS },
-		);
-		await expect(deal(tab[seat])).toBeDisabled();
-	}
-	// A modified tab sends the deal anyway: the host answers "waiting" with the same reason, and the outbox
-	// sends it again every 2 s.
-	await deal(tab.W).evaluate((node) => {
-		if (!(node instanceof HTMLButtonElement)) throw new Error("not a button");
-		node.disabled = false;
-		node.click();
-	});
-	const forced = tab.W.getByTestId("table-actions").locator(
-		'li[data-state="pending"]',
-	);
-	await expect(forced).toHaveCount(1, { timeout: CONNECT_MS });
-	await expect(forced).toContainText("Waiting for South to come back");
-	// Several resends while South is away start no board.
+	await expectWaitingFor("South");
+	// While South is away, nothing moves.
 	await tab.W.waitForTimeout(8_000);
-	await expectAt(0, 0);
-	await expect(forced).toHaveCount(1);
-	await expect(refusals(tab.W)).toHaveCount(0);
+	await expectAt(0);
 
-	// When South is back, the waiting deal goes through once, without a second click.
+	// North dealt hand 1, so East takes the first turn once South is back.
 	await reopen("S");
-	await expectAt(1, 0);
-	await expect(forced).toHaveCount(0);
-	await expect(refusals(tab.W)).toHaveCount(0);
+	expect(await turn(0)).toBe("E");
+	await expectAt(2);
 	for (const seat of SEATS)
-		await expect(table(tab[seat])).toHaveAttribute("data-phase", "auction");
+		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play");
 });
 
-test("4: the host crashes mid-auction; a player clicks Make me the host; the old host reopens, follows, and the auction goes on", async () => {
+test("4: the host crashes mid-hand; a player clicks Make me the host; the old host reopens, follows, and the play goes on", async () => {
 	test.setTimeout(180_000);
-	expect(await call(1, 0, "1C")).toBe("N");
-	await expectAt(1, 1);
+	expect(await turn(2)).toBe("S");
+	await expectAt(4);
 	await crash("W");
-	await expectBanner(tab.E, "waiting-for-host");
+	// The banner reads "unreachable" until the other players' last reports of West are HOST_LOST_MS old.
+	await expectBanner(tab.E, "waiting-for-host", {
+		timeout: HOST_LOST_MS + 10_000,
+	});
 	const become = tab.E.getByTestId("become-host");
 	await expect(become).toBeEnabled({ timeout: BUTTON_LATEST_MS });
 	await become.click();
 	expect(await commonHost()).toBe("E");
-	// The new host keeps the board, but the auction waits for West (R4).
-	await expectAt(1, 1);
-	for (const seat of openSeats())
-		await expect(prompt(tab[seat])).toHaveText(
-			"Waiting for West to come back",
-			{ timeout: CONNECT_MS },
-		);
-	await expect(tab.E.getByTestId("bid-box").locator("button")).toHaveCount(0);
+	// The new host keeps the hand, but West's turn waits for West (R4).
+	await expectAt(4);
+	await expectWaitingFor("West");
 
 	await reopen("W");
 	expect(await commonHost()).toBe("E");
 	await expect(tab.W.getByTestId("banner")).toBeHidden({ timeout: CONNECT_MS });
-	expect(await call(1, 1, "P")).toBe("E");
-	expect(await call(1, 2, "P")).toBe("S");
-	expect(await call(1, 3, "P")).toBe("W");
-	await expectAt(1, 4);
-	for (const seat of SEATS) {
+	expect(await turn(4)).toBe("W");
+	expect(await turn(6)).toBe("N");
+	await expectAt(8);
+	for (const seat of SEATS)
 		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play");
-		await expect(table(tab[seat])).toContainText("1♣ by North");
-	}
 });
 
-test("5: dummy crashes during the play: declarer plays on; the next deal waits for dummy (R4)", async () => {
-	test.setTimeout(300_000);
-	await crash(DUMMY);
-	for (let at = 4; at < 56; at += 1) {
-		const seat = await playFirst(at);
-		expect(seat, "dummy is away").not.toBe(DUMMY);
-	}
-	await expectAt(1, 56);
-	const result = await tab.W.getByTestId("result").innerText();
-	expect(result).toMatch(/^1♣(?:=|[+-]\d) by North: /);
-	for (const seat of openSeats()) {
-		await expect(table(tab[seat])).toHaveAttribute("data-phase", "complete");
-		await expect(tab[seat].getByTestId("result")).toHaveText(result);
-		await expect(deal(tab[seat])).toHaveText("Deal board 2");
-		await expect(deal(tab[seat])).toBeDisabled();
-		await expect(prompt(tab[seat])).toHaveText(
-			"Waiting for South to come back",
-		);
-	}
+test("5: a player crashes after drawing; the table waits; the reopened tab holds the drawn cards and finishes the turn (R4)", async () => {
+	test.setTimeout(180_000);
+	expect(await turn(8)).toBe("E");
+	await expectAt(10);
+	expect(await actor()).toBe("S");
+	await tab.S.getByTestId("action-draw").click();
+	await expectAt(11);
+	const drawn = await handCards(tab.S);
+	await crash("S");
+	await expectWaitingFor("South");
 
-	await reopen(DUMMY);
-	await expectAt(1, 56);
-	await expect(tab.S.getByTestId("result")).toHaveText(result);
-	const sheet = await tab.W.getByTestId("scores").innerText();
-	await expect(tab.S.getByTestId("scores")).toHaveText(sheet, {
-		useInnerText: true,
-	});
-	for (const seat of SEATS)
-		await expect(deal(tab[seat])).toBeEnabled({ timeout: CONNECT_MS });
+	await reopen("S");
+	await expect
+		.poll(() => handCards(tab.S), { timeout: CONNECT_MS })
+		.toEqual(drawn);
+	await expect(prompt(tab.S)).toHaveText(
+		"Your turn: meld, extend, then discard.",
+		{ timeout: CONNECT_MS },
+	);
+	await expect(tab.S.getByTestId("action-draw")).toHaveCount(0);
+	await tab.S.locator(".own-hand button.card").first().click();
+	await tab.S.getByTestId("action-discard").click();
+	await expectAt(12);
 });
 
 test("6: three players crash while one stays; its message waits; after they reopen, all four have the same table", async () => {
 	test.setTimeout(180_000);
-	const result = await tab.S.getByTestId("result").innerText();
 	await crash("W");
 	await crash("E");
 	await crash("N");
-	await expectBanner(tab.S, "waiting-for-host");
+	// A frozen or crashed host is "unreachable" until the other players' last reports of it are HOST_LOST_MS old.
+	await expectBanner(tab.S, "waiting-for-host", {
+		timeout: HOST_LOST_MS + 10_000,
+	});
 	const alone = "S: the others are away";
 	await type("S", alone);
 	const waiting = tab.S.getByTestId("pending").locator("li");
@@ -332,7 +332,7 @@ test("6: three players crash while one stays; its message waits; after they reop
 	await expect(waiting).toContainText(alone);
 	await expect(texts(tab.S)).toHaveText(expected);
 
-	for (const seat of ["W", "N", "E"] as const) await reopen(seat);
+	for (const seat of ["W", "N", "E"] as const) await reopenOwn(seat);
 	expected.push(alone);
 	await expectTranscripts();
 	await expect(waiting).toHaveCount(0);
@@ -340,13 +340,11 @@ test("6: three players crash while one stays; its message waits; after they reop
 		type: "host after the reopen",
 		description: await commonHost(),
 	});
-	for (const seat of SEATS) {
-		await expect(table(tab[seat])).toHaveAttribute("data-phase", "complete");
-		await expect(tab[seat].getByTestId("result")).toHaveText(result);
-		await expect(deal(tab[seat])).toBeEnabled({ timeout: CONNECT_MS });
-	}
-	await deal(tab.E).click();
-	await expectAt(2, 0);
+	await expectAt(12);
+	for (const seat of SEATS)
+		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play");
+	expect(await turn(12)).toBe("W");
+	await expectAt(14);
 });
 
 test("7: a frozen player shows offline, and after the thaw it has everything it missed", async () => {
@@ -369,9 +367,9 @@ test("7: a frozen player shows offline, and after the thaw it has everything it 
 			tab[seat].getByTestId("roster").locator('li[data-state="online"]'),
 		).toHaveCount(4, { timeout: CONNECT_MS });
 	await expect(tab[frozen].getByTestId("banner")).toBeHidden();
-	// Board 2: East deals and calls first; the thawed tab sees the call.
-	expect(await call(2, 0, "1D")).toBe("E");
-	await expectAt(2, 1);
+	// North's turn: the thawed tab sees it.
+	expect(await turn(14)).toBe("N");
+	await expectAt(16);
 });
 
 test("no uncaught errors and no request to the old backend", () => {

@@ -324,7 +324,7 @@ class Sim {
 		});
 	}
 
-	/** One move when it is this page's turn: N starts the match; then the seat to act picks a random legal action. */
+	/** One move when it is this page's turn: the host starts the match; then the seat to act picks a random legal action. */
 	#play(page: SimPage): void {
 		const command = this.#choose(page);
 		if (!command) return;
@@ -343,7 +343,8 @@ class Sim {
 		const state = parseCanastaState(table.state, TABLE);
 		if (!state) throw new Error("the table state is not a canasta table");
 		const seat = page.browser.seat;
-		if (!state.match) return seat === "N" ? startPayload(TABLE) : null;
+		if (!state.match)
+			return page.election.mode.kind === "hosting" ? startPayload(TABLE) : null;
 		const { match } = state;
 		if (match.settled) return null;
 		const actions = legalActions(match.hand, engineSeat(seat));
@@ -534,8 +535,9 @@ describe("four pages play a board across a host crash", () => {
 					expect(resent).toBeUndefined();
 					expect(undone).toEqual([["N", [crashed.id]]]);
 				} else {
-					// R4: North is declarer, so the new host keeps the card waiting until North is back. Rebinding the
-					// same holder and generation adds no seat entry; the delayed card takes the next log position.
+					// R4: every canasta action needs all four seats, so the new host keeps the action waiting until North is
+					// back. Rebinding the same holder and generation adds no seat entry; the delayed action takes the next
+					// log position.
 					const back = reference.entries.find(
 						(entry) =>
 							entry.kind === "seat" && entry.seat === "N" && entry.gen === 2,

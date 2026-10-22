@@ -1,5 +1,5 @@
-import { deriveHolder } from "../p2p/keys";
 import { isBotName, type RoomConfig, SEATS, type Seat } from "../protocol";
+import { deriveHolder } from "./keys";
 
 export interface BotSeatClaim {
 	readonly seat: Seat;

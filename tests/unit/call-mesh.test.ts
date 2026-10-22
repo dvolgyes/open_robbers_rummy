@@ -655,6 +655,42 @@ describe("CallMesh membership and lifecycle", () => {
 		expectConnected(north, south);
 	});
 
+	it("forgets a peer that returns within 10 s but does not answer the greeting, as after a reload", async () => {
+		const north = table.take("N");
+		const south = table.take("S");
+		north.mesh.join(AUDIO);
+		south.mesh.join(AUDIO);
+		await settle();
+		// The page reloads: its inbox is gone, and the new page holds the seat again without joining the call.
+		table.broker.outage("S");
+		table.broker.online.delete("S");
+		table.publish(north);
+		await settle(VANISHED_MS / 5);
+		table.broker.online.add("S");
+		table.publish(north);
+		await settle(SILENCE_MS - 1);
+		expect(north.mesh.peer("S")).toBeDefined();
+		await settle(1);
+		expect(north.mesh.peer("S")).toBeUndefined();
+		expect(north.live("S")).toEqual([]);
+	});
+
+	it("keeps a returning peer that answers the greeting", async () => {
+		const north = table.take("N");
+		const south = table.take("S");
+		north.mesh.join(AUDIO);
+		south.mesh.join(AUDIO);
+		await settle();
+		table.broker.online.delete("S");
+		table.publish(north);
+		await settle(VANISHED_MS / 5);
+		table.broker.online.add("S");
+		table.publish(north);
+		await settle(SILENCE_MS * 2);
+		expect(north.mesh.peer("S")).toEqual(AUDIO);
+		expectConnected(north, south);
+	});
+
 	it("Leave closes every link and the peers forget the seat", async () => {
 		const north = table.take("N");
 		const east = table.take("E");

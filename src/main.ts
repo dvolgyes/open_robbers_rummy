@@ -13,7 +13,7 @@ import { guardedStorage, SeatMemory, webSeatLocks } from "./session";
 import { startApp } from "./ui/app";
 import type { CallSupport } from "./ui/deps";
 
-const LOCALE_STORAGE_KEY = "opentrick.locale";
+const LOCALE_STORAGE_KEY = "open_canasta.locale";
 const browser = guardedStorage(() => window.localStorage);
 const detectedLocale = detectLocale(navigator.languages, navigator.language);
 const storedLocale = browser?.getItem(LOCALE_STORAGE_KEY);

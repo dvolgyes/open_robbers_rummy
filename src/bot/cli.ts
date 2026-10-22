@@ -1,4 +1,5 @@
 import { RTCPeerConnection as WeriftPeerConnection } from "werift";
+import { parseRoomSetup } from "../bookmark";
 import type { MatchState } from "../canasta";
 import {
 	actionPayload,
@@ -22,7 +23,6 @@ import {
 	SEATS,
 } from "../protocol";
 import { type SeatLocks, SeatMemory } from "../session";
-import { parseRoomSetup } from "../ui/bookmark";
 import { OpenRouterStrategy } from "./node-openrouter";
 import { NODE_PROMPT_TEMPLATES } from "./node-prompts";
 import { actionPositionKey } from "./position";

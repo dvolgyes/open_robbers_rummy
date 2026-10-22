@@ -1,4 +1,9 @@
 import {
+	botSeatsQuery,
+	parseBookmark,
+	SELECTED_PLAYER_PARAM,
+} from "../bookmark";
+import {
 	normalizeHostApiKey,
 	readHostApiKey,
 	writeHostApiKey,
@@ -8,23 +13,19 @@ import {
 	HostBotRunner,
 	type HostBotSettings,
 } from "../bot/host-runner";
-import { type Board, boardStatus } from "../bridge/engine";
 import { CallController } from "../call/call";
 import { classify, readSignals, watchDeviceClass } from "../call/device-class";
 import { createCallSignaling } from "../call/signaling";
 import {
 	actionPayload,
-	claimRequestPayload,
-	claimVotePayload,
-	dealPayload,
-	parseBridgeState,
+	type CanastaState,
+	nextHandPayload,
+	parseCanastaState,
 	resetCancelPayload,
 	resetRequestPayload,
 	resetVotePayload,
-	undoCancelPayload,
-	undoRequestPayload,
-	undoVotePayload,
-} from "../game/bridge";
+	startPayload,
+} from "../game/canasta";
 import { chatPayload, checkMessageText } from "../game/chat";
 import { tableLink } from "../p2p/link";
 import type { TableController, TableStatus } from "../p2p/table";
@@ -38,11 +39,6 @@ import {
 	SEATS,
 	type Seat,
 } from "../protocol";
-import {
-	botSeatsQuery,
-	parseBookmark,
-	SELECTED_PLAYER_PARAM,
-} from "./bookmark";
 import { CallMemory } from "./call-memory";
 import type { CallDisplay, RemoteCallPresence } from "./call-model";
 import { cameraSetup } from "./camera-setup";
@@ -69,7 +65,7 @@ import { modelPriorityControl } from "./model-priority";
 import { networkPanel } from "./network";
 import { remoteAudio } from "./remote-audio";
 import { tableSection } from "./table";
-import { autoDealBoard, tableView } from "./table-model";
+import { tableView } from "./table-model";
 import type { TurnSound } from "./turn-sound";
 
 export interface RoomScreenHandlers extends Navigation {
@@ -429,15 +425,17 @@ export function showRoom(
 	let confirming: Seat | undefined;
 	/** The browser's answer to the persistence request (plan §4.3). */
 	let persisted: boolean | undefined;
-	/** The board as last rendered: an action is sent for the position the player saw. */
-	let shownBoard: Board | null = null;
+	/** The table as last rendered: an action is sent for the position the player saw. */
+	let shownState: CanastaState | undefined;
 	/** The view models as last rendered. The controller notifies every tick; equal models keep their nodes. */
 	let shownRoom: string | undefined;
 	let shownTable: string | undefined;
-	let scoringBoard: number | undefined;
+	let scoringHand: number | undefined;
 	let scoringStartedAt: number | undefined;
 	let scoringTimer: number | undefined;
-	let autoDealtBoard: number | undefined;
+	/** The host command last sent for the table: the start, or the next hand by its number. */
+	let hostCommandSent: string | undefined;
+	/** The reset request that the decision buttons answer. */
 	let resetRequestId: string | undefined;
 
 	/** Stores the command for sending; `onFail` gets the reason when this browser could not store it. */
@@ -451,17 +449,6 @@ export function showRoom(
 			render();
 		});
 	};
-
-	const dealBoard = (board: number, onFail?: () => void): void => {
-		actionError = undefined;
-		submit(dealPayload(tableId, board), (reason) => {
-			actionError = deps.t("Not sent: {reason}", { reason });
-			onFail?.();
-		});
-		render();
-	};
-	/** The host deals the first board once all four seats are filled. */
-	let firstDealSent = false;
 
 	function manageBotSeat(targetSeat: Seat, enabled: boolean): void {
 		if (enabled && !readHostApiKey(deps.browser)) {
@@ -626,47 +613,11 @@ export function showRoom(
 				await navigator.share({ url: roomShareLink(deps.pageUrl(), key) });
 			},
 			act(action) {
-				if (!shownBoard) return;
+				if (!shownState?.match) return;
 				actionError = undefined;
-				submit(actionPayload(tableId, shownBoard, action), (reason) => {
+				const { match, actions } = shownState;
+				submit(actionPayload(tableId, match, actions, action), (reason) => {
 					actionError = deps.t("Not sent: {reason}", { reason });
-				});
-				render();
-			},
-			undoRequest(board) {
-				actionError = undefined;
-				submit(undoRequestPayload(tableId, board), (reason) => {
-					actionError = deps.t("Undo not sent: {reason}", { reason });
-				});
-				render();
-			},
-			undoVote(requestId, approve) {
-				actionError = undefined;
-				submit(undoVotePayload(tableId, requestId, approve), (reason) => {
-					actionError = deps.t("Undo vote not sent: {reason}", { reason });
-				});
-				render();
-			},
-			undoCancel(requestId) {
-				actionError = undefined;
-				submit(undoCancelPayload(tableId, requestId), (reason) => {
-					actionError = deps.t("Undo cancellation not sent: {reason}", {
-						reason,
-					});
-				});
-				render();
-			},
-			claimRequest(board, tricks) {
-				actionError = undefined;
-				submit(claimRequestPayload(tableId, board, tricks), (reason) => {
-					actionError = deps.t("Claim not sent: {reason}", { reason });
-				});
-				render();
-			},
-			claimVote(requestId, approve) {
-				actionError = undefined;
-				submit(claimVotePayload(tableId, requestId, approve), (reason) => {
-					actionError = deps.t("Claim decision not sent: {reason}", { reason });
 				});
 				render();
 			},
@@ -749,7 +700,6 @@ export function showRoom(
 				retry: (target) => call?.retry(target),
 			},
 		},
-		undefined,
 		deps.t,
 	);
 
@@ -830,6 +780,7 @@ export function showRoom(
 		modelPriority.setValue(botSettings.modelOrder);
 		if (!modelDialog.open) modelDialog.showModal();
 	});
+	// A reset clears the scores and starts a new match once every other present player approves it.
 	const reset = button(
 		deps.t("Reset"),
 		() => {
@@ -839,51 +790,7 @@ export function showRoom(
 				actionError = deps.t("Reset not sent: {reason}", { reason });
 			});
 		},
-		{ className: "reset-button" },
-	);
-	const exit = button(deps.t("Exit"), handlers.createNew, {
-		className: "sidebar-exit",
-	});
-	const pauseBots = button(deps.t("Pause bots"), () => {
-		if (!botRunner) return;
-		botRunner.pause();
-		botsPaused = true;
-		botStatus.textContent = deps.t("Bots paused.");
-		render();
-	});
-	const resumeBots = button(deps.t("Resume bots"), () => {
-		if (!botRunner) {
-			void startHostBots();
-			return;
-		}
-		botBalancePaused = false;
-		botRunner.resume();
-		botsPaused = false;
-		botStatus.textContent = runningBotStatus();
-		render();
-	});
-	const resetControls = el(
-		"section",
-		{ className: "room-controls", attrs: { "data-testid": "room-controls" } },
-		el(
-			"div",
-			{ className: "room-control-row room-primary-controls" },
-			copyRoomLink,
-			reset,
-			exit,
-		),
-		el(
-			"div",
-			{ className: "room-control-row room-bot-controls" },
-			setApiKey,
-			chooseModel,
-			pauseBots,
-			resumeBots,
-			botSpendCounter,
-		),
-		botStatus,
-		keyDialog,
-		modelDialog,
+		{ className: "reset-button", attrs: { "data-testid": "reset" } },
 	);
 	const resetStatus = el("p", { className: "note", attrs: { role: "status" } });
 	const resetApprove = button(deps.t("Approve reset"), () => {
@@ -914,10 +821,53 @@ export function showRoom(
 		resetReject,
 		resetCancel,
 	);
-	resetControls.append(resetDecision);
-	table.sidebar.prepend(resetControls);
+	resetDecision.hidden = true;
+	const exit = button(deps.t("Exit"), handlers.createNew, {
+		className: "room-exit",
+	});
+	const pauseBots = button(deps.t("Pause bots"), () => {
+		if (!botRunner) return;
+		botRunner.pause();
+		botsPaused = true;
+		botStatus.textContent = deps.t("Bots paused.");
+		render();
+	});
+	const resumeBots = button(deps.t("Resume bots"), () => {
+		if (!botRunner) {
+			void startHostBots();
+			return;
+		}
+		botBalancePaused = false;
+		botRunner.resume();
+		botsPaused = false;
+		botStatus.textContent = runningBotStatus();
+		render();
+	});
+	const roomControls = el(
+		"section",
+		{ className: "room-controls", attrs: { "data-testid": "room-controls" } },
+		el(
+			"div",
+			{ className: "room-control-row room-primary-controls" },
+			copyRoomLink,
+			reset,
+			exit,
+		),
+		el(
+			"div",
+			{ className: "room-control-row room-bot-controls" },
+			setApiKey,
+			chooseModel,
+			pauseBots,
+			resumeBots,
+			botSpendCounter,
+		),
+		botStatus,
+		keyDialog,
+		modelDialog,
+	);
 
-	// A storage warning stays visible on every screen, so it sits in the stage, not in the extras.
+	// A storage warning stays visible on every screen, so it sits in the stage, not in the drawer.
 	const storageNotices =
 		deps.storageProblem === undefined
 			? []
@@ -930,7 +880,22 @@ export function showRoom(
 				];
 
 	// The stage holds what a player needs during play; on a compact device it fills the screen.
-	// While waiting (`data-waiting="true"`) the CSS hides the sidebar and the extras.
+	// The players, invite link, network panel and messages sit in a drawer under the table, closed by default.
+	const drawer = el(
+		"details",
+		{ className: "room-drawer", attrs: { "data-testid": "room-drawer" } },
+		el("summary", {}, deps.t("Players and messages")),
+		el("h2", {}, deps.t("Players")),
+		roster,
+		rosterNote,
+		allConnected,
+		links,
+		network.element,
+		el("h2", {}, deps.t("Messages")),
+		transcript,
+		pending,
+		form,
+	);
 	const room = el(
 		"section",
 		{ className: "room" },
@@ -939,36 +904,17 @@ export function showRoom(
 			{ className: "stage" },
 			you,
 			banner,
+			resetDecision,
 			actionNote,
 			...storageNotices,
 			table.element,
 		),
 		audio.element,
-		table.sidebar,
-		el(
-			"div",
-			{ className: "room-extra" },
-			el("h2", {}, deps.t("Players")),
-			roster,
-			rosterNote,
-			allConnected,
-			links,
-			network.element,
-			el("h2", {}, deps.t("Messages")),
-			transcript,
-			pending,
-			form,
-		),
+		el("footer", { className: "room-footer" }, roomControls, drawer),
 	);
-	// The room keeps one Full HD presentation; deviceForm remains the call policy for camera support.
+	// The room has one responsive layout; deviceForm remains the call policy for camera support.
 	room.dataset.form = "desktop";
 	table.setForm("desktop");
-	const updateRoomCanvasScale = (): void => {
-		const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-		root.style.setProperty("--room-canvas-scale", String(scale));
-	};
-	updateRoomCanvasScale();
-	window.addEventListener("resize", updateRoomCanvasScale);
 	const pageIsVisible = (): boolean => document.visibilityState === "visible";
 	const checkTurnAlert = (): void => {
 		if (
@@ -1293,7 +1239,7 @@ export function showRoom(
 		const state =
 			view.table === null
 				? undefined
-				: (parseBridgeState(view.table.state, tableId) ?? null);
+				: (parseCanastaState(view.table.state, tableId) ?? null);
 		remoteCallPresence = {};
 		for (const targetSeat of SEATS) {
 			const record = state?.media[targetSeat];
@@ -1314,14 +1260,14 @@ export function showRoom(
 			};
 		}
 		renderCall();
-		shownBoard = state?.board ?? null;
+		shownState = state ?? undefined;
 		const pendingReset = state?.reset ?? null;
 		resetRequestId = pendingReset?.id;
-		reset.disabled = terminal || pendingReset !== null;
+		reset.disabled =
+			terminal || pendingReset !== null || (state?.match ?? null) === null;
 		resetDecision.hidden = pendingReset === null;
 		resetApprove.hidden =
 			pendingReset === null ||
-			pendingReset.requester === seat ||
 			!pendingReset.required.includes(seat) ||
 			pendingReset.approved.includes(seat);
 		resetReject.hidden = resetApprove.hidden;
@@ -1338,22 +1284,20 @@ export function showRoom(
 						})
 					: deps.t("{requester} asks to reset the game.", { requester });
 		}
-		const completedBoard =
-			state?.board &&
-			(state.claimResult !== null ||
-				boardStatus(state.board).phase === "complete")
-				? state.board.number
+		// A settled hand with no winner waits for its countdown, then the host deals the next hand.
+		const settledHand =
+			state?.match?.settled && state.match.winner === null
+				? state.match.handNo
 				: undefined;
-		if (completedBoard !== scoringBoard) {
+		if (settledHand !== scoringHand) {
 			if (scoringTimer !== undefined) window.clearInterval(scoringTimer);
-			scoringBoard = completedBoard;
+			scoringHand = settledHand;
 			scoringStartedAt =
-				completedBoard === undefined
+				settledHand === undefined
 					? undefined
 					: (view.table?.lastActivityAt ?? Date.now());
-			autoDealtBoard = undefined;
 			scoringTimer =
-				completedBoard === undefined
+				settledHand === undefined
 					? undefined
 					: window.setInterval(render, 1000);
 		}
@@ -1417,11 +1361,11 @@ export function showRoom(
 		);
 		yourTurn = tableModel.yourTurn;
 		currentTurnKey = yourTurn
-			? `${tableModel.board}:${tableModel.at}:${seat}`
+			? `${tableModel.handNo}:${tableModel.at}:${seat}`
 			: undefined;
-		document.title = `${yourTurn ? "TURN - " : ""}Bridge: ${config.names[seat]} (${deps.t(seat)})`;
+		document.title = `${yourTurn ? "TURN - " : ""}Open Canasta: ${config.names[seat]} (${deps.t(seat)})`;
 		checkTurnAlert();
-		// The lobby uses the table layout, so it looks like the game; only the sidebar is hidden while waiting.
+		// The lobby uses the table layout, so it looks like the game; only the game controls differ while waiting.
 		root.dataset.screen = "table";
 		root.dataset.waiting = String(tableModel.phase === "waiting");
 		const tableKey = JSON.stringify(
@@ -1435,24 +1379,34 @@ export function showRoom(
 		if (tableKey !== shownTable) {
 			shownTable = tableKey;
 			table.render(tableModel);
-			const first = tableModel.nextBoard;
-			if (view.hosting && first?.board === 1 && first.ready && !firstDealSent) {
-				firstDealSent = true;
-				dealBoard(1);
-			}
 		}
 		table.setCountdown(tableModel.scoring?.countdown);
-		const boardToDeal = autoDealBoard(
-			view.hosting,
-			tableModel.board,
-			tableModel.scoring?.countdown,
-			tableModel.nextBoard,
-			autoDealtBoard,
-		);
-		if (boardToDeal !== undefined) {
-			autoDealtBoard = boardToDeal;
-			dealBoard(boardToDeal, () => {
-				autoDealtBoard = undefined;
+		// The host starts the match once all four seats are connected, and deals each next hand after the countdown.
+		// The start key counts the matches, so the host starts again after a reset; nothing is dealt while a reset waits.
+		const hostCommand =
+			!view.hosting ||
+			terminal ||
+			state === undefined ||
+			state === null ||
+			state.reset !== null
+				? undefined
+				: state.match === null
+					? present.size === SEATS.length
+						? {
+								key: `start:${state.matches}`,
+								payload: startPayload(tableId),
+							}
+						: undefined
+					: settledHand !== undefined && scoringCountdown === 0
+						? {
+								key: `next:${settledHand}`,
+								payload: nextHandPayload(tableId),
+							}
+						: undefined;
+		if (hostCommand !== undefined && hostCommand.key !== hostCommandSent) {
+			hostCommandSent = hostCommand.key;
+			submit(hostCommand.payload, () => {
+				hostCommandSent = undefined;
 			});
 		}
 		send.textContent = deps.t(model.send.label);
@@ -1486,8 +1440,6 @@ export function showRoom(
 		if (rateLimitTimer !== undefined) window.clearTimeout(rateLimitTimer);
 		if (scoringTimer !== undefined) window.clearInterval(scoringTimer);
 		stopWatching();
-		window.removeEventListener("resize", updateRoomCanvasScale);
-		root.style.removeProperty("--room-canvas-scale");
 		unsubscribe();
 		unsubscribeCamera?.();
 		camera?.dispose();

@@ -1,17 +1,26 @@
 import { expect, type Page, test } from "@playwright/test";
+import {
+	BUTTON_MS,
+	CLAIM_PULL_MS,
+	HOST_LOST_MS,
+	STAGGER_MS,
+	VOLUNTEER_MS,
+} from "../../src/p2p/limits";
 import { freeze } from "./lifecycle";
 import { Player, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
 	createRoom,
 	expectBanner,
+	expectSeat,
 	hostRows,
 	MESSAGE,
+	openDrawer,
+	ownLink,
 	pick,
 	type SeatKey,
 	sendDraft,
 	texts,
-	YOU,
 } from "./room";
 
 /**
@@ -20,14 +29,14 @@ import {
  * at the table (plan §2 D1). Each test has its own table and its own browsers.
  */
 
-/** The owner's wait before the button shows. */
-const BUTTON_MS = 10_000;
-/** The owner's wait before a player volunteers automatically. */
-const VOLUNTEER_MS = 30_000;
-/** The latest time for the automatic host: 6 s until the host counts as lost, the stagger, the claim pull, slack. */
-const VOLUNTEER_LATEST_MS = 60_000;
-/** A page counts as lost 6 s after its last message; then the button needs 10 s more, with slack. */
-const BUTTON_LATEST_MS = 30_000;
+/**
+ * The latest time for the automatic host after the host leaves: the host counts as lost HOST_LOST_MS after its
+ * last beat, then the volunteer wait, the stagger of the three seats, the claim pull, and slack.
+ */
+const VOLUNTEER_LATEST_MS =
+	HOST_LOST_MS + VOLUNTEER_MS + 3 * STAGGER_MS + CLAIM_PULL_MS + 15_000;
+/** The host counts as lost HOST_LOST_MS after its last beat; then the button needs BUTTON_MS more, with slack. */
+const BUTTON_LATEST_MS = HOST_LOST_MS + BUTTON_MS + 10_000;
 const SEATS = ["W", "N", "E", "S"] as const satisfies readonly SeatKey[];
 
 /** Every browser of every test, for the final error check. */
@@ -149,16 +158,22 @@ async function northAlone(): Promise<{
 	readonly north: Page;
 	readonly westBrowser: Player;
 	readonly since: number;
+	/** When the disabled button showed: BUTTON_MS into North's absence clock. */
+	readonly shownAt: number;
 }> {
 	const { link, tab, west: westBrowser } = await seatTable(["N"]);
 	const north = tabOf(tab, "N");
 	await tabOf(tab, "W").close({ runBeforeUnload: false });
 	const since = Date.now();
 
-	await expectBanner(north, "waiting-for-host");
+	// The banner reads "unreachable" until West's last beat is HOST_LOST_MS old.
+	await expectBanner(north, "waiting-for-host", {
+		timeout: HOST_LOST_MS + 10_000,
+	});
 	const become = north.getByTestId("become-host");
 	await expect(become).toBeVisible({ timeout: BUTTON_LATEST_MS });
-	const shownAfter = Date.now() - since;
+	const shownAt = Date.now();
+	const shownAfter = shownAt - since;
 	test.info().annotations.push({
 		type: "button shown after (ms)",
 		description: String(shownAfter),
@@ -168,7 +183,7 @@ async function northAlone(): Promise<{
 	await expect(north.getByTestId("banner")).toContainText(
 		"Another player must be online to confirm",
 	);
-	return { link, north, westBrowser, since };
+	return { link, north, westBrowser, since, shownAt };
 }
 
 /** The old host reopens and follows North; West's message reaches every page. */
@@ -182,8 +197,8 @@ async function westFollowsNorth(
 		timeout: CONNECT_MS,
 	});
 	await pick(visitor, "E");
-	const west = await westBrowser.page(link);
-	await expect(west.getByTestId("you")).toHaveText(YOU.W, {
+	const west = await westBrowser.page(ownLink(link, "W"));
+	await expectSeat(west, "W", {
 		timeout: CONNECT_MS,
 	});
 	expect(await commonHost([north, visitor, west])).toBe("N");
@@ -194,19 +209,20 @@ async function westFollowsNorth(
 
 test("the button shows after 10 s without a host; it waits for a witness, and a click gives one host", async () => {
 	test.setTimeout(180_000);
-	const { link, north, westBrowser, since } = await northAlone();
+	const { link, north, westBrowser, shownAt } = await northAlone();
 	const become = north.getByTestId("become-host");
 
 	// A visitor in another browser is a witness. It must connect before the automatic volunteer at 30 s.
 	const visitor = await (await openBrowser("visitor")).page(link);
 	await expect(become).toBeEnabled({ timeout: CONNECT_MS });
-	const enabledAfter = Date.now() - since;
+	// North's absence clock was at BUTTON_MS when the button showed.
+	const absentAtEnable = BUTTON_MS + Date.now() - shownAt;
 	test.info().annotations.push({
-		type: "button enabled after (ms)",
-		description: String(enabledAfter),
+		type: "absence when the button was enabled (ms)",
+		description: String(absentAtEnable),
 	});
 	expect(
-		enabledAfter,
+		absentAtEnable,
 		"the witness came before the automatic volunteer",
 	).toBeLessThan(VOLUNTEER_MS);
 	await become.click();
@@ -223,7 +239,7 @@ test("alone, a seated player never becomes the host; after 30 s it volunteers as
 	const become = north.getByTestId("become-host");
 	// Alone, North never volunteers: no new term without a witness (plan §2 D1).
 	await holdsUntil(
-		since + VOLUNTEER_MS + 10_000,
+		since + HOST_LOST_MS + VOLUNTEER_MS + 10_000,
 		"North stays without a host and its button stays disabled",
 		async () =>
 			(await hostRows(north).count()) === 0 &&
@@ -244,6 +260,7 @@ test("with four seats, a player volunteers about 30 s after the host leaves; the
 	test.setTimeout(180_000);
 	const { link, tab, west: westBrowser } = await seatTable(["N", "E"]);
 	// "All players connected" needs the other three seats.
+	await openDrawer(tabOf(tab, "W"));
 	await expect(tabOf(tab, "W").getByTestId("all-connected")).toBeHidden();
 	const south = await (await openBrowser("S")).page(link);
 	await expect(south.getByTestId("pick-S")).toBeVisible({
@@ -251,10 +268,12 @@ test("with four seats, a player volunteers about 30 s after the host leaves; the
 	});
 	await pick(south, "S");
 	tab.S = south;
-	for (const seat of SEATS)
+	for (const seat of SEATS) {
+		await openDrawer(tabOf(tab, seat));
 		await expect(tabOf(tab, seat).getByTestId("all-connected")).toBeVisible({
 			timeout: CONNECT_MS,
 		});
+	}
 
 	await tabOf(tab, "W").close({ runBeforeUnload: false });
 	const since = Date.now();
@@ -278,8 +297,8 @@ test("with four seats, a player volunteers about 30 s after the host leaves; the
 	for (const page of guests)
 		await expect(page.getByTestId("banner")).toBeHidden();
 
-	const west = await westBrowser.page(link);
-	await expect(west.getByTestId("you")).toHaveText(YOU.W, {
+	const west = await westBrowser.page(ownLink(link, "W"));
+	await expectSeat(west, "W", {
 		timeout: CONNECT_MS,
 	});
 	expect(await commonHost([...guests, west])).toBe(host);
@@ -335,7 +354,7 @@ test("a host that reloads resumes its term, and no page shows the button", async
 		() => noButton(guests),
 	);
 	await west.reload();
-	await expect(west.getByTestId("you")).toHaveText(YOU.W, {
+	await expectSeat(west, "W", {
 		timeout: CONNECT_MS,
 	});
 	await holdsUntil(
@@ -365,7 +384,7 @@ test("a thawed old host steps down, and its later message still goes through", a
 	await thaw();
 	expect(await commonHost([west, north, east])).toBe("N");
 	await expect(west.getByTestId("banner")).toBeHidden({ timeout: CONNECT_MS });
-	await expect(west.getByTestId("you")).toHaveText(YOU.W);
+	await expectSeat(west, "W");
 	await sendDraft(west);
 	for (const page of [west, north, east])
 		await expect(texts(page)).toHaveText([MESSAGE.W]);
@@ -381,7 +400,7 @@ test("a second tab cannot take the host's active seat", async () => {
 		west.getByRole("heading", { name: "Choose your seat" }),
 	).toBeVisible({ timeout: CONNECT_MS });
 	await expect(west.getByTestId("pick-W")).toHaveCount(0);
-	await expect(old.getByTestId("you")).toHaveText(YOU.W);
+	await expectSeat(old, "W");
 	await expect(old.getByTestId("send")).toBeEnabled();
 
 	expect(await commonHost([old, north])).toBe("W");

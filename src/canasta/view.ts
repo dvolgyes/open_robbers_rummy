@@ -1,5 +1,13 @@
-import type { Card } from "./cards";
-import type { HandState, Outcome, Phase, Seat, TeamState } from "./hand";
+import { type Card, isWild } from "./cards";
+import {
+	type HandState,
+	initialSatisfied,
+	type Outcome,
+	type Phase,
+	type Seat,
+	type TeamState,
+	teamOf,
+} from "./hand";
 import type { CanastaRules } from "./rules";
 
 /** What one seat may know. Other hands and the stock are hidden until the hand is over. */
@@ -18,6 +26,8 @@ export interface HandView {
 	readonly revealed: readonly (readonly Card[])[] | null;
 	readonly stockCount: number;
 	readonly pile: readonly Card[];
+	/** The viewer's side cannot take the pile to extend a meld: the pile holds a wild card, or the side has no initial meld yet. */
+	readonly pileFrozen: boolean;
 	readonly teams: readonly [TeamState, TeamState];
 }
 
@@ -36,6 +46,7 @@ export function viewFor(hand: HandState, seat: Seat): HandView {
 		revealed: hand.outcome === null ? null : hand.hands,
 		stockCount: hand.stock.length,
 		pile: hand.pile,
+		pileFrozen: hand.pile.some(isWild) || !initialSatisfied(hand, teamOf(seat)),
 		teams: hand.teams,
 	};
 }

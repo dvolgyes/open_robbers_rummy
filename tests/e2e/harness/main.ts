@@ -1,9 +1,4 @@
 import { getRelaySockets, joinRoom } from "@trystero-p2p/torrent";
-import {
-	type Board,
-	boardStatus,
-	legalActions,
-} from "../../../src/bridge/engine";
 import type { CallMessage } from "../../../src/call/messages";
 import { type CallRecords, callRecordPayload } from "../../../src/call/record";
 import {
@@ -11,11 +6,15 @@ import {
 	createCallSignaling,
 	type SignalingEnd,
 } from "../../../src/call/signaling";
+import { legalActions } from "../../../src/canasta";
 import {
 	actionPayload,
-	bridgeModule,
-	parseBridgeState,
-} from "../../../src/game/bridge";
+	type CanastaState,
+	canastaModule,
+	engineSeat,
+	parseCanastaState,
+	startPayload,
+} from "../../../src/game/canasta";
 import { chatPayload } from "../../../src/game/chat";
 import { newCommandId } from "../../../src/ids";
 import { randomNonce } from "../../../src/p2p/checks";
@@ -44,7 +43,7 @@ import { guardedStorage, SeatMemory, webSeatLocks } from "../../../src/session";
 
 /**
  * The real-network harness for `tests/e2e/p2p-mesh.spec.ts`: production modules (Trystero over the public
- * trackers, IndexedDB, Web Locks), driven by Playwright through `window.lbHarness`. One page holds at most one
+ * trackers, IndexedDB, Web Locks), driven by Playwright through `window.ocHarness`. One page holds at most one
  * Trystero room, because Trystero has one peer id per page.
  */
 
@@ -72,16 +71,22 @@ export interface CallView {
 
 export interface Harness {
 	createTable(seat: Seat): Promise<{ readonly key: string }>;
-	openTable(key: string): Promise<void>;
+	/**
+	 * Opens a table link. `seat` stands for the `selected_player` of a player's own URL, which a reload or a
+	 * reopened tab keeps (ADR 0005); the page then takes that seat back from its own replica.
+	 */
+	openTable(key: string, seat?: Seat): Promise<void>;
 	view(): TableView | null;
 	transcript(): readonly TranscriptLine[];
 	choose(seat: Seat): Promise<ChooseResult>;
 	send(text: string): Promise<SubmitResult>;
 	/**
-	 * Takes the next game action when this page's seat is the actor, otherwise null: the dealer opens the lowest
-	 * bid, every other call is a pass, and a card is the first legal one.
+	 * Takes the first legal canasta action when this page's seat is the actor, otherwise null. The engine lists
+	 * only actions that it accepts, so any sequence of these actions is legal.
 	 */
 	act(): Promise<SubmitResult | null>;
+	/** Sends the start of the match, which deals hand 1; only the host may send it. */
+	deal(): Promise<SubmitResult>;
 	click(): void;
 	/**
 	 * Approximates a network change (Wi-Fi to cellular): every link closes on both sides and the tracker sockets
@@ -135,7 +140,7 @@ export interface Harness {
 
 declare global {
 	interface Window {
-		lbHarness?: Harness;
+		ocHarness?: Harness;
 	}
 }
 
@@ -179,7 +184,11 @@ async function storage() {
 	return opened.value;
 }
 
-async function open(key: string, creator: boolean): Promise<void> {
+async function open(
+	key: string,
+	creator: boolean,
+	preferredSeat?: Seat,
+): Promise<void> {
 	if (controller || stranger) throw new Error("this page already joined");
 	const identity = await tableIdentity(key, browser);
 	const config = meshConfig();
@@ -188,7 +197,7 @@ async function open(key: string, creator: boolean): Promise<void> {
 		storage: await storage(),
 		locks,
 		memory,
-		module: bridgeModule,
+		module: canastaModule,
 		clock,
 		every: (ms, run) => {
 			const timer = setInterval(run, ms);
@@ -201,6 +210,7 @@ async function open(key: string, creator: boolean): Promise<void> {
 		newId: newCommandId,
 		nonce: randomNonce,
 		creator,
+		preferredSeat,
 	});
 	controller = table;
 	await table.start();
@@ -211,11 +221,11 @@ function seated(): TableController {
 	return controller;
 }
 
-function currentBoard(table: TableController): Board | null {
+function currentState(table: TableController): CanastaState {
 	const state = table.view().table?.state;
-	const parsed = state ? parseBridgeState(state, table.tableId) : undefined;
-	if (!parsed) throw new Error("the table has no bridge state");
-	return parsed.board;
+	const parsed = state ? parseCanastaState(state, table.tableId) : undefined;
+	if (!parsed) throw new Error("the table has no canasta state");
+	return parsed;
 }
 
 function joinMessage(): CallMessage {
@@ -246,7 +256,7 @@ function recordOnline(table: TableController): void {
 	if (onlineHistory.at(-1) !== online) onlineHistory.push(online);
 }
 
-window.lbHarness = {
+window.ocHarness = {
 	async createTable(seat) {
 		const key = newTableKey();
 		const identity = await tableIdentity(key, browser);
@@ -255,7 +265,7 @@ window.lbHarness = {
 			identity,
 			seat,
 			config: CONFIG,
-			module: bridgeModule,
+			module: canastaModule,
 			newId: newCommandId,
 			clock,
 			memory,
@@ -264,7 +274,7 @@ window.lbHarness = {
 		await open(key, true);
 		return { key };
 	},
-	openTable: (key) => open(key, false),
+	openTable: (key, seat) => open(key, false, seat),
 	view: () => controller?.view() ?? null,
 	transcript: () =>
 		(controller?.entries() ?? []).map((entry) => ({
@@ -281,19 +291,18 @@ window.lbHarness = {
 	},
 	async act() {
 		const table = seated();
-		const board = currentBoard(table);
+		const state = currentState(table);
 		const seat = table.view().seat;
-		if (!board || !seat || boardStatus(board).actor !== seat) return null;
-		const actions = legalActions(board, seat);
-		const opening = board.calls.length === 0;
-		const action =
-			boardStatus(board).phase === "auction"
-				? actions.find(
-						(item) => item.type === "call" && (item.call === "P") !== opening,
-					)
-				: actions[0];
+		if (!state.match || !seat) return null;
+		const action = legalActions(state.match.hand, engineSeat(seat))[0];
 		if (!action) return null;
-		return table.send(actionPayload(table.tableId, board, action));
+		return table.send(
+			actionPayload(table.tableId, state.match, state.actions, action),
+		);
+	},
+	deal() {
+		const table = seated();
+		return table.send(startPayload(table.tableId));
 	},
 	click: () => seated().click(),
 
@@ -470,11 +479,7 @@ window.lbHarness = {
 	},
 
 	media() {
-		const table = seated();
-		const state = table.view().table?.state;
-		const parsed = state ? parseBridgeState(state, table.tableId) : undefined;
-		if (!parsed) throw new Error("the table has no bridge state");
-		return parsed.media;
+		return currentState(seated()).media;
 	},
 
 	holder: () => seated().holder,

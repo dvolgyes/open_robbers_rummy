@@ -4,7 +4,7 @@ import {
 	botSeatsQuery,
 	parseBookmark,
 	parseRoomSetup,
-} from "../../src/ui/bookmark";
+} from "../../src/bookmark";
 
 describe("parseBookmark", () => {
 	it("reads the four names and the host seat by direction", () => {

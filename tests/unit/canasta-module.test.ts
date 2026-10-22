@@ -9,9 +9,13 @@ import {
 	nextHandPayload,
 	parseAction,
 	parseCanastaState,
+	resetCancelPayload,
+	resetRequestPayload,
+	resetVotePayload,
 	startPayload,
 	tableSeat,
 } from "../../src/game/canasta";
+import { chatPayload } from "../../src/game/chat";
 import type { ApplyContext } from "../../src/game/module";
 import { type JsonObject, SEATS, type Seat } from "../../src/protocol";
 import { type RandomBelow, randomBelowFrom } from "../../src/random";
@@ -189,30 +193,10 @@ describe("canasta module: replicated state", () => {
 
 describe("canasta module: a full hand through the module", () => {
 	it("plays one hand to settlement with legal actions only, then deals the next", () => {
-		let state = started();
-		let accepted = 0;
-		for (let step = 0; step < 5000; step++) {
-			const parsed = table(state);
-			const match = parsed.match;
-			if (match === null) throw new Error("no match");
-			if (match.settled) break;
-			const seat = tableSeat(match.hand.turn);
-			const options = legalActions(match.hand, match.hand.turn);
-			const pick = options[(step * 7919) % options.length];
-			if (pick === undefined)
-				throw new Error(`no legal action at step ${step}`);
-			const result = module.apply(
-				state,
-				context(seat),
-				actionPayload(ROOM, match, parsed.actions, pick),
-			);
-			if (!result.ok) throw new Error(`step ${step}: ${result.reason}`);
-			state = result.state;
-			accepted++;
-		}
-		const finished = table(state).match;
-		expect(finished?.settled).toBe(true);
-		expect(accepted).toBeGreaterThan(0);
+		const state = playToSettlement(started());
+		const finished = table(state);
+		expect(finished.match?.settled).toBe(true);
+		expect(finished.actions).toBeGreaterThan(0);
 		const next = module.apply(state, context("N"), nextHandPayload(ROOM));
 		expect(next.ok).toBe(true);
 		if (next.ok) expect(table(next.state).match?.handNo).toBe(2);
@@ -222,5 +206,229 @@ describe("canasta module: a full hand through the module", () => {
 describe("canasta module: shared constants", () => {
 	it("is the module for canasta tables", () => {
 		expect(canastaModule.isState(started(), ROOM)).toBe(true);
+	});
+});
+
+/** Plays the current hand with legal actions until the host settles it. */
+function playToSettlement(start: JsonObject): JsonObject {
+	let state = start;
+	for (let step = 0; step < 5000; step++) {
+		const parsed = table(state);
+		const match = parsed.match;
+		if (match === null) throw new Error("no match");
+		if (match.settled) return state;
+		const seat = tableSeat(match.hand.turn);
+		const options = legalActions(match.hand, match.hand.turn);
+		const pick = options[(step * 7919) % options.length];
+		if (pick === undefined) throw new Error(`no legal action at step ${step}`);
+		const result = module.apply(
+			state,
+			context(seat),
+			actionPayload(ROOM, match, parsed.actions, pick),
+		);
+		if (!result.ok) throw new Error(`step ${step}: ${result.reason}`);
+		state = result.state;
+	}
+	throw new Error("the hand did not end");
+}
+
+/** A command id in the format that `newCommandId` gives, one for each seat. */
+function commandIdOf(seat: Seat): string {
+	return `00000000-0000-4000-8000-00000000000${SEATS.indexOf(seat)}`;
+}
+
+function applied(
+	state: JsonObject,
+	seat: Seat,
+	payload: JsonObject,
+	present: readonly Seat[] = SEATS,
+): JsonObject {
+	const result = module.apply(
+		state,
+		{ ...context(seat, present), commandId: commandIdOf(seat) },
+		payload,
+	);
+	if (!result.ok) throw new Error(result.reason);
+	return result.state;
+}
+
+function requestId(state: JsonObject): string {
+	const id = table(state).reset?.id;
+	if (id === undefined) throw new Error("no reset request");
+	return id;
+}
+
+describe("canasta module: reset", () => {
+	it("waits for the three other players, then clears the scores, keeps the messages, and lets the host deal a new match", () => {
+		let state = playToSettlement(started());
+		state = applied(state, "E", chatPayload(ROOM, "hi"));
+		const before = table(state);
+		expect(before.match?.settled).toBe(true);
+		expect(before.matches).toBe(1);
+
+		state = applied(state, "N", resetRequestPayload(ROOM));
+		expect(table(state).reset).toEqual({
+			id: commandIdOf("N"),
+			requester: "N",
+			required: ["E", "S", "W"],
+			approved: [],
+		});
+		state = applied(state, "E", resetVotePayload(ROOM, requestId(state), true));
+		state = applied(state, "S", resetVotePayload(ROOM, requestId(state), true));
+		expect(table(state).match).not.toBeNull();
+		const result = module.apply(
+			state,
+			context("W"),
+			resetVotePayload(ROOM, requestId(state), true),
+		);
+		expect(result).toMatchObject({
+			ok: true,
+			event: { kind: "reset-applied", requester: "N" },
+		});
+		if (!result.ok) return;
+		const after = table(result.state);
+		expect(after).toMatchObject({
+			match: null,
+			actions: 0,
+			reset: null,
+			matches: 1,
+			messages: before.messages,
+		});
+
+		const again = applied(result.state, "N", startPayload(ROOM));
+		expect(table(again).match).toMatchObject({
+			handNo: 1,
+			scores: [0, 0],
+			settled: false,
+		});
+		expect(table(again).matches).toBe(2);
+	});
+
+	it("ends the request when one player rejects it, and keeps the match", () => {
+		let state = applied(started(), "S", resetRequestPayload(ROOM));
+		const match = table(state).match;
+		state = applied(state, "W", resetVotePayload(ROOM, requestId(state), true));
+		const result = module.apply(
+			state,
+			context("N"),
+			resetVotePayload(ROOM, requestId(state), false),
+		);
+		expect(result).toMatchObject({
+			ok: true,
+			event: { kind: "reset-rejected", by: "N" },
+		});
+		if (result.ok)
+			expect(table(result.state)).toMatchObject({ reset: null, match });
+	});
+
+	it("lets only the requester cancel the request", () => {
+		const state = applied(started(), "S", resetRequestPayload(ROOM));
+		const id = requestId(state);
+		expect(
+			module.apply(state, context("E"), resetCancelPayload(ROOM, id)),
+		).toEqual({
+			ok: false,
+			reason: "only the requester can cancel this reset",
+		});
+		expect(
+			table(applied(state, "S", resetCancelPayload(ROOM, id))).reset,
+		).toBeNull();
+	});
+
+	it("blocks the game, the next hand and a second request while a reset waits for answers", () => {
+		const state = applied(started(), "N", resetRequestPayload(ROOM));
+		const { match, actions } = table(state);
+		if (match === null) throw new Error("no match");
+		const seat = currentSeat(state);
+		const blocked = {
+			ok: false,
+			reason: "a reset request is waiting for answers",
+		};
+		expect(
+			module.apply(
+				state,
+				context(seat),
+				actionPayload(ROOM, match, actions, { type: "draw" }),
+			),
+		).toEqual(blocked);
+		expect(
+			module.apply(state, context("E"), resetRequestPayload(ROOM)),
+		).toEqual(blocked);
+		const settled = applied(
+			playToSettlement(started()),
+			"N",
+			resetRequestPayload(ROOM),
+		);
+		expect(module.apply(settled, context("N"), nextHandPayload(ROOM))).toEqual(
+			blocked,
+		);
+	});
+
+	it("asks only the players who are present, and resets at once when the requester is alone", () => {
+		const partial = applied(started(), "N", resetRequestPayload(ROOM), [
+			"N",
+			"S",
+		]);
+		expect(table(partial).reset?.required).toEqual(["S"]);
+		const alone = module.apply(
+			started(),
+			context("N", ["N"]),
+			resetRequestPayload(ROOM),
+		);
+		expect(alone).toMatchObject({ ok: true, event: { kind: "reset-applied" } });
+		if (alone.ok) expect(table(alone.state).match).toBeNull();
+	});
+
+	it("refuses a vote from a seat that was not asked, a repeated approval, and a vote for another request", () => {
+		let state = applied(started(), "N", resetRequestPayload(ROOM), [
+			"N",
+			"E",
+			"S",
+		]);
+		const id = requestId(state);
+		expect(
+			module.apply(state, context("W"), resetVotePayload(ROOM, id, true)),
+		).toMatchObject({
+			ok: false,
+			reason: "your seat is not asked to approve this reset",
+		});
+		expect(
+			module.apply(state, context("E"), resetVotePayload(ROOM, "other", true)),
+		).toMatchObject({
+			ok: false,
+			reason: "there is no matching reset request",
+		});
+		state = applied(state, "E", resetVotePayload(ROOM, id, true));
+		expect(
+			module.apply(state, context("E"), resetVotePayload(ROOM, id, true)),
+		).toMatchObject({
+			ok: false,
+			reason: "your seat has already approved this reset",
+		});
+	});
+
+	it("keeps a waiting request in the replicated state, and refuses a malformed one", () => {
+		const state = applied(started(), "N", resetRequestPayload(ROOM));
+		expect(module.isState(JSON.parse(JSON.stringify(state)), ROOM)).toBe(true);
+		const reset = table(state).reset;
+		expect(
+			module.isState(
+				{ ...state, reset: { ...reset, required: ["N", "E"] } },
+				ROOM,
+			),
+		).toBe(false);
+		expect(
+			module.isState(
+				{ ...state, reset: { ...reset, approved: ["W", "W"] } },
+				ROOM,
+			),
+		).toBe(false);
+	});
+
+	it("is not a host-only command, because it deals no cards", () => {
+		expect(module.isRandomCommand?.(resetRequestPayload(ROOM))).toBe(false);
+		expect(module.isRandomCommand?.(resetVotePayload(ROOM, "x", true))).toBe(
+			false,
+		);
 	});
 });

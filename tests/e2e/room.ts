@@ -65,19 +65,76 @@ export async function createRoom(page: Page): Promise<string> {
 	return link;
 }
 
+/** A player's own URL: the table link with `selected_player`, which a reopened tab keeps its seat with (ADR 0005). */
+export function ownLink(link: string, seat: SeatKey): string {
+	const url = new URL(link);
+	url.searchParams.set("selected_player", seat);
+	return url.toString();
+}
+
 export async function pick(page: Page, seat: SeatKey): Promise<void> {
 	await page.getByTestId(`pick-${seat}`).click();
 	const name = YOU[seat].split(" — ")[1];
 	await expect(page).toHaveTitle(new RegExp(`${name} \\(${seat}\\)$`));
 }
 
+/**
+ * Waits until this page holds the seat: the title names the player and the seat, and the roster tags the row "You".
+ * The roster sits in the closed room drawer, so the tag is attached, not visible.
+ */
+export async function expectSeat(
+	page: Page,
+	seat: SeatKey,
+	options: { timeout?: number } = {},
+): Promise<void> {
+	const name = YOU[seat].split(" — ")[1];
+	await expect(page).toHaveTitle(new RegExp(`${name} \\(${seat}\\)$`), options);
+	await expect(
+		rosterSeat(page, seat).locator(".tag", { hasText: /^You$/ }),
+	).toBeAttached(options);
+}
+
+/** Opens the room drawer, where the roster and the connection note sit. Does nothing when it is open. */
+export async function openDrawer(page: Page): Promise<void> {
+	const drawer = page.getByTestId("room-drawer");
+	if (!(await drawer.evaluate((node) => (node as HTMLDetailsElement).open)))
+		await drawer.locator("summary").first().click();
+}
+
+/** In hand 1 North deals, so play starts at the dealer's left. */
+export const TURN_ORDER = ["E", "S", "W", "N"] as const;
+
+/**
+ * One canasta turn through the buttons a player uses, from table position `at`: draw from the stock, then discard
+ * the first card of the hand. Any card is a legal discard after a draw, so the turn needs no knowledge of the deal.
+ */
+export async function takeTurn(page: Page, at: number): Promise<void> {
+	const table = page.getByTestId("table");
+	await expect(table).toHaveAttribute("data-at", String(at));
+	await page.getByTestId("action-draw").click();
+	await expect(table).toHaveAttribute("data-at", String(at + 1));
+	await page.locator(".own-hand button.card").first().click();
+	await page.getByTestId("action-discard").click();
+	await expect(table).toHaveAttribute("data-at", String(at + 2));
+}
+
 /** Sends the prefilled message and waits until this tab shows it in the transcript. */
 export async function sendDraft(page: Page): Promise<void> {
 	const before = await lines(page).count();
+	// The message form sits in the room drawer, which is closed by default.
+	await openDrawer(page);
 	await page.getByTestId("send").click();
 	await expect(lines(page)).toHaveCount(before + 1);
 }
 
-export async function expectBanner(page: Page, kind: string): Promise<void> {
-	await expect(page.getByTestId("banner")).toHaveAttribute("data-kind", kind);
+export async function expectBanner(
+	page: Page,
+	kind: string,
+	options?: { timeout: number },
+): Promise<void> {
+	await expect(page.getByTestId("banner")).toHaveAttribute(
+		"data-kind",
+		kind,
+		options,
+	);
 }

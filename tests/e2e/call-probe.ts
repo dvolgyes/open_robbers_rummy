@@ -500,8 +500,23 @@ export const SEAT_NAMES: Readonly<Record<SeatKey, string>> = {
 	W: "West",
 };
 
+/** The name on the tile of a seated player: the seat letter and the player name that createRoom gives. */
+export const TILE_NAMES: Readonly<Record<SeatKey, string>> = {
+	N: "N - player1",
+	E: "E - player3",
+	S: "S - player2",
+	W: "W - player4",
+};
+
 export const panel = (page: Page): Locator => page.getByTestId("call-panel");
 export const note = (page: Page): Locator => page.getByTestId("call-note");
+
+/** The call note is for screen readers only: the panel clips it to one pixel, so it shows no text. */
+export async function expectNoteUnseen(page: Page): Promise<void> {
+	const box = await note(page).boundingBox();
+	expect(box?.width ?? 0).toBeLessThanOrEqual(1);
+	expect(box?.height ?? 0).toBeLessThanOrEqual(1);
+}
 export const caption = (page: Page, seat: SeatKey): Locator =>
 	page.getByTestId(`tile-${seat}`).locator(".tile-caption");
 export const toggle = (page: Page, name: string): Locator =>
@@ -513,13 +528,56 @@ export const leaveButton = (page: Page): Locator =>
 export const rejoinButton = (page: Page): Locator =>
 	page.getByRole("button", { name: "Rejoin the call", exact: true });
 
-/** Opens the Join choices, picks a mode and confirms. */
+/** The call switches, in the panel's order. */
+const SWITCH_NAMES = [
+	"Send mic audio",
+	"Hear others: receive audio",
+	"Send camera video",
+	"See cameras: receive video",
+] as const;
+
+/** The switches of each mode of the handover §2 table, in SWITCH_NAMES order. */
+const MODE_SWITCHES: Readonly<
+	Record<string, readonly [boolean, boolean, boolean, boolean]>
+> = {
+	"Audio only": [true, true, false, false],
+	"Send camera; hear others": [true, true, true, false],
+	"See cameras; send voice": [true, true, false, true],
+	"Audio + video both ways": [true, true, true, true],
+	"Listen only": [false, true, false, false],
+};
+
+/**
+ * Outside the call, the switches choose what Join starts with. A phone cannot turn on its video switches, so a
+ * mode with video fails there.
+ */
+export async function chooseMode(page: Page, mode: string): Promise<void> {
+	const wanted = MODE_SWITCHES[mode];
+	if (wanted === undefined) throw new Error(`unknown call mode: ${mode}`);
+	for (const [index, name] of SWITCH_NAMES.entries()) {
+		const node = toggle(page, name);
+		const pressed = String(wanted[index]);
+		if ((await node.getAttribute("aria-pressed")) !== pressed) {
+			await expect(node).toBeEnabled();
+			await node.click();
+		}
+		await expect(node).toHaveAttribute("aria-pressed", pressed);
+	}
+}
+
+/** Sets the switches of a mode, then joins; a mode that sends video confirms the camera preview first. */
 export async function joinWith(page: Page, mode: string): Promise<void> {
+	await chooseMode(page, mode);
 	await joinButton(page).click();
-	const chooser = page.getByTestId("call-chooser");
-	await expect(chooser).toBeVisible();
-	await chooser.getByRole("radio", { name: mode, exact: true }).check();
-	await page.getByTestId("call-confirm").click();
-	await expect(chooser).toBeHidden();
+	if (MODE_SWITCHES[mode]?.[2]) await confirmCamera(page);
 	await expect(leaveButton(page)).toBeVisible();
+}
+
+/** Waits for the camera preview to show a picture, then sends the camera. */
+export async function confirmCamera(page: Page): Promise<void> {
+	const preview = page.getByTestId("camera-preview");
+	await expect(preview).toBeVisible();
+	await expect(page.getByTestId("camera-preview-confirm")).toBeEnabled();
+	await page.getByTestId("camera-preview-confirm").click();
+	await expect(preview).toBeHidden();
 }

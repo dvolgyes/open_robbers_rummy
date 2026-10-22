@@ -6,6 +6,7 @@ import {
 	test,
 } from "@playwright/test";
 import type { StoredCallRecord } from "../../src/call/record";
+import { HOST_LOST_MS, SEAT_GRACE_MS } from "../../src/p2p/limits";
 import type { TableView } from "../../src/p2p/table";
 import type { Seat } from "../../src/protocol";
 import type { CallView, Harness, TranscriptLine } from "./harness/main";
@@ -49,7 +50,7 @@ async function dumpPages() {
 	for (const [index, page] of pages.entries()) {
 		if (page.isClosed()) continue;
 		const summary = await page.evaluate(() => {
-			const harness = window.lbHarness as Harness;
+			const harness = window.ocHarness as Harness;
 			const current = harness.view();
 			if (!current)
 				return { stranger: harness.strangerView()?.network ?? null };
@@ -84,7 +85,7 @@ async function openPage(context: BrowserContext): Promise<Page> {
 	pages.push(page);
 	page.on("pageerror", (error) => pageErrors.push(error.message));
 	await page.goto(HARNESS);
-	await page.waitForFunction(() => window.lbHarness !== undefined);
+	await page.waitForFunction(() => window.ocHarness !== undefined);
 	return page;
 }
 
@@ -95,38 +96,39 @@ async function newPlayer(browser: Browser): Promise<Player> {
 }
 
 function view(page: Page): Promise<TableView | null> {
-	return page.evaluate(() => (window.lbHarness as Harness).view());
+	return page.evaluate(() => (window.ocHarness as Harness).view());
 }
 
 function transcript(page: Page): Promise<readonly TranscriptLine[]> {
-	return page.evaluate(() => (window.lbHarness as Harness).transcript());
+	return page.evaluate(() => (window.ocHarness as Harness).transcript());
 }
 
 async function create(player: Player, seat: Seat): Promise<string> {
 	const { key } = await player.page.evaluate(
-		(chosen) => (window.lbHarness as Harness).createTable(chosen),
+		(chosen) => (window.ocHarness as Harness).createTable(chosen),
 		seat,
 	);
 	return key;
 }
 
-function openTable(page: Page, key: string): Promise<void> {
+/** `seat` opens the player's own URL, which keeps the selected seat (ADR 0005); without it, the shared link. */
+function openTable(page: Page, key: string, seat?: Seat): Promise<void> {
 	return page.evaluate(
-		(link) => (window.lbHarness as Harness).openTable(link),
-		key,
+		({ link, chosen }) => (window.ocHarness as Harness).openTable(link, chosen),
+		{ link: key, chosen: seat },
 	);
 }
 
 function choose(page: Page, seat: Seat) {
 	return page.evaluate(
-		(chosen) => (window.lbHarness as Harness).choose(chosen),
+		(chosen) => (window.ocHarness as Harness).choose(chosen),
 		seat,
 	);
 }
 
 function send(page: Page, text: string) {
 	return page.evaluate(
-		(body) => (window.lbHarness as Harness).send(body),
+		(body) => (window.ocHarness as Harness).send(body),
 		text,
 	);
 }
@@ -213,9 +215,37 @@ async function crash(player: Player) {
 	await player.page.close({ runBeforeUnload: false });
 }
 
-async function reopen(player: Player, key: string) {
+/** The player opens their own URL again in a new tab. */
+async function reopen(player: Player, key: string, seat: Seat) {
+	player.page = await openPage(player.context);
+	await openTable(player.page, key, seat);
+}
+
+/**
+ * Right after a crash the player opens the shared link in a new tab and takes the seat back. The host still counts
+ * the crashed page as connected, so it refuses the own URL of the seat until it sees the seat offline; the lobby
+ * offers the seat again after the seat grace, and the page of the same browser takes it, as the lobby does when it
+ * offers one seat. A sent claim is not yet a bound seat, because the host can still refuse it, so the page claims
+ * again until it holds the seat.
+ */
+async function reopenAfterCrash(player: Player, key: string, seat: Seat) {
 	player.page = await openPage(player.context);
 	await openTable(player.page, key);
+	const page = player.page;
+	await expect
+		.poll(
+			async () => {
+				const current = await view(page);
+				if (current?.seat === seat) return seat;
+				if (current?.seat === null) await choose(page, seat);
+				return current?.seat ?? null;
+			},
+			{
+				timeout: HOST_LOST_MS + SEAT_GRACE_MS + CONNECT_MS,
+				intervals: [2_000],
+			},
+		)
+		.toBe(seat);
 }
 
 async function waitForButton(page: Page) {
@@ -267,7 +297,11 @@ async function expectGone(host: Page, seat: Seat) {
 }
 
 function act(page: Page) {
-	return page.evaluate(() => (window.lbHarness as Harness).act());
+	return page.evaluate(() => (window.ocHarness as Harness).act());
+}
+
+function deal(page: Page) {
+	return page.evaluate(() => (window.ocHarness as Harness).deal());
 }
 
 async function commands(page: Page): Promise<number> {
@@ -290,7 +324,7 @@ async function actInTurn(page: Page, pages: readonly Page[], count: number) {
 }
 
 function callOpen(page: Page) {
-	return page.evaluate(() => (window.lbHarness as Harness).callOpen());
+	return page.evaluate(() => (window.ocHarness as Harness).callOpen());
 }
 
 /** Each page opens its call inbox; the result is each seat's generation. */
@@ -312,7 +346,7 @@ async function openInboxes(
 
 function callSend(page: Page, to: Seat | null): Promise<string> {
 	return page.evaluate(
-		(target) => (window.lbHarness as Harness).callSend(target),
+		(target) => (window.ocHarness as Harness).callSend(target),
 		to,
 	);
 }
@@ -323,19 +357,19 @@ function callForge(
 ): Promise<string> {
 	return page.evaluate(
 		({ to, toGen, fromGen, count }) =>
-			(window.lbHarness as Harness).callForge(to, toGen, fromGen, count),
+			(window.ocHarness as Harness).callForge(to, toGen, fromGen, count),
 		frame,
 	);
 }
 
 function callView(page: Page): Promise<CallView> {
-	return page.evaluate(() => (window.lbHarness as Harness).callView());
+	return page.evaluate(() => (window.ocHarness as Harness).callView());
 }
 
 /** The messages of call session `session` that reached the inbox of `page`, as [from, fromGen]. */
 async function arrivals(page: Page, session: string) {
 	const received = await page.evaluate(() =>
-		(window.lbHarness as Harness).callReceived(),
+		(window.ocHarness as Harness).callReceived(),
 	);
 	return received
 		.filter((message) => message.session === session)
@@ -377,7 +411,7 @@ function callStatus(
 function sendMedia(page: Page, version: number, video: boolean) {
 	return page.evaluate(
 		({ version, video }) =>
-			(window.lbHarness as Harness).sendMedia(version, video),
+			(window.ocHarness as Harness).sendMedia(version, video),
 		{ version, video },
 	);
 }
@@ -388,7 +422,7 @@ async function expectMedia(
 ) {
 	for (const page of pages) {
 		await expect
-			.poll(() => page.evaluate(() => (window.lbHarness as Harness).media()), {
+			.poll(() => page.evaluate(() => (window.ocHarness as Harness).media()), {
 				timeout: CONNECT_MS,
 			})
 			.toEqual(expected);
@@ -398,6 +432,7 @@ async function expectMedia(
 test("four players form one table, take seats, and replicate commands", async ({
 	browser,
 }) => {
+	test.setTimeout(180_000);
 	const { key, players } = await fullTable(browser);
 	const pages = pagesOf(players, SEATS);
 
@@ -422,13 +457,13 @@ test("four players form one table, take seats, and replicate commands", async ({
 
 	// R1: a follower reloads and gets its seat and the log back.
 	await players.E.page.reload();
-	await players.E.page.waitForFunction(() => window.lbHarness !== undefined);
-	await openTable(players.E.page, key);
+	await players.E.page.waitForFunction(() => window.ocHarness !== undefined);
+	await openTable(players.E.page, key, "E");
 	await expectSeated(players.E.page, "E", "N");
 
 	// R1: a follower crashes and reopens the link in a new tab.
 	await crash(players.S);
-	await reopen(players.S, key);
+	await reopenAfterCrash(players.S, key, "S");
 	await expectSeated(players.S.page, "S", "N");
 
 	expect(await send(players.S.page, "south is back")).toEqual({ ok: true });
@@ -451,7 +486,7 @@ test("the table survives the host and three players leaving", async ({
 	// The host crashes. With other players connected, the button is enabled, and one click elects a host.
 	await crash(players.N);
 	expect(await waitForButton(players.E.page)).toEqual({ enabled: true });
-	await players.E.page.evaluate(() => (window.lbHarness as Harness).click());
+	await players.E.page.evaluate(() => (window.ocHarness as Harness).click());
 	await expect
 		.poll(async () => (await view(players.E.page))?.hosting, {
 			timeout: CONNECT_MS,
@@ -465,7 +500,7 @@ test("the table survives the host and three players leaving", async ({
 	});
 
 	// The old host returns, sees the newer term, and follows.
-	await reopen(players.N, key);
+	await reopen(players.N, key, "N");
 	await expectSeated(players.N.page, "N", "E");
 	// The new host counts the players who were connected before its claim, not only the ones who came later.
 	await expectBound(players.E.page, ["N", "S", "W"]);
@@ -483,8 +518,8 @@ test("the table survives the host and three players leaving", async ({
 	});
 
 	// Two players return and are the witnesses; North's copy restores the table.
-	await reopen(players.S, key);
-	await reopen(players.W, key);
+	await reopen(players.S, key, "S");
+	await reopen(players.W, key, "W");
 	await expect
 		.poll(
 			async () => {
@@ -496,13 +531,13 @@ test("the table survives the host and three players leaving", async ({
 			{ timeout: CONNECT_MS },
 		)
 		.toBe(true);
-	await players.N.page.evaluate(() => (window.lbHarness as Harness).click());
+	await players.N.page.evaluate(() => (window.ocHarness as Harness).click());
 	for (const seat of ["S", "W"] as const) {
 		await expectSeated(players[seat].page, seat, "N");
 	}
 
 	// The last host returns, sees the newer term, and follows instead of resuming its own.
-	await reopen(players.E, key);
+	await reopen(players.E, key, "E");
 	await expectSeated(players.E.page, "E", "N");
 	await expectBound(players.N.page, ["E", "S", "W"]);
 
@@ -531,7 +566,7 @@ test("a page that changes network gets its links back with the same peer and sea
 	// East's links all close, as after a switch from Wi-Fi to cellular; the page and its peer id stay.
 	expect(
 		await players.E.page.evaluate(() =>
-			(window.lbHarness as Harness).dropLinks(),
+			(window.ocHarness as Harness).dropLinks(),
 		),
 	).toEqual({ closed: 3, peersAfter: 0 });
 
@@ -573,7 +608,7 @@ test("a visitor whose first links fail still connects within the connection budg
 	const failMs = 15_000;
 	const visitor = await newPlayer(browser);
 	await visitor.page.evaluate(
-		(ms) => (window.lbHarness as Harness).failLinksFor(ms),
+		(ms) => (window.ocHarness as Harness).failLinksFor(ms),
 		failMs,
 	);
 	const opened = Date.now();
@@ -638,51 +673,44 @@ test("a latecomer whose first offers reach no page that answers rejoins and conn
 	);
 });
 
-test("game actions wait for every player, except dummy during the play (R4)", async ({
-	browser,
-}) => {
+test("game actions wait for every player (R4)", async ({ browser }) => {
 	test.setTimeout(300_000);
 	const { key, players } = await fullTable(browser);
 	const pages = pagesOf(players, SEATS);
 	for (const page of pages) await expectAllConnected(page);
 
-	// A quiet table: no command for longer than the 6 s presence window. All players are still there.
+	// A quiet table: no command for longer than the 6 s presence window. All players are still there, so the
+	// host's deal lands.
 	await players.N.page.waitForTimeout(8_000);
+	await expectCommands(pages, 0);
+	expect(await deal(players.N.page)).toEqual({ ok: true });
 	await expectCommands(pages, 1);
 
-	// West leaves. North dealt board 1, so North opens the auction; the call waits for West.
+	// West leaves. North dealt hand 1, so East takes the first turn; its draw waits for West.
 	await crash(players.W);
-	await expectGone(players.N.page, "W");
-	expect(await act(players.N.page)).toEqual({ ok: true });
+	await expectGone(players.E.page, "W");
+	expect(await act(players.N.page), "North is not the actor").toBeNull();
+	expect(await act(players.E.page)).toEqual({ ok: true });
 	await expect
 		.poll(
 			async () =>
-				(await view(players.N.page))?.outbox.map((item) => item.waiting),
+				(await view(players.E.page))?.outbox.map((item) => item.waiting),
 			{ timeout: CONNECT_MS },
 		)
 		.toEqual(["Waiting for West to come back"]);
-	expect(await commands(players.N.page)).toBe(1);
+	expect(await commands(players.E.page)).toBe(1);
 
-	// West returns, and the stored call lands without a new click.
-	await reopen(players.W, key);
+	// West returns, and the stored draw lands without a new click.
+	await reopen(players.W, key, "W");
 	await expectSeated(players.W.page, "W", "N");
 	const all = pagesOf(players, SEATS);
 	await expectCommands(all, 2);
-	expect((await view(players.N.page))?.outbox).toEqual([]);
+	expect((await view(players.E.page))?.outbox).toEqual([]);
 
-	// Three passes: North declares, South is dummy, and East leads.
+	// East goes on with its turn.
 	await actInTurn(players.E.page, all, 2);
-	await actInTurn(players.S.page, all, 3);
-	await actInTurn(players.W.page, all, 4);
 
-	// Dummy leaves, and the play goes on: East leads, and North plays from dummy.
-	await crash(players.S);
-	await expectGone(players.N.page, "S");
-	const staying = pagesOf(players, ["N", "E", "W"]);
-	await actInTurn(players.E.page, staying, 5);
-	await actInTurn(players.N.page, staying, 6);
-
-	for (const page of staying) expect((await view(page))?.failures).toEqual([]);
+	for (const page of all) expect((await view(page))?.failures).toEqual([]);
 	const log = await transcript(players.N.page);
 	expectWellFormed(log);
 	expect(new Set(log.map((line) => line.term))).toEqual(new Set([1]));
@@ -810,7 +838,7 @@ test("call signaling and the call status come back after a network change and a 
 	// East's links drop, as after a switch from Wi-Fi to cellular. North sees East leave and come back, and
 	// East's inbox stays open through it.
 	await players.E.page.evaluate(() =>
-		(window.lbHarness as Harness).dropLinks(),
+		(window.ocHarness as Harness).dropLinks(),
 	);
 	for (const page of pages) await expectAllConnected(page);
 	await expect
@@ -819,7 +847,7 @@ test("call signaling and the call status come back after a network change and a 
 		})
 		.toEqual(others("N"));
 	const history = await players.N.page.evaluate(() =>
-		(window.lbHarness as Harness).callOnlineHistory(),
+		(window.ocHarness as Harness).callOnlineHistory(),
 	);
 	expect(
 		history.slice(history.indexOf("ESW")).some((seats) => !seats.includes("E")),
@@ -827,7 +855,7 @@ test("call signaling and the call status come back after a network change and a 
 	).toBe(true);
 	expect(
 		await players.E.page.evaluate(() =>
-			(window.lbHarness as Harness).callEnded(),
+			(window.ocHarness as Harness).callEnded(),
 		),
 	).toBeNull();
 	const toEast = await callSend(players.N.page, "E");
@@ -840,7 +868,7 @@ test("call signaling and the call status come back after a network change and a 
 	// R2: East's call status is a versioned record in every replica; an equal version never replaces it. The host
 	// stores it with the holder of East's seat, which only East's own browser knows first-hand.
 	const eastHolder = await players.E.page.evaluate(() =>
-		(window.lbHarness as Harness).holder(),
+		(window.ocHarness as Harness).holder(),
 	);
 	expect(await sendMedia(players.E.page, 1, true)).toEqual({ ok: true });
 	await expectMedia(pages, { E: callStatus(1, true, eastHolder) });
@@ -858,15 +886,15 @@ test("call signaling and the call status come back after a network change and a 
 	expect(await sendMedia(players.E.page, 2, false)).toEqual({ ok: true });
 	await expectMedia(pages, { E: callStatus(2, false, eastHolder) });
 
-	// After a reload, East reads its call status from its own replica, holds a new generation, and its new inbox
-	// receives.
+	// After a reload, East reads its call status from its own replica. Its own URL binds the seat again at the
+	// generation that it holds, and its new inbox receives.
 	await players.E.page.reload();
-	await players.E.page.waitForFunction(() => window.lbHarness !== undefined);
-	await openTable(players.E.page, key);
+	await players.E.page.waitForFunction(() => window.ocHarness !== undefined);
+	await openTable(players.E.page, key, "E");
 	await expectSeated(players.E.page, "E", "N");
 	await expectMedia([players.E.page], { E: callStatus(2, false, eastHolder) });
 	const reopened = await callOpen(players.E.page);
-	expect(reopened.generation).toBeGreaterThan(gens.E);
+	expect(reopened.generation).toBe(gens.E);
 	await expect
 		.poll(() => callView(players.N.page), { timeout: CONNECT_MS })
 		.toEqual({
@@ -884,7 +912,7 @@ test("a page with another key never becomes a peer", async ({ browser }) => {
 	await expectSeated(north.page, "N", "N");
 	const stranger = await newPlayer(browser);
 	await stranger.page.evaluate(
-		(link) => (window.lbHarness as Harness).wrongKeyJoin(link),
+		(link) => (window.ocHarness as Harness).wrongKeyJoin(link),
 		key,
 	);
 	await expect
@@ -892,7 +920,7 @@ test("a page with another key never becomes a peer", async ({ browser }) => {
 			async () => {
 				const table = await view(north.page);
 				const other = await stranger.page.evaluate(() =>
-					(window.lbHarness as Harness).strangerView(),
+					(window.ocHarness as Harness).strangerView(),
 				);
 				return (table?.network?.wrongKey ?? 0) + (other?.network.wrongKey ?? 0);
 			},
@@ -903,7 +931,7 @@ test("a page with another key never becomes a peer", async ({ browser }) => {
 	expect(
 		(
 			await stranger.page.evaluate(() =>
-				(window.lbHarness as Harness).strangerView(),
+				(window.ocHarness as Harness).strangerView(),
 			)
 		)?.peers,
 	).toBe(0);
@@ -918,7 +946,7 @@ test("the receive cap drops an oversize control message and the link keeps worki
 	const sender = await newPlayer(browser);
 	expect(
 		await sender.page.evaluate(
-			(link) => (window.lbHarness as Harness).oversizeThenPing(link),
+			(link) => (window.ocHarness as Harness).oversizeThenPing(link),
 			key,
 		),
 	).toBe(true);
@@ -944,7 +972,7 @@ test("a second tab cannot take a seat from an active same-browser tab", async ({
 		})
 		.toEqual(["E"]);
 	expect(
-		await second.evaluate(() => (window.lbHarness as Harness).choose("E")),
+		await second.evaluate(() => (window.ocHarness as Harness).choose("E")),
 	).toEqual({ ok: false, reason: "held-elsewhere" });
 	await expectSeated(east.page, "E", "N");
 	expect(await send(east.page, "still active")).toEqual({ ok: true });
