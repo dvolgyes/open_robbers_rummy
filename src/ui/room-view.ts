@@ -651,6 +651,9 @@ export function showRoom(
 			setBotSeat(targetSeat, enabled) {
 				manageBotSeat(targetSeat, enabled);
 			},
+			newGame() {
+				requestReset();
+			},
 			requestAutoplay(enabled) {
 				playerAutoplayPending = true;
 				playerAutoplayStatus = deps.t("Sending autoplay request…");
@@ -809,15 +812,19 @@ export function showRoom(
 		modelPriority.setValue(botSettings.modelOrder);
 		if (!modelDialog.open) modelDialog.showModal();
 	});
-	// A reset clears the scores and starts a new match once every other present player approves it.
+	// A reset clears the scores and starts a new match once every other present player approves it. The new game
+	// button after a finished match sends the same request but keeps the bot cost counter.
+	function requestReset(): void {
+		actionError = undefined;
+		submit(resetRequestPayload(tableId), (reason) => {
+			actionError = deps.t("Reset not sent: {reason}", { reason });
+		});
+	}
 	const reset = button(
 		deps.t("Reset"),
 		() => {
 			resetBotSpend();
-			actionError = undefined;
-			submit(resetRequestPayload(tableId), (reason) => {
-				actionError = deps.t("Reset not sent: {reason}", { reason });
-			});
+			requestReset();
 		},
 		{ className: "reset-button", attrs: { "data-testid": "reset" } },
 	);

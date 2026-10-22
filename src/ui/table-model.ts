@@ -703,7 +703,7 @@ export interface TableView {
 	readonly options: readonly ActionOption[];
 	/** Set once a hand is over and before the next hand is dealt. */
 	readonly scoring: ScoringView | undefined;
-	/** "N-S won the match." once the match is over; empty otherwise. */
+	/** "Your side (N-S) won the match." or "... lost the match." once the match is over; empty otherwise. */
 	readonly winner: string;
 	readonly lines: readonly TableActionLine[];
 }
@@ -946,10 +946,16 @@ export function tableView(input: TableViewInput): TableView {
 	else prompt = t("Waiting for {name}.", { name: config.names[turnSeat] });
 
 	const top = view.pile.at(-1);
+	const viewerSide = teamOf(engineSeat(seat));
 	const winner =
 		match.winner === null
 			? ""
-			: t("{side} won the match.", { side: sideLabel(match.winner, t) });
+			: t(
+					match.winner === viewerSide
+						? "Your side ({side}) won the match."
+						: "Your side ({side}) lost the match.",
+					{ side: sideLabel(viewerSide, t) },
+				);
 	const scoring =
 		view.outcome !== null && phase !== "play"
 			? {

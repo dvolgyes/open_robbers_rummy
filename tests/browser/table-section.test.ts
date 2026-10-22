@@ -11,7 +11,7 @@ import {
 import { PROTOCOL_VERSION, SEATS } from "../../src/protocol";
 import type { RosterRow } from "../../src/ui/model";
 import "../../src/ui/style.css";
-import { tableSection } from "../../src/ui/table";
+import { type TableHandlers, tableSection } from "../../src/ui/table";
 import {
 	type CardView,
 	type MeldView,
@@ -84,9 +84,14 @@ function turnView(
 	});
 }
 
-function mount(acted: Action[], t?: Translate) {
+function mount(
+	acted: Action[],
+	t?: Translate,
+	extra: Partial<TableHandlers> = {},
+) {
 	const section = tableSection(
 		{
+			...extra,
 			exit: () => {},
 			shareUrl: async () => {},
 			act: (action) => acted.push(action),
@@ -373,6 +378,41 @@ describe("table section", () => {
 			String(second.total),
 		]);
 		expect(shown?.textContent).toContain("Next hand in 7 seconds");
+	});
+
+	it("announces the result of the match over the felt and offers a new game", () => {
+		let newGames = 0;
+		const section = mount([], undefined, {
+			newGame: () => {
+				newGames += 1;
+			},
+		});
+		const drawn = afterDraw();
+		const summary = () =>
+			section.element.querySelector<HTMLElement>(
+				'[data-testid="hand-summary"]',
+			);
+		const newGame = () =>
+			summary()?.querySelector<HTMLButtonElement>('[data-testid="new-game"]');
+		const ended = {
+			...drawn,
+			hand: {
+				...drawn.hand,
+				outcome: { kind: "out" as const, seat: 1 as const, concealed: false },
+			},
+			settled: true,
+		};
+		section.render(turnView(ended, 2, { seat: "E" }));
+		expect(newGame()?.checkVisibility()).toBeFalsy();
+
+		section.render(turnView({ ...ended, winner: 1 }, 2, { seat: "E" }));
+		expect(summary()?.checkVisibility()).toBe(true);
+		expect(summary()?.querySelector(".winner")?.textContent).toBe(
+			"Your side (E-W) won the match.",
+		);
+		expect(newGame()?.checkVisibility()).toBe(true);
+		newGame()?.click();
+		expect(newGames).toBe(1);
 	});
 
 	it("asks only for messages that every language translates", () => {

@@ -37,6 +37,8 @@ export interface TableHandlers {
 	): readonly ActionOption[];
 	setBotSeat?(seat: Seat, enabled: boolean): void;
 	requestAutoplay?(enabled: boolean): void;
+	/** Asks the other players for a new match after the last one ended; it keeps the bot cost counter. */
+	newGame?(): void;
 	readonly call: CallHandlers;
 }
 
@@ -134,7 +136,6 @@ export function tableSection(
 		className: "prompt",
 		attrs: { role: "status", "data-testid": "table-prompt" },
 	});
-	const winnerLine = el("p", { className: "winner" });
 	const commands = el("ul", {
 		className: "commands",
 		attrs: { "data-testid": "table-actions" },
@@ -154,16 +155,16 @@ export function tableSection(
 		el("div", { className: "meta" }, heading, details, target),
 		sideCells[1].node,
 	);
-	const status = el(
-		"div",
-		{ className: "table-status" },
-		prompt,
-		winnerLine,
-		commands,
-	);
+	const status = el("div", { className: "table-status" }, prompt, commands);
 
 	// After a hand ends, the summary covers the middle of the felt: who went out, the score of the hand for each
-	// side, and the countdown to the next hand.
+	// side, and the countdown to the next hand. After the last hand, it says whether the viewer's side won the
+	// match and offers a new game instead of the countdown.
+	const winnerLine = el("h2", { className: "winner" });
+	const newGameButton = button(t("New game"), () => handlers.newGame?.(), {
+		className: "new-game",
+		attrs: { "data-testid": "new-game" },
+	});
 	const outcomeLine = el("h3", { className: "outcome" });
 	const scoreTable = el("table", { className: "score-table" });
 	const countdownLine = el("p", {
@@ -176,9 +177,11 @@ export function tableSection(
 			className: "hand-summary",
 			attrs: { "data-testid": "hand-summary", "aria-live": "polite" },
 		},
+		winnerLine,
 		outcomeLine,
 		scoreTable,
 		countdownLine,
+		newGameButton,
 	);
 
 	// Seats around the felt. The viewer's own place is the bottom.
@@ -847,6 +850,8 @@ export function tableSection(
 		renderSummary(view);
 		winnerLine.textContent = view.winner;
 		winnerLine.hidden = view.winner === "";
+		newGameButton.hidden =
+			view.phase !== "complete" || handlers.newGame === undefined;
 		target.textContent = t("Target {score}", { score: view.target });
 
 		for (const [index, side] of view.sides.entries()) renderSide(side, index);

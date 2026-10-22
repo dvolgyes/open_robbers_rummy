@@ -954,6 +954,16 @@ main[data-screen="table"] > .room {
 	font-size: 1.3rem;
 }
 
+.hand-summary .winner {
+	margin: 0 0 0.6rem;
+	font-size: 1.6rem;
+}
+
+.hand-summary .new-game:not([hidden]) {
+	display: block;
+	margin: 0.8rem auto 0;
+}
+
 .score-table {
 	border-collapse: collapse;
 	font-variant-numeric: tabular-nums;

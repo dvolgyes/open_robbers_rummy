@@ -120,12 +120,15 @@ describe("table phases", () => {
 		expect(view.options).toEqual([]);
 	});
 
-	it("a finished match names the winning side", () => {
-		const match = startMatch(7);
-		const view = tableView(inputFor(stateOf({ ...match, winner: 0 })));
+	it("a finished match tells each viewer whether its side won or lost", () => {
+		const match = { ...startMatch(7), winner: 0 as const };
+		const view = tableView(inputFor(stateOf(match), "S"));
 		expect(view.phase).toBe("complete");
-		expect(view.winner).toBe("N-S won the match.");
+		expect(view.winner).toBe("Your side (N-S) won the match.");
 		expect(view.options).toEqual([]);
+		expect(tableView(inputFor(stateOf(match), "E")).winner).toBe(
+			"Your side (E-W) lost the match.",
+		);
 	});
 });
 
