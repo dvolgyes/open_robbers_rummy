@@ -79,6 +79,12 @@ Evidence, checked on 2026-10-22:
     A side with no meld may go out concealed after a stock draw without the minimum count; after a pile pickup, the minimum applies.
     Amended 2026-10-22: before this change, the bonus depended on the side having no meld at the start of the turn, and the minimum always applied.
     The hand records the seats that melded in the optional `meldedSeats` field; a hand stored without it keeps the earlier rule until it ends.
+  - The match ends when one or both sides have 5000 or more after a hand, and the higher total wins.
+    Pagat gives no rule for equal totals at or above 5000, so the match goes on with another hand.
+  - The table does not offer the question "may I go out?" to the partner.
+    Pagat makes the question optional: "You are under no obligation to ask your partner's permission before going out".
+    Without it, every turn is still legal; the table loses only the partner's binding answer.
+    Amended 2026-10-22: this omission is recorded after a rules audit; the question needs a partner prompt across the network, and it may be added later.
 
 ## Consequences
 

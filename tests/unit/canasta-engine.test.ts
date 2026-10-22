@@ -12,10 +12,13 @@ import {
 	isRed3,
 	isWild,
 	legalActions,
+	type MatchState,
 	type Meld,
 	newHand,
 	type Seat,
 	scoreHand,
+	settleHand,
+	startMatch,
 	validateMeld,
 	viewFor,
 } from "../../src/canasta";
@@ -1206,6 +1209,36 @@ describe("scoring", () => {
 			] as const,
 		};
 		expect(scoreHand(three)[0].redThrees).toBe(300);
+	});
+});
+
+describe("match end", () => {
+	/** The match after a hand that ends at the exhausted stock, with the final scores given. */
+	function settledAt(finals: readonly [number, number]): MatchState {
+		const match = startMatch(5);
+		const hand: HandState = { ...match.hand, outcome: { kind: "stock" } };
+		const [first, second] = scoreHand(hand);
+		const step = settleHand({
+			...match,
+			hand,
+			scores: [finals[0] - first.total, finals[1] - second.total],
+		});
+		if (!step.ok) throw new Error(step.reason);
+		expect(step.match.scores).toEqual(finals);
+		return step.match;
+	}
+
+	it("goes on while both sides are below the target", () => {
+		expect(settledAt([4990, 4000]).winner).toBeNull();
+	});
+
+	it("is won by the higher total when one or both sides reach the target", () => {
+		expect(settledAt([5000, 4000]).winner).toBe(0);
+		expect(settledAt([5100, 5200]).winner).toBe(1);
+	});
+
+	it("goes on with another hand when both sides reach the target with equal totals", () => {
+		expect(settledAt([5100, 5100]).winner).toBeNull();
 	});
 });
 
