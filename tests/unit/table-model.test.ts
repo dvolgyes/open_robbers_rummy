@@ -605,6 +605,36 @@ describe("why the pile cannot be taken", () => {
 	});
 });
 
+describe("melds on the table", () => {
+	it("shows a side's melds by rank, lowest on the left, not in the order they were made", () => {
+		const match = afterDraw(7);
+		const meld = (id: string, rank: Meld["rank"], ids: string[]): Meld => ({
+			id,
+			rank,
+			team: 0,
+			cards: cardsOf(ids),
+		});
+		const melds = [
+			meld("m1", "K", ["0-KS", "1-KS", "0-KH"]),
+			meld("m2", "4", ["0-4S", "1-4S", "0-4H"]),
+			meld("m3", "A", ["0-AS", "1-AS", "0-2C"]),
+			meld("m4", "10", ["0-10S", "1-10S", "0-10H"]),
+		];
+		const side = { melds, redThrees: [], initialMade: true };
+		const sorted: MatchState = {
+			...match,
+			hand: { ...match.hand, teams: [side, match.hand.teams[1]] },
+		};
+		const view = tableView(inputFor(stateOf(sorted, 1), turnOf(sorted)));
+		expect(view.sides[0].melds.map((shown) => shown.rank)).toEqual([
+			"4",
+			"10",
+			"K",
+			"A",
+		]);
+	});
+});
+
 describe("the first meld minimum", () => {
 	const sevens = ["0-7H", "1-7H", "0-7S"];
 	const aces = ["0-AS", "1-AS", "0-AH"];

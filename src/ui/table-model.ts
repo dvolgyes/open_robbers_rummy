@@ -38,6 +38,7 @@ import {
 	SEATS,
 	type Seat,
 } from "../protocol";
+import { sortMelds } from "./hand-layout";
 import { ownCommands, type RosterRow } from "./model";
 
 /**
@@ -203,7 +204,9 @@ function sideViews(
 			score: scores[index],
 			mine,
 			melds:
-				view && team ? team.melds.map((meld) => meldView(meld, view, t)) : [],
+				view && team
+					? sortMelds(team.melds).map((meld) => meldView(meld, view, t))
+					: [],
 			redThrees: team ? team.redThrees.map((card) => cardView(card, t)) : [],
 			initialMade: team?.initialMade ?? false,
 			initialMeld:

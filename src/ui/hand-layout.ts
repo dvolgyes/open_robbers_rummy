@@ -35,6 +35,13 @@ function suitIndex(suit: string | null): number {
 	return suit === null ? SUIT_ORDER.length : SUIT_ORDER.indexOf(suit);
 }
 
+/** A new array with the melds by rank, as the hand orders ranks: 3 to A. Melds of equal rank keep their order. */
+export function sortMelds<T extends { readonly rank: string }>(
+	melds: readonly T[],
+): T[] {
+	return [...melds].sort((a, b) => rankIndex(a.rank) - rankIndex(b.rank));
+}
+
 /**
  * A new array with the cards in the given order. The input is not changed. Equal cards keep their input order.
  * By rank: 3 to A, then 2, then jokers; within a rank, clubs, diamonds, hearts, spades.
