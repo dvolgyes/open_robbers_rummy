@@ -668,17 +668,6 @@ const rows: readonly CanastaRow[] = [
 		"drieën kunnen niet worden uitgelegd",
 	],
 	[
-		"wild cards cannot outnumber natural cards",
-		"Joker und Zweier dürfen nicht in der Überzahl sein",
-		"a jokerek és kettesek nem lehetnek többségben",
-		"jokere og toere kan ikke være flere enn de naturlige kortene",
-		"los comodines no pueden superar a las cartas naturales",
-		"os curingas não podem ser mais do que as cartas naturais",
-		"les cartes frimées ne peuvent pas dépasser les cartes naturelles",
-		"le matte non possono superare le carte naturali",
-		"jokers en tweeën mogen niet in de meerderheid zijn",
-	],
-	[
 		"the side already has a meld of this rank; add the cards to it",
 		"die Seite hat schon eine Kombination dieses Rangs; lege die Karten dort an",
 		"az oldalnak már van ilyen kirakása; tedd hozzá a lapokat",

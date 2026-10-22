@@ -16,8 +16,8 @@ export type MeldCheck =
 	| { readonly ok: false; readonly reason: string };
 
 /**
- * Validates a complete meld: at least three cards, at least two naturals of one rank, at most as many wilds
- * as naturals, and at most `maxWildsPerMeld` wilds. Threes are not melded in this ruleset.
+ * Validates a complete meld: at least three cards, at least two naturals of one rank, and at most
+ * `maxWildsPerMeld` wilds. Threes are not melded in this ruleset.
  * An extension is validated by passing the existing cards together with the new ones.
  */
 export function validateMeld(
@@ -48,8 +48,6 @@ export function validateMeld(
 	}
 	if (naturals.length < 2)
 		return { ok: false, reason: "a meld needs at least two natural cards" };
-	if (wilds > naturals.length)
-		return { ok: false, reason: "wild cards cannot outnumber natural cards" };
 	if (wilds > rules.maxWildsPerMeld) {
 		return {
 			ok: false,

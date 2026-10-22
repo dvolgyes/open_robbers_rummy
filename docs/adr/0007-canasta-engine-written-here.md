@@ -27,6 +27,9 @@ Evidence, checked on 2026-10-22:
   Pagat states each of them for the classic game:
   - A joker counts 50 points, an ace or a 2 counts 20, a king down to an 8 counts 10, and a 7 down to a 4, or a black three, counts 5.
     Amended 2026-10-22: before this change, a 2 counted 50.
+  - A meld has at least two natural cards and at most three wild cards, so its wild cards can outnumber its natural cards, as in Q-Q-2-2-2.
+    Amended 2026-10-22: before this change, the engine refused such a meld.
+    That rule belongs to the Austrian variant, which Pagat lists as a modification.
   - A player draws one card from the stock, or takes the whole discard pile.
   - The initial meld needs 15 points at a negative score, 50 from 0, 90 from 1500, and 120 from 3000.
   - A red three is set aside when dealt or drawn.

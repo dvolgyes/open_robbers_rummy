@@ -96,11 +96,24 @@ describe("meld validation", () => {
 		).toBe(false);
 	});
 
-	it("rejects more wild cards than natural cards", () => {
+	it("accepts more wild cards than natural cards, up to three wild cards", () => {
 		const cards = cardsById(["0-5H", "0-5D", "0-2S", "1-2S", "0-2C"]);
+		expect(validateMeld(cards, CLASSIC_RULES)).toEqual({ ok: true, rank: "5" });
+	});
+
+	it("rejects a fourth wild card", () => {
+		const cards = cardsById([
+			"0-5H",
+			"0-5D",
+			"0-5S",
+			"0-2S",
+			"1-2S",
+			"0-2C",
+			"0-JK0",
+		]);
 		expect(validateMeld(cards, CLASSIC_RULES)).toEqual({
 			ok: false,
-			reason: "wild cards cannot outnumber natural cards",
+			reason: "a meld may hold at most 3 wild cards",
 		});
 	});
 
