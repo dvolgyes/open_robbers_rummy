@@ -45,7 +45,10 @@ export interface HandSnapshot {
 }
 
 export interface HandState extends HandSnapshot {
-	/** Restored by `resetTurn`, which lets a player retract a turn before ending it. */
+	/**
+	 * Restored by `resetTurn`, which lets a player retract a turn before ending it: the hand at the start of the
+	 * turn, or after the turn's draw from the stock, because a drawn card cannot go back.
+	 */
 	readonly turnStart: HandSnapshot;
 }
 
@@ -192,8 +195,10 @@ function applyDraw(hand: HandState, seat: Seat): Step {
 	const last = hand.stock.at(-1);
 	const endsOnRedThree =
 		drawn.rest.length === 0 && last !== undefined && isRed3(last);
-	const next: HandState = {
-		...hand,
+	// The drawn card is hidden information, so resetTurn restores the hand after the draw, not before it.
+	// A draw changes neither the pile nor the melds, so the other uses of turnStart see the same values.
+	const afterDraw: HandSnapshot = {
+		...snapshotOf(hand),
 		stock: drawn.rest,
 		hands: withHand(hand.hands, seat, cards),
 		teams: withTeam(hand.teams, team, {
@@ -201,8 +206,9 @@ function applyDraw(hand: HandState, seat: Seat): Step {
 			redThrees: [...teamAt(hand.teams, team).redThrees, ...drawn.redThrees],
 		}),
 		phase: "play",
-		turnActions: hand.turnActions + 1,
+		turnActions: 0,
 	};
+	const next: HandState = { ...afterDraw, turnStart: afterDraw };
 	// The last stock card is a red three, or only red threes were left: the player may not meld or discard, so the hand ends.
 	if (cards.length === 0 || endsOnRedThree)
 		return succeed({ ...next, outcome: { kind: "stock" } });

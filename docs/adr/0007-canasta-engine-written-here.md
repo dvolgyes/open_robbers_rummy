@@ -39,6 +39,8 @@ Evidence, checked on 2026-10-22:
     The rest of the pile does not count, even when it is melded in the same turn.
   - The initial meld must be laid in the turn in which it is made, at or above the minimum for the side's score.
     A discard is refused while the side has partial melds on the table; `resetTurn` takes them back.
+    Amended 2026-10-22: `resetTurn` keeps a card drawn from the stock, so a player cannot see the card, take it back, and take the pile instead.
+    It still undoes a pile pickup, because a pickup below the initial minimum must stay retractable.
   - When the stock is exhausted, the next player must take the pile and meld or discard it.
     If that player cannot take the pile, the hand ends.
   - A last stock card that is a red three ends the hand when it is drawn, so its drawer may not meld or discard.

@@ -414,16 +414,72 @@ describe("hand flow", () => {
 		});
 	});
 
-	it("reports resetTurn only after an action in the turn", () => {
-		const hand = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
-		expect(
-			legalActions(hand, 1).some((action) => action.type === "resetTurn"),
-		).toBe(false);
+	it("reports resetTurn only after a meld or a pickup in the turn", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			hands: [[], cardsById(["0-KH", "1-KH", "0-KS", "0-9H"]), [], []],
+			stock: cardsById(["0-4C", "0-6C"]),
+		});
+		const canReset = (state: HandState): boolean =>
+			legalActions(state, 1).some((action) => action.type === "resetTurn");
+		expect(canReset(hand)).toBe(false);
 		const drawn = applyAction(hand, 1, { type: "draw" });
 		if (!drawn.ok) throw new Error(drawn.reason);
+		// The drawn card stays drawn, so there is nothing to take back yet.
+		expect(canReset(drawn.hand)).toBe(false);
+		const melded = applyAction(drawn.hand, 1, {
+			type: "meld",
+			cards: ["0-KH", "1-KH", "0-KS"],
+		});
+		if (!melded.ok) throw new Error(melded.reason);
+		expect(canReset(melded.hand)).toBe(true);
+	});
+
+	it("keeps the card drawn from the stock when the turn's melds are taken back", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			hands: [[], cardsById(["0-KH", "1-KH", "0-KS", "0-9H"]), [], []],
+			stock: cardsById(["0-4C", "0-6C"]),
+		});
+		const drawn = applyAction(hand, 1, { type: "draw" });
+		if (!drawn.ok) throw new Error(drawn.reason);
+		const melded = applyAction(drawn.hand, 1, {
+			type: "meld",
+			cards: ["0-KH", "1-KH", "0-KS"],
+		});
+		if (!melded.ok) throw new Error(melded.reason);
+		const reset = applyAction(melded.hand, 1, { type: "resetTurn" });
+		if (!reset.ok) throw new Error(reset.reason);
+		// The player may not put the card back and take the pile instead.
+		expect(reset.hand.phase).toBe("play");
+		expect(reset.hand.stock.map((card) => card.id)).toEqual(["0-6C"]);
+		expect(reset.hand.hands[1]?.map((card) => card.id)).toContain("0-4C");
+		expect(reset.hand.teams[1].melds).toHaveLength(0);
 		expect(
-			legalActions(drawn.hand, 1).some((action) => action.type === "resetTurn"),
-		).toBe(true);
+			legalActions(reset.hand, 1).some((action) => action.type === "takePile"),
+		).toBe(false);
+	});
+
+	it("takes a pile pickup back to the start of the turn, because the pile hides no card", () => {
+		const base = newHand({ teamScores: [0, 0], dealer: 0, seed: 1 });
+		const hand = scenario(base, {
+			turn: 1,
+			phase: "draw",
+			hands: [[], cardsById(["0-7H", "1-7H", "0-KS"]), [], []],
+			pile: cardsById(["0-9C", "0-7D"]),
+		});
+		const taken = applyAction(hand, 1, {
+			type: "takePile",
+			cards: ["0-7H", "1-7H"],
+		});
+		if (!taken.ok) throw new Error(taken.reason);
+		const reset = applyAction(taken.hand, 1, { type: "resetTurn" });
+		if (!reset.ok) throw new Error(reset.reason);
+		expect(reset.hand.phase).toBe("draw");
+		expect(reset.hand.pile).toHaveLength(2);
+		expect(reset.hand.hands[1]).toHaveLength(3);
 	});
 });
 
