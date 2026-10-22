@@ -169,6 +169,28 @@ describe("table section", () => {
 		);
 	});
 
+	it("shows the seat letters and the side names in the viewer's language, with whose side each is", () => {
+		const hu = translator("hu");
+		const section = mount([], hu);
+		const view = turnView(afterDraw(), 1, { t: hu });
+		section.render(view);
+		const avatars = [
+			...section.element.querySelectorAll<HTMLElement>(".tile .avatar"),
+		].map((avatar) => avatar.textContent);
+		expect(avatars).toHaveLength(3);
+		for (const letter of avatars)
+			expect(["É", "K", "D", "Ny"]).toContain(letter);
+		const texts = (selector: string): (string | null)[] =>
+			[...section.element.querySelectorAll<HTMLElement>(selector)].map(
+				(node) => node.textContent,
+			);
+		const expected = view.sides[0]?.mine
+			? ["É-D (miénk)", "K-Ny (övék)"]
+			: ["É-D (övék)", "K-Ny (miénk)"];
+		expect(texts(".side-title")).toEqual(expected);
+		expect(texts(".score-strip .side-label")).toEqual(expected);
+	});
+
 	it("asks only for messages that every language translates", () => {
 		const asked = new Set<string>();
 		const english = translator("en");

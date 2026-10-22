@@ -180,14 +180,27 @@ describe("score strip and piles", () => {
 		expect(view.target).toBe(CLASSIC_RULES.targetScore);
 		expect(view.sides[0]).toMatchObject({
 			label: "N-S",
+			owner: "ours",
 			score: 120,
 			mine: true,
 		});
 		expect(view.sides[1]).toMatchObject({
 			label: "E-W",
+			owner: "theirs",
 			score: 45,
 			mine: false,
 		});
+	});
+
+	it("names the sides with the viewer's seat letters, and marks them from the viewer's side", () => {
+		const match = { ...startMatch(7), winner: 1 as const };
+		const view = tableView({
+			...inputFor(stateOf(match), "W"),
+			t: translator("hu"),
+		});
+		expect(view.sides[0]).toMatchObject({ label: "É-D", owner: "övék" });
+		expect(view.sides[1]).toMatchObject({ label: "K-Ny", owner: "miénk" });
+		expect(view.winner).toContain("K-Ny");
 	});
 
 	it("reports the frozen pile until the viewer's side has its initial meld", () => {

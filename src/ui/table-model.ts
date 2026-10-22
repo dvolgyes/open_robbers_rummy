@@ -48,7 +48,15 @@ export const SUIT_SYMBOLS: Readonly<Record<Suit, string>> = {
 };
 
 /** The two sides in engine team order: index 0 is North-South, index 1 is East-West. */
-const SIDE_LABELS = ["N-S", "E-W"] as const;
+const SIDE_SEATS = [
+	["N", "S"],
+	["E", "W"],
+] as const;
+
+/** A side's name from the translated seat letters, such as "N-S" or, in Hungarian, "É-D". */
+function sideLabel(team: 0 | 1, t: Translate): string {
+	return SIDE_SEATS[team].map((seat) => t(seat)).join("-");
+}
 
 // ---------------------------------------------------------------------------------------------------------------
 // Cards
@@ -144,8 +152,10 @@ export interface MeldView {
 }
 
 export interface SideView {
-	/** "N-S" or "E-W". */
+	/** "N-S" or "E-W", with the translated seat letters. */
 	readonly label: string;
+	/** "ours" for the viewer's side, "theirs" for the opponents, translated. */
+	readonly owner: string;
 	/** The settled score of the match. */
 	readonly score: number;
 	/** The viewer's own side. */
@@ -174,10 +184,12 @@ function sideViews(
 ): readonly [SideView, SideView] {
 	const side = (index: 0 | 1): SideView => {
 		const team = view?.teams[index];
+		const mine = teamOf(engineSeat(viewer)) === index;
 		return {
-			label: SIDE_LABELS[index],
+			label: sideLabel(index, t),
+			owner: mine ? t("ours") : t("theirs"),
 			score: scores[index],
-			mine: teamOf(engineSeat(viewer)) === index,
+			mine,
 			melds:
 				view && team ? team.melds.map((meld) => meldView(meld, view, t)) : [],
 			redThrees: team ? team.redThrees.map((card) => cardView(card, t)) : [],
@@ -491,7 +503,7 @@ function commandLines(
 function outcomeText(outcome: Outcome, t: Translate): string {
 	if (outcome.kind === "stock")
 		return t("The stock ran out. No side went out.");
-	const side = SIDE_LABELS[teamOf(outcome.seat)];
+	const side = sideLabel(teamOf(outcome.seat), t);
 	return outcome.concealed
 		? t("{side} went out concealed.", { side })
 		: t("{side} went out.", { side });
@@ -672,7 +684,7 @@ export function tableView(input: TableViewInput): TableView {
 	const winner =
 		match.winner === null
 			? ""
-			: t("{side} won the match.", { side: SIDE_LABELS[match.winner] });
+			: t("{side} won the match.", { side: sideLabel(match.winner, t) });
 	const scoring =
 		phase === "hand-over" && view.outcome !== null
 			? {

@@ -451,7 +451,7 @@ export function tableSection(
 			el(
 				"span",
 				{ className: "avatar", attrs: { "aria-hidden": "true" } },
-				seat,
+				t(seat),
 			),
 			video,
 			botOverlay,
@@ -732,11 +732,9 @@ export function tableSection(
 		const block = sideBlocks[index];
 		if (cell === undefined || block === undefined) return;
 		cell.node.dataset.mine = String(side.mine);
-		cell.label.textContent = side.label;
+		cell.label.textContent = `${side.label} (${side.owner})`;
 		cell.score.textContent = String(side.score);
-		block.title.textContent = side.mine
-			? `${side.label} (${t("yours")})`
-			: side.label;
+		block.title.textContent = `${side.label} (${side.owner})`;
 		block.melds.replaceChildren(
 			...(side.melds.length === 0
 				? [el("span", { className: "none" }, t("No melds yet"))]
