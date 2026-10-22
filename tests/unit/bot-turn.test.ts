@@ -15,7 +15,15 @@ import {
 	parseChoice,
 } from "../../src/bot/strategy";
 import { chooseTurn, turnRequest } from "../../src/bot/turn";
-import { applyAction, legalActions, startMatch } from "../../src/canasta";
+import {
+	applyAction,
+	buildDecks,
+	type Seat as EngineSeat,
+	type HandState,
+	legalActions,
+	startMatch,
+	teamOf,
+} from "../../src/canasta";
 import { mulberry32 } from "../../src/canasta/random";
 import { engineSeat, tableSeat } from "../../src/game/canasta";
 import type { Seat } from "../../src/protocol";
@@ -50,6 +58,103 @@ describe("heuristic ranking", () => {
 		const draw = scoreAction(match.hand, engine, { type: "draw" });
 		expect(reset).toBeLessThan(draw);
 	});
+
+	/**
+	 * After the draw, the seat on turn holds three queens, a 2, a joker, a 9 and a 4. Its side has melded six 7s
+	 * and three 8s.
+	 */
+	function holdingWilds(): { hand: HandState; seat: EngineSeat } {
+		const match = startMatch(7);
+		const seat = match.hand.turn;
+		const drawn = applyAction(match.hand, seat, { type: "draw" });
+		if (!drawn.ok) throw new Error(drawn.reason);
+		const deck = buildDecks();
+		const cards = (ids: readonly string[]) =>
+			ids.flatMap((id) => deck.filter((card) => card.id === id));
+		const team = teamOf(seat);
+		const side = {
+			melds: [
+				{
+					id: "sevens",
+					rank: "7" as const,
+					team,
+					cards: cards(["0-7C", "1-7C", "0-7D", "1-7D", "0-7H", "1-7H"]),
+				},
+				{
+					id: "eights",
+					rank: "8" as const,
+					team,
+					cards: cards(["0-8C", "1-8C", "0-8D"]),
+				},
+			],
+			redThrees: [],
+			initialMade: true,
+		};
+		const teams = drawn.hand.teams;
+		const own = cards([
+			"0-QS",
+			"1-QS",
+			"0-QH",
+			"0-2C",
+			"0-JK0",
+			"0-9D",
+			"0-4S",
+		]);
+		const hand: HandState = {
+			...drawn.hand,
+			teams: team === 0 ? [side, teams[1]] : [teams[0], side],
+			hands: drawn.hand.hands.map((held, index) =>
+				index === seat ? own : held,
+			),
+		};
+		return { hand: { ...hand, turnStart: hand }, seat };
+	}
+
+	it("melds natural cards before wild cards", () => {
+		const { hand, seat } = holdingWilds();
+		const score = (cards: string[]) =>
+			scoreAction(hand, seat, { type: "meld", cards });
+		const natural = score(["0-QS", "1-QS", "0-QH"]);
+		expect(natural).toBeGreaterThan(score(["0-QS", "1-QS", "0-QH", "0-2C"]));
+		expect(natural).toBeGreaterThan(score(["0-QS", "1-QS", "0-2C"]));
+		expect(score(["0-QS", "1-QS", "0-2C"])).toBeGreaterThan(
+			score(["0-QS", "1-QS", "0-2C", "0-JK0"]),
+		);
+		const melds = legalActions(hand, seat).filter(
+			(action) => action.type === "meld",
+		);
+		expect(rankActions(hand, seat, melds)[0]).toEqual({
+			type: "meld",
+			cards: ["0-QS", "1-QS", "0-QH"],
+		});
+	});
+
+	it("keeps a wild card in the hand rather than add it to a meld that it does not make a canasta", () => {
+		const { hand, seat } = holdingWilds();
+		const discard = scoreAction(hand, seat, { type: "discard", card: "0-9D" });
+		const extend = (meldId: string) =>
+			scoreAction(hand, seat, { type: "extend", meldId, cards: ["0-2C"] });
+		expect(extend("eights")).toBeLessThan(discard);
+		expect(extend("sevens")).toBeGreaterThan(discard);
+	});
+
+	it("completes a canasta with a natural card rather than a wild card", () => {
+		const { hand, seat } = holdingWilds();
+		const seven = buildDecks().find((card) => card.id === "0-7S");
+		if (seven === undefined) throw new Error("no 7");
+		const own = [...(hand.hands[seat] ?? []), seven];
+		const holding: HandState = {
+			...hand,
+			hands: hand.hands.map((held, index) => (index === seat ? own : held)),
+		};
+		const extend = (card: string) =>
+			scoreAction(holding, seat, {
+				type: "extend",
+				meldId: "sevens",
+				cards: [card],
+			});
+		expect(extend("0-7S")).toBeGreaterThan(extend("0-2C"));
+	});
 });
 
 /** Plays one hand in which every seat takes the offered option that `pick` names; returns the outcome and resets. */
@@ -83,6 +188,7 @@ describe("offered choices", () => {
 			});
 	});
 
+	// 40 full hands take a few seconds, more than the default limit when the other test files run in parallel.
 	it("end every hand when each seat takes a random option", () => {
 		const random = mulberry32(99);
 		for (let seed = 1; seed <= 40; seed++)
@@ -90,7 +196,7 @@ describe("offered choices", () => {
 				playOffered(seed, (count) => Math.floor(random() * count)),
 				`seed ${seed}`,
 			).toEqual({ ended: true, resets: 0 });
-	});
+	}, 20_000);
 
 	it("offer only resetTurn when the turn cannot end otherwise", () => {
 		// Seed 1, South: after a draw and a partial meld below the minimum, no discard is legal.

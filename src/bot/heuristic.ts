@@ -3,6 +3,7 @@ import {
 	applyAction,
 	cardPoints,
 	type HandState,
+	isCanasta,
 	isWild,
 	legalActions,
 	type Seat,
@@ -12,9 +13,50 @@ import {
 const GOING_OUT = 1000;
 
 /**
+ * The cost of each wild card that an action puts on the table. It ranks a natural meld above the same meld with a
+ * wild card, and a discard above a lone wild card added to a meld that it does not make a canasta.
+ */
+const WILD_COST = 25;
+
+/**
+ * What putting `cards` on the table is worth beyond their count: a tenth of the bonus of each canasta that the
+ * action makes, so a natural canasta ranks above a mixed one, less the cost of the wild cards.
+ */
+function tableValue(
+	hand: HandState,
+	seat: Seat,
+	cards: readonly string[],
+	after: HandState | undefined,
+): number {
+	const own = hand.hands[seat] ?? [];
+	const wilds = own.filter(
+		(card) => cards.includes(card.id) && isWild(card),
+	).length;
+	const team = teamOf(seat);
+	const before = new Set(
+		(hand.teams[team]?.melds ?? [])
+			.filter((meld) => isCanasta(meld, hand.rules))
+			.map((meld) => meld.id),
+	);
+	const made = (after?.teams[team]?.melds ?? []).filter(
+		(meld) => isCanasta(meld, hand.rules) && !before.has(meld.id),
+	);
+	const bonus = made.reduce(
+		(sum, meld) =>
+			sum +
+			(meld.cards.some(isWild)
+				? hand.rules.mixedCanastaBonus
+				: hand.rules.naturalCanastaBonus) /
+				10,
+		0,
+	);
+	return bonus - wilds * WILD_COST;
+}
+
+/**
  * A rough value for one legal action, used to order the choices offered to a model and as the fallback when
  * no model answers. It reads only the seat's own cards and the public pile and melds, and it applies the action
- * only to learn whether it goes out.
+ * only to learn whether it goes out or makes a canasta.
  */
 export function scoreAction(
 	hand: HandState,
@@ -23,15 +65,26 @@ export function scoreAction(
 ): number {
 	const step = applyAction(hand, seat, action);
 	if (step.ok && step.hand.outcome?.kind === "out") return GOING_OUT;
+	const after = step.ok ? step.hand : undefined;
 	switch (action.type) {
 		case "draw":
 			return 10;
 		case "takePile":
-			return 30 + hand.pile.length;
+			return (
+				30 + hand.pile.length + tableValue(hand, seat, action.cards, after)
+			);
 		case "meld":
-			return 40 + action.cards.length * 3;
+			return (
+				40 +
+				action.cards.length * 3 +
+				tableValue(hand, seat, action.cards, after)
+			);
 		case "extend":
-			return 35 + action.cards.length * 3;
+			return (
+				35 +
+				action.cards.length * 3 +
+				tableValue(hand, seat, action.cards, after)
+			);
 		case "discard": {
 			const own = hand.hands[seat] ?? [];
 			const card = own.find((item) => item.id === action.card);
