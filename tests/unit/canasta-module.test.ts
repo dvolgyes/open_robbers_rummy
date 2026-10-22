@@ -86,6 +86,21 @@ describe("canasta module: starting and presence", () => {
 		});
 	});
 
+	it("chooses the first dealer at random", () => {
+		const dealers = new Set(
+			Array.from({ length: 40 }, (_, seed) => {
+				const result = createCanastaModule(seededRandom(seed)).apply(
+					module.initialState(ROOM, { names }),
+					context("N"),
+					startPayload(ROOM),
+				);
+				if (!result.ok) throw new Error(result.reason);
+				return table(result.state).match?.dealer;
+			}),
+		);
+		expect([...dealers].sort()).toEqual([0, 1, 2, 3]);
+	});
+
 	it("deals the same hand for the same seed", () => {
 		const first = createCanastaModule(seededRandom(7)).apply(
 			module.initialState(ROOM, { names }),
@@ -232,6 +247,8 @@ describe("canasta module: shared constants", () => {
 /** Plays the current hand with legal actions until the host settles it. */
 function playToSettlement(start: JsonObject): JsonObject {
 	let state = start;
+	// A pseudo-random choice, because a fixed stride can alternate between a pile pickup and taking it back.
+	let random = 7919;
 	for (let step = 0; step < 5000; step++) {
 		const parsed = table(state);
 		const match = parsed.match;
@@ -239,7 +256,8 @@ function playToSettlement(start: JsonObject): JsonObject {
 		if (match.settled) return state;
 		const seat = tableSeat(match.hand.turn);
 		const options = legalActions(match.hand, match.hand.turn);
-		const pick = options[(step * 7919) % options.length];
+		random = (random * 1103515245 + 12345) >>> 0;
+		const pick = options[(random >>> 16) % options.length];
 		if (pick === undefined) throw new Error(`no legal action at step ${step}`);
 		const result = module.apply(
 			state,

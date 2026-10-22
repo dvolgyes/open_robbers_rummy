@@ -9,6 +9,7 @@ import {
 	picks,
 	sendDraft,
 	takeTurn,
+	turnOrder,
 } from "./room";
 
 test("one browser: create, three seats from one link, ordered messages, and a reset vote", async ({
@@ -74,10 +75,18 @@ test("one browser: create, three seats from one link, ordered messages, and a re
 			await expect(page.getByTestId("pending").locator("li")).toHaveCount(0);
 			await expect(page.getByTestId("banner")).toBeHidden();
 		}
-		// East opens hand 1. West asks for a reset; the three others approve, and the host deals a new match.
-		const east = guests[1];
-		if (east === undefined) throw new Error("East has no page");
-		await takeTurn(east, 0);
+		// The first player opens hand 1. West asks for a reset; the three others approve, and the host deals a new
+		// match, with a new random dealer.
+		const [north, east, south] = guests;
+		if (north === undefined || east === undefined || south === undefined)
+			throw new Error("a guest has no page");
+		const pages = { W: host, N: north, E: east, S: south };
+		const firstPage = async () => {
+			const [first] = await turnOrder(pages);
+			if (first === undefined) throw new Error("nobody plays first");
+			return pages[first];
+		};
+		await takeTurn(await firstPage(), 0);
 		await host.getByTestId("reset").click();
 		await expect(host.getByTestId("reset-decision")).toContainText(
 			"to approve the reset",
@@ -94,7 +103,7 @@ test("one browser: create, three seats from one link, ordered messages, and a re
 			await expect(page.getByTestId("reset-decision")).toBeHidden();
 			await expect(lines(page).locator(".text")).toHaveText(expected);
 		}
-		await takeTurn(east, 0);
+		await takeTurn(await firstPage(), 0);
 		expect(player.errors).toEqual([]);
 		expect(player.supabaseRequests).toBe(0);
 	} finally {

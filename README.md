@@ -43,7 +43,7 @@ If a seat is already held by an active browser, choose another available seat or
 Reopening the link in the same browser normally restores that browser's seat.
 
 When all four seats are ready, the table deals the first hand automatically: eleven cards to each player.
-North deals the first hand, and the player at the dealer's left starts.
+The first dealer is chosen at random, the deal then passes to the left, and the player at the dealer's left starts.
 In each turn, a player does these steps:
 
 1. Draw the top card of the stock, or take the whole discard pile.

@@ -101,8 +101,36 @@ export async function openDrawer(page: Page): Promise<void> {
 		await drawer.locator("summary").first().click();
 }
 
-/** In hand 1 North deals, so play starts at the dealer's left. */
-export const TURN_ORDER = ["E", "S", "W", "N"] as const;
+/** The seats clockwise, in the order of play. */
+const CLOCKWISE = ["N", "E", "S", "W"] as const satisfies readonly SeatKey[];
+
+/**
+ * The seats in the order of play from the seat whose page shows its turn. The first dealer is random, so the first
+ * player is too.
+ */
+export async function turnOrder(
+	pages: Record<SeatKey, Page>,
+): Promise<SeatKey[]> {
+	const playing = async (): Promise<SeatKey[]> => {
+		const seats: SeatKey[] = [];
+		for (const seat of CLOCKWISE)
+			if (
+				(await pages[seat]
+					.getByTestId("table")
+					.getAttribute("data-your-turn")) === "true"
+			)
+				seats.push(seat);
+		return seats;
+	};
+	// A page can show the play phase a render before it shows the turn, so wait for one seat to have it.
+	await expect
+		.poll(async () => (await playing()).length, { timeout: CONNECT_MS })
+		.toBe(1);
+	const [first] = await playing();
+	if (first === undefined) throw new Error("expected one seat to play");
+	const start = CLOCKWISE.indexOf(first);
+	return [...CLOCKWISE.slice(start), ...CLOCKWISE.slice(0, start)];
+}
 
 /**
  * One canasta turn through the buttons a player uses, from table position `at`: draw from the stock, then discard

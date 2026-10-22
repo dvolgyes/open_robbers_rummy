@@ -36,8 +36,8 @@ import {
 	pick,
 	rosterSeat,
 	type SeatKey,
-	TURN_ORDER,
 	takeTurn,
+	turnOrder,
 } from "./room";
 
 /**
@@ -667,7 +667,8 @@ test("7: a browser limited to relays gets Retry for each of its pairs, the other
 		);
 
 	// Hand 1 (dealt in test 1): each seat takes one turn, and North acts over its relay-only links.
-	for (const [index, seat] of TURN_ORDER.entries()) {
+	await expectAt(0);
+	for (const [index, seat] of (await turnOrder(tab)).entries()) {
 		await expectAt(index * 2);
 		await takeTurn(tab[seat], index * 2);
 	}

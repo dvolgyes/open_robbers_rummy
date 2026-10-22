@@ -30,6 +30,8 @@ Evidence, checked on 2026-10-22:
   - A meld has at least two natural cards and at most three wild cards, so its wild cards can outnumber its natural cards, as in Q-Q-2-2-2.
     Amended 2026-10-22: before this change, the engine refused such a meld.
     That rule belongs to the Austrian variant, which Pagat lists as a modification.
+  - The first dealer is chosen at random, and the deal passes clockwise.
+    Amended 2026-10-22: before this change, North dealt the first hand of every match.
   - A player draws one card from the stock, or takes the whole discard pile.
   - The initial meld needs 15 points at a negative score, 50 from 0, 90 from 1500, and 120 from 3000.
   - A red three is set aside when dealt or drawn.

@@ -14,6 +14,7 @@ import {
 	sendDraft,
 	takeTurn,
 	texts,
+	turnOrder,
 } from "./room";
 
 /**
@@ -117,8 +118,10 @@ test("a tracker outage keeps the table: messages, the deal and the play go on; a
 			"data-phase",
 			"play",
 		);
-	// Hand 1: North deals, so East takes the first turn.
-	await takeTurn(tab.E, 0);
+	// The first dealer is random, so the first player is too.
+	const [first] = await turnOrder(tab);
+	if (first === undefined) throw new Error("nobody plays first");
+	await takeTurn(tab[first], 0);
 	for (const seat of seats)
 		await expect(tab[seat].getByTestId("table")).toHaveAttribute(
 			"data-at",

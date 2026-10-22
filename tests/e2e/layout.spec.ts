@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { Player } from "./player";
-import { CONNECT_MS, createRoom, pick, type SeatKey } from "./room";
+import { CONNECT_MS, createRoom, pick, type SeatKey, turnOrder } from "./room";
 
 /**
  * Player-relative layout (call/layout plan C3). Four desktop browsers check the rotation, the tiles and the free
@@ -189,27 +189,30 @@ async function expectFit(
 	page: Page,
 	parts: Readonly<Record<string, string>>,
 ): Promise<void> {
-	await page.evaluate(() => window.scrollTo(0, 0));
-	const view = await page.evaluate(() => ({
-		innerWidth: window.innerWidth,
-		innerHeight: window.innerHeight,
-		scrollWidth: document.documentElement.scrollWidth,
-	}));
-	expect(view.scrollWidth, "sideways page scroll").toBeLessThanOrEqual(
-		view.innerWidth,
-	);
-	const rects = await measure(page, parts);
-	for (const name of Object.keys(parts)) {
-		const rect = shown(rects, name);
-		expect(rect.x, `${name} left edge`).toBeGreaterThanOrEqual(-SUBPIXEL);
-		expect(rect.y, `${name} top edge`).toBeGreaterThanOrEqual(-SUBPIXEL);
-		expect(right(rect), `${name} right edge`).toBeLessThanOrEqual(
-			view.innerWidth + SUBPIXEL,
+	// The canvas scale follows the window's resize event, which can arrive after a viewport change.
+	await expect(async () => {
+		await page.evaluate(() => window.scrollTo(0, 0));
+		const view = await page.evaluate(() => ({
+			innerWidth: window.innerWidth,
+			innerHeight: window.innerHeight,
+			scrollWidth: document.documentElement.scrollWidth,
+		}));
+		expect(view.scrollWidth, "sideways page scroll").toBeLessThanOrEqual(
+			view.innerWidth,
 		);
-		expect(bottom(rect), `${name} bottom edge`).toBeLessThanOrEqual(
-			view.innerHeight + SUBPIXEL,
-		);
-	}
+		const rects = await measure(page, parts);
+		for (const name of Object.keys(parts)) {
+			const rect = shown(rects, name);
+			expect(rect.x, `${name} left edge`).toBeGreaterThanOrEqual(-SUBPIXEL);
+			expect(rect.y, `${name} top edge`).toBeGreaterThanOrEqual(-SUBPIXEL);
+			expect(right(rect), `${name} right edge`).toBeLessThanOrEqual(
+				view.innerWidth + SUBPIXEL,
+			);
+			expect(bottom(rect), `${name} bottom edge`).toBeLessThanOrEqual(
+				view.innerHeight + SUBPIXEL,
+			);
+		}
+	}).toPass({ timeout: 5_000 });
 }
 
 /** The parts that are not seats: the scores, the call dock, the room controls, the drawer and the language. */
@@ -336,15 +339,17 @@ test("1: desktop, first hand: each of the four viewers sits at the bottom, with 
 		await expectRotation(tab[seat], seat, "row");
 	}
 
-	// North dealt, so East acts first: its window shows the hand and the action buttons without page scroll,
-	// also on a low laptop window.
-	await expect(tab.E.getByTestId("action-draw")).toBeVisible();
-	await expectFit(tab.E, OWN_PARTS);
-	await expectSideParts(tab.E, "canvas");
-	await tab.E.setViewportSize(LOW_LAPTOP);
-	await expectFit(tab.E, OWN_PARTS);
-	await expectSideParts(tab.E, "canvas");
-	await tab.E.setViewportSize({ width: 1280, height: 720 });
+	// The window of the first player shows the hand and the action buttons without page scroll, also on a low
+	// laptop window.
+	const [first] = await turnOrder(tab);
+	if (first === undefined) throw new Error("nobody plays first");
+	await expect(tab[first].getByTestId("action-draw")).toBeVisible();
+	await expectFit(tab[first], OWN_PARTS);
+	await expectSideParts(tab[first], "canvas");
+	await tab[first].setViewportSize(LOW_LAPTOP);
+	await expectFit(tab[first], OWN_PARTS);
+	await expectSideParts(tab[first], "canvas");
+	await tab[first].setViewportSize({ width: 1280, height: 720 });
 });
 
 test("2: a phone shows the table without sideways scroll, with the own hand and the actions in reach", async () => {

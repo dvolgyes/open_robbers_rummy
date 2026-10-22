@@ -6,6 +6,7 @@ import {
 	test,
 } from "@playwright/test";
 import type { StoredCallRecord } from "../../src/call/record";
+import { parseCanastaState, tableSeat } from "../../src/game/canasta";
 import { HOST_LOST_MS, SEAT_GRACE_MS } from "../../src/p2p/limits";
 import type { TableView } from "../../src/p2p/table";
 import type { Seat } from "../../src/protocol";
@@ -302,6 +303,18 @@ function act(page: Page) {
 
 function deal(page: Page) {
 	return page.evaluate(() => (window.ocHarness as Harness).deal());
+}
+
+const SEAT_NAMES = { N: "North", E: "East", S: "South", W: "West" } as const;
+
+/** The seat that plays first in the dealt hand, from the state that the page holds. */
+async function firstPlayer(page: Page): Promise<Seat> {
+	const record = (await view(page))?.table;
+	const match = record
+		? parseCanastaState(record.state, record.tableId)?.match
+		: undefined;
+	if (!match) throw new Error("no hand is dealt");
+	return tableSeat(match.hand.turn);
 }
 
 async function commands(page: Page): Promise<number> {
@@ -686,29 +699,37 @@ test("game actions wait for every player (R4)", async ({ browser }) => {
 	expect(await deal(players.N.page)).toEqual({ ok: true });
 	await expectCommands(pages, 1);
 
-	// West leaves. North dealt hand 1, so East takes the first turn; its draw waits for West.
-	await crash(players.W);
-	await expectGone(players.E.page, "W");
-	expect(await act(players.N.page), "North is not the actor").toBeNull();
-	expect(await act(players.E.page)).toEqual({ ok: true });
+	// The first dealer is random, so the first player is too. A seat that is neither the host (North) nor the
+	// first player leaves, and the first player's draw waits for it.
+	const first = await firstPlayer(players.N.page);
+	const [gone, idle] = SEATS.filter((seat) => seat !== "N" && seat !== first);
+	if (gone === undefined || idle === undefined)
+		throw new Error("no seat to leave");
+	await crash(players[gone]);
+	await expectGone(players[first].page, gone);
+	expect(
+		await act(players[idle].page),
+		"the idle seat is not the actor",
+	).toBeNull();
+	expect(await act(players[first].page)).toEqual({ ok: true });
 	await expect
 		.poll(
 			async () =>
-				(await view(players.E.page))?.outbox.map((item) => item.waiting),
+				(await view(players[first].page))?.outbox.map((item) => item.waiting),
 			{ timeout: CONNECT_MS },
 		)
-		.toEqual(["Waiting for West to come back"]);
-	expect(await commands(players.E.page)).toBe(1);
+		.toEqual([`Waiting for ${SEAT_NAMES[gone]} to come back`]);
+	expect(await commands(players[first].page)).toBe(1);
 
-	// West returns, and the stored draw lands without a new click.
-	await reopen(players.W, key, "W");
-	await expectSeated(players.W.page, "W", "N");
+	// The seat returns, and the stored draw lands without a new click.
+	await reopen(players[gone], key, gone);
+	await expectSeated(players[gone].page, gone, "N");
 	const all = pagesOf(players, SEATS);
 	await expectCommands(all, 2);
-	expect((await view(players.E.page))?.outbox).toEqual([]);
+	expect((await view(players[first].page))?.outbox).toEqual([]);
 
-	// East goes on with its turn.
-	await actInTurn(players.E.page, all, 2);
+	// The first player goes on with the turn.
+	await actInTurn(players[first].page, all, 2);
 
 	for (const page of all) expect((await view(page))?.failures).toEqual([]);
 	const log = await transcript(players.N.page);

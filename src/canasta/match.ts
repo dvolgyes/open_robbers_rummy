@@ -23,21 +23,23 @@ export type MatchStep =
 
 const fail = (reason: string): MatchStep => ({ ok: false, reason });
 
+/** The caller chooses the first dealer, at random in a real game; the deal then rotates clockwise. */
 export function startMatch(
 	seed: number,
 	rules: CanastaRules = CLASSIC_RULES,
+	dealer: Seat = 0,
 ): MatchState {
 	const scores: readonly [number, number] = [0, 0];
 	return {
 		rules,
 		seed,
 		handNo: 1,
-		dealer: 0,
+		dealer,
 		scores,
 		hand: newHand({
 			rules,
 			teamScores: scores,
-			dealer: 0,
+			dealer,
 			seed: handSeed(seed, 1),
 		}),
 		settled: false,

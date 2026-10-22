@@ -129,15 +129,23 @@ async function commonHost(): Promise<SeatKey> {
 	return seat;
 }
 
-/** Every open tab shows hand 1 at the position: the number of game actions taken in it. */
+/**
+ * The positions in the tests count from East's first turn. The first dealer is random, so test 3 lets the players
+ * before East take their turns and sets this offset to the actions that they took.
+ */
+let offset = 0;
+
+/** Every open tab shows hand 1 at the position: the number of game actions taken in it, after the offset. */
 async function expectAt(at: number): Promise<void> {
 	for (const seat of openSeats()) {
 		await expect(table(tab[seat])).toHaveAttribute("data-hand", "1", {
 			timeout: CONNECT_MS,
 		});
-		await expect(table(tab[seat])).toHaveAttribute("data-at", String(at), {
-			timeout: CONNECT_MS,
-		});
+		await expect(table(tab[seat])).toHaveAttribute(
+			"data-at",
+			String(offset + at),
+			{ timeout: CONNECT_MS },
+		);
 	}
 }
 
@@ -165,7 +173,7 @@ async function actor(): Promise<SeatKey> {
 async function turn(at: number): Promise<SeatKey> {
 	await expectAt(at);
 	const seat = await actor();
-	await takeTurn(tab[seat], at);
+	await takeTurn(tab[seat], offset + at);
 	return seat;
 }
 
@@ -256,8 +264,13 @@ test("3: a turn waits while a player is away; it goes on after the player return
 	await tab.W.waitForTimeout(8_000);
 	await expectAt(0);
 
-	// North dealt hand 1, so East takes the first turn once South is back.
+	// The play goes on once South is back. The players before East take their turns, so that the later tests find
+	// the seats in the order that they expect.
 	await reopen("S");
+	while ((await actor()) !== "E") {
+		await turn(0);
+		offset += 2;
+	}
 	expect(await turn(0)).toBe("E");
 	await expectAt(2);
 	for (const seat of SEATS)

@@ -1,6 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
 import { Player } from "./player";
-import { CONNECT_MS, createRoom, openDrawer, pick } from "./room";
+import {
+	CONNECT_MS,
+	createRoom,
+	openDrawer,
+	pick,
+	takeTurn,
+	turnOrder,
+} from "./room";
 
 /**
  * The host page's bot seats. OpenRouter is replaced by a route on the host page that always answers option 0, the
@@ -174,13 +181,18 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 		await pick(southPage, "S");
 		// East is the last free seat, so its page takes it without a picker.
 		const eastPage = await east.page(link);
-		for (const page of [hostPage, eastPage])
+		const pages = { W: hostPage, N: northPage, E: eastPage, S: southPage };
+		for (const page of Object.values(pages))
 			await expect(page.getByTestId("table")).toHaveAttribute(
 				"data-phase",
 				"play",
 				{ timeout: CONNECT_MS },
 			);
-		// Hand 1: North deals, so East has the first turn.
+		// The first dealer is random. The players before East take their turns, so that East has the turn.
+		const order = await turnOrder(pages);
+		const before = order.indexOf("E");
+		for (const [index, seat] of order.slice(0, before).entries())
+			await takeTurn(pages[seat], index * 2);
 		await expect(eastPage.getByTestId("action-draw")).toBeEnabled({
 			timeout: CONNECT_MS,
 		});
@@ -222,7 +234,7 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 			.getByRole("button", { name: /Switch to player$/ })
 			.click();
 
-		// East has the turn: as a bot it draws and discards without a click, so the table moves past position 2.
+		// East has the turn: as a bot it draws and discards without a click, so the table moves past its turn.
 		await hostPage
 			.getByTestId("tile-E")
 			.getByRole("button", { name: /Switch to bot$/ })
@@ -233,7 +245,7 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 					Number(await hostPage.getByTestId("table").getAttribute("data-at")),
 				{ timeout: 30_000 },
 			)
-			.toBeGreaterThanOrEqual(2);
+			.toBeGreaterThanOrEqual(before * 2 + 2);
 		expect(new URL(hostPage.url()).searchParams.get("bot_seats")).toBe("E");
 		await expect(
 			hostPage.getByTestId("tile-E").locator(".bot-overlay"),

@@ -349,7 +349,7 @@ function applyStart(
 	const waiting = absence(SEATS, present);
 	if (waiting) return waiting;
 	const seed = randomBelow(2 ** 32);
-	const match = startMatch(seed);
+	const match = startMatch(seed, CLASSIC_RULES, randomBelow(4) as EngineSeat);
 	return accept(
 		{ kind: "start", handNo: match.handNo },
 		{
