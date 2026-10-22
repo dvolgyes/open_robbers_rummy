@@ -308,6 +308,21 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"TURN-URLs werden nicht unterstützt. VITE_STUN_URLS akzeptiert nur stun:- und stuns:-URLs.",
 			"Pause bots": "Bots pausieren",
 			"Resume bots": "Bots fortsetzen",
+			Reset: "Zurücksetzen",
+			"Approve reset": "Zurücksetzen bestätigen",
+			"Reject reset": "Zurücksetzen ablehnen",
+			"Cancel reset": "Zurücksetzen abbrechen",
+			"Reset not sent: {reason}": "Zurücksetzen nicht gesendet: {reason}",
+			"Reset approval not sent: {reason}":
+				"Bestätigung des Zurücksetzens nicht gesendet: {reason}",
+			"Reset decision not sent: {reason}":
+				"Entscheidung über das Zurücksetzen nicht gesendet: {reason}",
+			"Reset cancellation not sent: {reason}":
+				"Abbruch des Zurücksetzens nicht gesendet: {reason}",
+			"Waiting for {players} to approve the reset.":
+				"Warte darauf, dass {players} das Zurücksetzen bestätigen.",
+			"{requester} asks to reset the game.":
+				"{requester} möchte das Spiel zurücksetzen.",
 			"Choose bot model": "Bot-Modell wählen",
 			"Use model": "Modell verwenden",
 			"After a server error, the bot tries the next model in this order.":
@@ -422,6 +437,23 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"Szerverhiba után a bot ebben a sorrendben próbálja a következő modellt.",
 			"Pause bots": "Botok felfüggesztése",
 			"Resume bots": "Botok folytatása",
+			Reset: "Újrakezdés",
+			"Approve reset": "Újrakezdés jóváhagyása",
+			"Reject reset": "Újrakezdés elutasítása",
+			"Cancel reset": "Újrakezdés visszavonása",
+			"Reset not sent: {reason}": "Az újrakezdés nem lett elküldve: {reason}",
+			"Reset approval not sent: {reason}":
+				"Az újrakezdés jóváhagyása nem lett elküldve: {reason}",
+			"Reset decision not sent: {reason}":
+				"Az újrakezdésről szóló döntés nem lett elküldve: {reason}",
+			"Reset cancellation not sent: {reason}":
+				"Az újrakezdés visszavonása nem lett elküldve: {reason}",
+			"Waiting for {players} to approve the reset.":
+				"Várakozás arra, hogy {players} jóváhagyja az újrakezdést.",
+			"{requester} asks to reset the game.":
+				"{requester} a játék újrakezdését kéri.",
+			"The game has expired or is no longer available":
+				"A játék lejárt, vagy már nem érhető el.",
 			Exit: "Kilépés",
 			Players: "Játékosok",
 			Messages: "Üzenetek",
@@ -717,6 +749,21 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Use model": "Bruk modell",
 			"Pause bots": "Sett botene på pause",
 			"Resume bots": "Fortsett med botene",
+			Reset: "Tilbakestill",
+			"Approve reset": "Godkjenn tilbakestilling",
+			"Reject reset": "Avvis tilbakestilling",
+			"Cancel reset": "Avbryt tilbakestilling",
+			"Reset not sent: {reason}": "Tilbakestillingen ble ikke sendt: {reason}",
+			"Reset approval not sent: {reason}":
+				"Godkjenningen av tilbakestillingen ble ikke sendt: {reason}",
+			"Reset decision not sent: {reason}":
+				"Avgjørelsen om tilbakestilling ble ikke sendt: {reason}",
+			"Reset cancellation not sent: {reason}":
+				"Avbrytelsen av tilbakestillingen ble ikke sendt: {reason}",
+			"Waiting for {players} to approve the reset.":
+				"Venter på at {players} godkjenner tilbakestillingen.",
+			"{requester} asks to reset the game.":
+				"{requester} ber om å tilbakestille spillet.",
 			Exit: "Avslutt",
 			Players: "Spillere",
 			Messages: "Meldinger",

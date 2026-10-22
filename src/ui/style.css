@@ -1218,6 +1218,35 @@ main[data-screen="table"] > .room {
 	outline-offset: 2px;
 }
 
+/* A card inside a line of text, such as an action label: rank and suit symbol on a small card face. */
+.pip {
+	display: inline-block;
+	padding: 0 0.2rem;
+	border: 1px solid var(--line);
+	border-radius: 0.2rem;
+	background: var(--card-bg);
+	color: var(--card-fg);
+	font-weight: 700;
+	line-height: 1.25;
+	white-space: nowrap;
+}
+
+.pip.red {
+	color: var(--red-suit);
+}
+
+.pip.joker {
+	color: #5b3a89;
+}
+
+/* Melds and the pile already sit on a card face. */
+.meld .pip,
+.pile-top .pip,
+.red-threes .pip {
+	padding: 0;
+	border: none;
+}
+
 /* The sort control and the hint on the left, the actions on the right, in one row where they fit. */
 .own-bar {
 	display: flex;

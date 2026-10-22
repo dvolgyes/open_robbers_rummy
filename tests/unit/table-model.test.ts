@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { CLASSIC_RULES, type MatchState, startMatch } from "../../src/canasta";
+import {
+	applyAction,
+	CLASSIC_RULES,
+	type MatchState,
+	startMatch,
+} from "../../src/canasta";
 import {
 	type CanastaState,
 	engineSeat,
 	tableSeat,
 } from "../../src/game/canasta";
+import {
+	catalogKeys,
+	type Locale,
+	type Translate,
+	translator,
+} from "../../src/i18n";
 import {
 	PROTOCOL_VERSION,
 	type RoomConfig,
@@ -14,6 +25,8 @@ import {
 import type { RosterRow } from "../../src/ui/model";
 import {
 	type ActionOption,
+	type Label,
+	labelText,
 	optionsFor,
 	positionOf,
 	type TableViewInput,
@@ -236,19 +249,19 @@ describe("hand over", () => {
 describe("optionsFor", () => {
 	const draw: ActionOption = {
 		key: "draw",
-		label: "Draw",
+		label: [{ kind: "text", text: "Draw" }],
 		action: { type: "draw" },
 		cards: [],
 	};
 	const discardA: ActionOption = {
 		key: "discard-a",
-		label: "Discard A",
+		label: [{ kind: "text", text: "Discard A" }],
 		action: { type: "discard", card: "a" },
 		cards: ["a"],
 	};
 	const meldAB: ActionOption = {
 		key: "meld-ab",
-		label: "Meld A and B",
+		label: [{ kind: "text", text: "Meld A and B" }],
 		action: { type: "meld", cards: ["a", "b"] },
 		cards: ["a", "b"],
 	};
@@ -264,5 +277,145 @@ describe("optionsFor", () => {
 
 	it("the selection matches the cards of an option in any order", () => {
 		expect(optionsFor(options, ["b", "a"])).toEqual([draw, meldAB]);
+	});
+});
+
+/** The match after the seat on turn drew from the stock, so it can meld and discard. */
+function afterDraw(seed: number): MatchState {
+	const match = startMatch(seed);
+	const step = applyAction(match.hand, match.hand.turn, { type: "draw" });
+	if (!step.ok) throw new Error(step.reason);
+	return { ...match, hand: step.hand };
+}
+
+const cardIdsOf = (label: Label): string[] =>
+	label.flatMap((part) => (part.kind === "card" ? [part.card.id] : []));
+/** The text of a label with each card as "|". */
+const textOf = (label: Label): string =>
+	label.map((part) => (part.kind === "text" ? part.text : "|")).join("");
+
+describe("action labels", () => {
+	const hu = translator("hu");
+
+	it("names a draw in the viewer's language", () => {
+		const match = startMatch(7);
+		const view = tableView(inputFor(stateOf(match), turnOf(match), { t: hu }));
+		const draw = view.options.find((option) => option.action.type === "draw");
+		expect(draw && labelText(draw.label)).toBe("Húzz egy lapot a pakliból");
+	});
+
+	it("shows a discarded card as a card, not as text", () => {
+		const match = afterDraw(7);
+		const view = tableView(
+			inputFor(stateOf(match, 1), turnOf(match), { t: hu }),
+		);
+		const discard = view.options.find(
+			(option) => option.action.type === "discard",
+		);
+		expect(discard).toBeDefined();
+		if (discard === undefined) return;
+		expect(textOf(discard.label)).toBe("Eldobás: |");
+		expect(cardIdsOf(discard.label)).toEqual(discard.cards);
+	});
+
+	it("shows each card of a new meld as a card, in the order of the action", () => {
+		const meld = Array.from({ length: 200 }, (_, seed) => afterDraw(seed + 1))
+			.flatMap(
+				(match) =>
+					tableView(inputFor(stateOf(match, 1), turnOf(match), { t: hu }))
+						.options,
+			)
+			.find((option) => option.action.type === "meld");
+		expect(meld).toBeDefined();
+		if (meld === undefined) return;
+		expect(textOf(meld.label)).toMatch(/^Kirakás: \|( \|)+$/);
+		expect(cardIdsOf(meld.label)).toEqual(meld.cards);
+	});
+});
+
+describe("translated table texts", () => {
+	/** A translator that records each message that the table asks for. */
+	function recording(): { t: Translate; asked: Set<string> } {
+		const asked = new Set<string>();
+		const english = translator("en");
+		return {
+			asked,
+			t: (message, values) => {
+				asked.add(message);
+				return english(message, values);
+			},
+		};
+	}
+
+	it("asks only for messages that every language translates", () => {
+		const { t, asked } = recording();
+		const match = startMatch(7);
+		const turn = turnOf(match);
+		const drawn = afterDraw(7);
+		const ended = (outcome: MatchState["hand"]["outcome"]): MatchState => ({
+			...match,
+			hand: { ...match.hand, outcome },
+		});
+		const refused = (id: string, reason: string) => ({
+			id,
+			payload: { type: "action", hand: match.handNo, action: { type: "draw" } },
+			status: "rejected" as const,
+			reason,
+		});
+		const inputs: TableViewInput[] = [
+			inputFor(undefined, "S", { t }),
+			inputFor(null, "S", { t }),
+			inputFor(stateOf(null), "S", { t, present: new Set(["N", "S"]) }),
+			inputFor(stateOf(null), "S", { t }),
+			inputFor(stateOf(match), turn, {
+				t,
+				failures: [
+					refused("c1", "draw before melding"),
+					refused("c2", "card 7H-1 is not in your hand"),
+					refused("c3", "a meld may hold at most 3 wild cards"),
+					refused("c4", "the cards do not match the meld rank 7"),
+					refused("c5", "the table has moved on since this action was chosen"),
+				],
+			}),
+			inputFor(stateOf(match), turn, {
+				t,
+				outbox: [
+					{
+						id: "c6",
+						order: 1,
+						state: "queued",
+						waiting: "Waiting for North and East to come back",
+						payload: { type: "next-hand" },
+					},
+				],
+			}),
+			inputFor(stateOf(drawn, 1), turnOf(drawn), { t }),
+			inputFor(stateOf(ended({ kind: "stock" })), turn, { t }),
+			inputFor(
+				stateOf(ended({ kind: "out", seat: 0, concealed: true })),
+				turn,
+				{ t },
+			),
+			inputFor(stateOf({ ...match, winner: 1 }), turn, { t }),
+		];
+		for (const input of inputs) tableView(input);
+		expect(asked.size).toBeGreaterThan(20);
+		const locales = [
+			"de",
+			"hu",
+			"no",
+			"es",
+			"pt",
+			"fr",
+			"it",
+			"nl",
+		] as const satisfies readonly Exclude<Locale, "en">[];
+		for (const locale of locales) {
+			const known = new Set(catalogKeys(locale));
+			expect(
+				[...asked].filter((message) => !known.has(message)),
+				locale,
+			).toEqual([]);
+		}
 	});
 });

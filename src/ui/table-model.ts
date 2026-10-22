@@ -1,4 +1,4 @@
-import { actionLabel } from "../bot/canasta-text";
+import { cardsById } from "../bot/canasta-text";
 import {
 	type Action,
 	type Card,
@@ -36,7 +36,7 @@ import { ownCommands, type RosterRow } from "./model";
 /**
  * Pure view model of the canasta table: the DOM layer only renders what these functions return.
  *
- * The rules come from the engine (`legalActions`, `viewFor`, `actionLabel`). This module only shapes them for the
+ * The rules come from the engine (`legalActions`, `viewFor`). This module only shapes them for the
  * screen: it does not decide what is legal beyond asking the engine.
  */
 
@@ -64,19 +64,72 @@ export interface CardView {
 }
 
 /** A card as the screen names it: the rank and the suit symbol, or "Joker". */
-export function cardText(card: Pick<Card, "rank" | "suit">): string {
+export function cardText(
+	card: Pick<Card, "rank" | "suit">,
+	t: Translate = english,
+): string {
 	return card.suit === null
-		? "Joker"
+		? t("Joker")
 		: `${card.rank}${SUIT_SYMBOLS[card.suit]}`;
 }
 
-function cardView(card: Card): CardView {
+function cardView(card: Card, t: Translate): CardView {
 	return {
 		id: card.id,
 		rank: card.rank,
 		suit: card.suit,
-		text: cardText(card),
+		text: cardText(card, t),
 	};
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Labels
+
+/** A part of a label: text, or a card that the screen shows as a card. */
+export type LabelPart =
+	| { readonly kind: "text"; readonly text: string }
+	| { readonly kind: "card"; readonly card: CardView };
+
+export type Label = readonly LabelPart[];
+
+/** The label as plain text, with each card as its rank and suit symbol. */
+export function labelText(label: Label): string {
+	return label
+		.map((part) => (part.kind === "text" ? part.text : part.card.text))
+		.join("");
+}
+
+/**
+ * Fills the `{name}` placeholders of a translated template. A placeholder can stand for text or for cards; the
+ * cards of one placeholder are separated by spaces.
+ */
+function labelOf(
+	template: string,
+	values: Readonly<Record<string, string | readonly CardView[]>> = {},
+): Label {
+	const parts: LabelPart[] = [];
+	const text = (value: string): void => {
+		const last = parts.at(-1);
+		if (value === "") return;
+		if (last?.kind === "text")
+			parts[parts.length - 1] = { kind: "text", text: last.text + value };
+		else parts.push({ kind: "text", text: value });
+	};
+	let rest = 0;
+	for (const match of template.matchAll(/\{([a-zA-Z0-9_]+)\}/g)) {
+		text(template.slice(rest, match.index));
+		rest = match.index + match[0].length;
+		const value = values[match[1] as string];
+		if (value === undefined) text(match[0]);
+		else if (typeof value === "string") text(value);
+		else
+			for (const [index, card] of value.entries()) {
+				if (index > 0) text(" ");
+				parts.push({ kind: "card", card });
+			}
+	}
+	text(template.slice(rest));
+	return parts;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -104,11 +157,11 @@ export interface SideView {
 	readonly initialMade: boolean;
 }
 
-function meldView(meld: Meld, view: HandView): MeldView {
+function meldView(meld: Meld, view: HandView, t: Translate): MeldView {
 	return {
 		id: meld.id,
 		rank: meld.rank,
-		cards: meld.cards.map(cardView),
+		cards: meld.cards.map((card) => cardView(card, t)),
 		canasta: isCanasta(meld, view.rules),
 	};
 }
@@ -117,6 +170,7 @@ function sideViews(
 	scores: readonly [number, number],
 	viewer: Seat,
 	view: HandView | undefined,
+	t: Translate,
 ): readonly [SideView, SideView] {
 	const side = (index: 0 | 1): SideView => {
 		const team = view?.teams[index];
@@ -124,8 +178,9 @@ function sideViews(
 			label: SIDE_LABELS[index],
 			score: scores[index],
 			mine: teamOf(engineSeat(viewer)) === index,
-			melds: view && team ? team.melds.map((meld) => meldView(meld, view)) : [],
-			redThrees: team ? team.redThrees.map(cardView) : [],
+			melds:
+				view && team ? team.melds.map((meld) => meldView(meld, view, t)) : [],
+			redThrees: team ? team.redThrees.map((card) => cardView(card, t)) : [],
 			initialMade: team?.initialMade ?? false,
 		};
 	};
@@ -212,11 +267,11 @@ export interface PileView {
 	readonly frozen: boolean;
 }
 
-/** One legal action of the viewer, with the label the engine's view gives it. */
+/** One legal action of the viewer, with its label in the viewer's language. */
 export interface ActionOption {
 	/** A stable key for the option, unique among the options of one position. */
 	readonly key: string;
-	readonly label: string;
+	readonly label: Label;
 	readonly action: Action;
 	/** The card ids the action uses from the viewer's hand. Empty for a draw and for a reset. */
 	readonly cards: readonly string[];
@@ -234,10 +289,83 @@ function cardIdsOf(action: Action): readonly string[] {
 	}
 }
 
-function optionOf(view: HandView, action: Action): ActionOption {
+/**
+ * A meld as an action names it: its rank, and its place among the side's melds of that rank when the side has
+ * more than one.
+ */
+function meldName(view: HandView, meldId: string): string {
+	for (const team of view.teams) {
+		const meld = team.melds.find((item) => item.id === meldId);
+		if (meld === undefined) continue;
+		const same = team.melds.filter((item) => item.rank === meld.rank);
+		return same.length > 1
+			? `${meld.rank} #${same.indexOf(meld) + 1}`
+			: meld.rank;
+	}
+	return meldId;
+}
+
+/** One action in the viewer's language, with the cards it uses as cards. */
+function actionLabel(action: Action, view: HandView, t: Translate): Label {
+	const known = cardsById(view);
+	const cards = (ids: readonly string[]): CardView[] =>
+		ids.flatMap((id) => {
+			const card = known.get(id);
+			return card === undefined ? [] : [cardView(card, t)];
+		});
+	switch (action.type) {
+		case "draw":
+			return view.rules.drawCount === 1
+				? labelOf(t("Draw a card from the stock"))
+				: labelOf(t("Draw {count} cards from the stock"), {
+						count: String(view.rules.drawCount),
+					});
+		case "takePile": {
+			const top = view.pile.at(-1);
+			const values = {
+				top: top === undefined ? [] : [cardView(top, t)],
+				cards: cards(action.cards),
+			};
+			if (action.extend === undefined)
+				return labelOf(
+					t("Take the pile ({top}) and meld it with {cards}"),
+					values,
+				);
+			const meld = meldName(view, action.extend);
+			// Onto an existing meld the top card can go alone, with no hand card.
+			return action.cards.length === 0
+				? labelOf(t("Take the pile ({top}) onto the {meld} meld"), {
+						...values,
+						meld,
+					})
+				: labelOf(
+						t("Take the pile ({top}) with {cards} onto the {meld} meld"),
+						{
+							...values,
+							meld,
+						},
+					);
+		}
+		case "meld":
+			return labelOf(t("Lay down a meld: {cards}"), {
+				cards: cards(action.cards),
+			});
+		case "extend":
+			return labelOf(t("Add {cards} to the {meld} meld"), {
+				cards: cards(action.cards),
+				meld: meldName(view, action.meldId),
+			});
+		case "discard":
+			return labelOf(t("Discard {card}"), { card: cards([action.card]) });
+		case "resetTurn":
+			return labelOf(t("Take back this turn's melds"));
+	}
+}
+
+function optionOf(view: HandView, action: Action, t: Translate): ActionOption {
 	return {
 		key: JSON.stringify(action),
-		label: actionLabel(action, view),
+		label: actionLabel(action, view, t),
 		action,
 		cards: cardIdsOf(action),
 	};
@@ -276,25 +404,64 @@ export type TableActionState =
 
 export interface TableActionLine {
 	readonly id: string;
-	readonly text: string;
+	readonly label: Label;
 	readonly state: TableActionState;
+	/** Why the host refused or holds the command, in the viewer's language. */
 	readonly reason?: string;
 }
 
-/** Short text of a table command, for the list of this seat's commands in flight. */
-export function commandText(
+/** Short label of a table command, for the list of this seat's commands in flight. */
+export function commandLabel(
 	payload: unknown,
 	t: Translate = english,
 	view?: HandView,
-): string {
-	if (!isObject(payload)) return "";
-	if (payload.type === "start") return t("Deal the first hand");
-	if (payload.type === "next-hand") return t("Deal the next hand");
+): Label {
+	if (!isObject(payload)) return [];
+	if (payload.type === "start") return labelOf(t("Deal the first hand"));
+	if (payload.type === "next-hand") return labelOf(t("Deal the next hand"));
 	if (payload.type === "action") {
 		const action = parseAction(payload.action);
-		return action && view ? actionLabel(action, view) : t("Action");
+		return action && view ? actionLabel(action, view, t) : labelOf(t("Action"));
 	}
-	return "";
+	return [];
+}
+
+/** The host's reasons that name a card, a number or a player; each becomes a translated message with values. */
+const REASON_PATTERNS: readonly {
+	readonly pattern: RegExp;
+	readonly message: string;
+	readonly names?: readonly string[];
+}[] = [
+	{
+		pattern: /^card \S+ is not in your hand$/,
+		message: "a chosen card is not in your hand",
+	},
+	{
+		pattern: /^a meld may hold at most (\d+) wild cards$/,
+		message: "a meld may hold at most {count} wild cards",
+		names: ["count"],
+	},
+	{
+		pattern: /^the cards do not match the meld rank (\S+)$/,
+		message: "the cards do not match the meld rank {rank}",
+		names: ["rank"],
+	},
+];
+
+/** A reason from the host or the engine, in the viewer's language. */
+function translateReason(reason: string, t: Translate): string {
+	if (reason.startsWith("Waiting for ")) return translateWait(reason, t);
+	for (const { pattern, message, names = [] } of REASON_PATTERNS) {
+		const match = pattern.exec(reason);
+		if (match)
+			return t(
+				message,
+				Object.fromEntries(
+					names.map((name, index) => [name, match[index + 1] ?? ""]),
+				),
+			);
+	}
+	return t(reason);
 }
 
 /** This seat's table commands that still concern the table: in flight, refused, or undone by a host change. */
@@ -313,9 +480,11 @@ function commandLines(
 		.filter((line) => relevant(line.payload))
 		.map((line) => ({
 			id: line.id,
-			text: commandText(line.payload, t, view),
+			label: commandLabel(line.payload, t, view),
 			state: line.state === "not-sent" ? "not-accepted" : line.state,
-			...(line.reason === undefined ? {} : { reason: line.reason }),
+			...(line.reason === undefined
+				? {}
+				: { reason: translateReason(line.reason, t) }),
 		}));
 }
 
@@ -429,7 +598,7 @@ function emptyView(
 		prompt,
 		yourTurn: false,
 		target,
-		sides: sideViews([0, 0], input.seat, undefined),
+		sides: sideViews([0, 0], input.seat, undefined, input.t ?? english),
 		seats: [],
 		own: [],
 		stockCount: 0,
@@ -484,7 +653,7 @@ export function tableView(input: TableViewInput): TableView {
 		phase === "play" && turnSeat === seat && canAct && dealWait === undefined;
 	const options = yourTurn
 		? legalActions(match.hand, engineSeat(seat)).map((action) =>
-				optionOf(view, action),
+				optionOf(view, action, t),
 			)
 		: [];
 
@@ -523,7 +692,7 @@ export function tableView(input: TableViewInput): TableView {
 		prompt,
 		yourTurn,
 		target: match.rules.targetScore,
-		sides: sideViews(match.scores, seat, view),
+		sides: sideViews(match.scores, seat, view, t),
 		seats: seatViews(
 			input,
 			t,
@@ -533,10 +702,10 @@ export function tableView(input: TableViewInput): TableView {
 				return view.handCounts[engineSeat(owner)] ?? 0;
 			},
 		),
-		own: view.own.map(cardView),
+		own: view.own.map((card) => cardView(card, t)),
 		stockCount: view.stockCount,
 		pile: {
-			top: top === undefined ? undefined : cardView(top),
+			top: top === undefined ? undefined : cardView(top, t),
 			count: view.pile.length,
 			frozen: view.pileFrozen,
 		},

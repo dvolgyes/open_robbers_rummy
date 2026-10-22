@@ -48,6 +48,7 @@ import {
 	type Banner,
 	bannerFor,
 	bannerText,
+	chatRefusalText,
 	draftFor,
 	heldSeats,
 	networkLines,
@@ -707,7 +708,9 @@ export function showRoom(
 		event.preventDefault();
 		const check = checkMessageText(draft.value);
 		if (!check.ok) {
-			sendError = deps.t("Not sent: {reason}.", { reason: check.reason });
+			sendError = deps.t("Not sent: {reason}.", {
+				reason: chatRefusalText(check.reason, deps.t),
+			});
 			render();
 			return;
 		}

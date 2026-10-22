@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { chatPayload } from "../../src/game/chat";
+import { chatPayload, checkMessageText } from "../../src/game/chat";
+import { translator } from "../../src/i18n";
 import type { ElectionView } from "../../src/p2p/election";
 import type { MeshDiagnostics } from "../../src/p2p/mesh";
 import type { OutboxItem } from "../../src/p2p/outbox";
@@ -14,6 +15,7 @@ import {
 	type BannerInput,
 	bannerFor,
 	bannerText,
+	chatRefusalText,
 	checkCreateFields,
 	DEFAULT_CREATE_FIELDS,
 	draftFor,
@@ -488,5 +490,19 @@ describe("roomView", () => {
 
 	it("fills the send field with a test message from the own seat", () => {
 		expect(draftFor("E")).toBe("Connection test from East");
+	});
+
+	it("says why a chat message was not sent in the viewer's language", () => {
+		const reasons = ["", "😀".repeat(501), "a\u0007b", 7].map((text) => {
+			const check = checkMessageText(text);
+			if (check.ok) throw new Error("the message passed the check");
+			return check.reason;
+		});
+		const hu = translator("hu");
+		expect(chatRefusalText(reasons[1] ?? "", hu)).toBe(
+			"az üzenet hosszabb 500 karakternél",
+		);
+		for (const reason of reasons)
+			expect(chatRefusalText(reason, hu)).not.toBe(reason);
 	});
 });

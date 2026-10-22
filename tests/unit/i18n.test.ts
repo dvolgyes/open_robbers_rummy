@@ -30,11 +30,11 @@ describe("localization", () => {
 		}
 	});
 
-	it("provides every existing translation key in each new catalog", () => {
+	it("provides every existing translation key in each catalog", () => {
 		const expected = [...translatedMessageKeys].sort();
 		expect(new Set(expected).size).toBe(expected.length);
 
-		for (const locale of newLocales) {
+		for (const locale of ["de", "hu", "no", ...newLocales] as const) {
 			expect([...catalogKeys(locale)].sort()).toEqual(expected);
 		}
 	});

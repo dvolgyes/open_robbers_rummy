@@ -133,6 +133,17 @@ export function submitText(
 		: storageText(result.code, t);
 }
 
+/** Why the chat check refused a message, in the viewer's language. */
+export function chatRefusalText(
+	reason: string,
+	t: Translate = english,
+): string {
+	const long = /^message is longer than (\d+) characters$/.exec(reason);
+	return long
+		? t("message is longer than {count} characters", { count: long[1] ?? "" })
+		: t(reason);
+}
+
 /** Why the host did not accept a seat claim. */
 export function seatText(code: SeatCode, t: Translate = english): string {
 	switch (code) {

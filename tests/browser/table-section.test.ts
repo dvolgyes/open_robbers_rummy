@@ -1,11 +1,21 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { Action } from "../../src/canasta";
-import { startMatch } from "../../src/canasta";
+import type { Action, MatchState } from "../../src/canasta";
+import { applyAction, startMatch } from "../../src/canasta";
 import { type CanastaState, tableSeat } from "../../src/game/canasta";
+import {
+	catalogKeys,
+	type Locale,
+	type Translate,
+	translator,
+} from "../../src/i18n";
 import { PROTOCOL_VERSION, SEATS } from "../../src/protocol";
 import type { RosterRow } from "../../src/ui/model";
 import { tableSection } from "../../src/ui/table";
-import { type TableView, tableView } from "../../src/ui/table-model";
+import {
+	type TableView,
+	type TableViewInput,
+	tableView,
+} from "../../src/ui/table-model";
 
 const sections: HTMLElement[] = [];
 
@@ -15,7 +25,23 @@ afterEach(() => {
 
 /** The view of the seat that takes the first turn of a new match; another seat hosts. */
 function firstTurnView(): TableView {
+	return turnView(startMatch(7), 0);
+}
+
+/** The match after the seat on turn drew from the stock, so it can meld and discard. */
+function afterDraw(): MatchState {
 	const match = startMatch(7);
+	const step = applyAction(match.hand, match.hand.turn, { type: "draw" });
+	if (!step.ok) throw new Error(step.reason);
+	return { ...match, hand: step.hand };
+}
+
+/** The view of the seat on turn; another seat hosts. */
+function turnView(
+	match: MatchState,
+	actions: number,
+	overrides: Partial<TableViewInput> = {},
+): TableView {
 	const seat = tableSeat(match.hand.turn);
 	const host = SEATS.find((item) => item !== seat) ?? "N";
 	const state: CanastaState = {
@@ -25,7 +51,7 @@ function firstTurnView(): TableView {
 		messages: 0,
 		matches: 1,
 		match,
-		actions: 0,
+		actions,
 		reset: null,
 		media: {},
 	};
@@ -48,21 +74,25 @@ function firstTurnView(): TableView {
 		outbox: [],
 		failures: [],
 		undone: [],
+		...overrides,
 	});
 }
 
-function mount(acted: Action[]) {
-	const section = tableSection({
-		exit: () => {},
-		shareUrl: async () => {},
-		act: (action) => acted.push(action),
-		call: {
-			join: () => {},
-			leave: () => {},
-			setSwitch: () => {},
-			retry: () => {},
+function mount(acted: Action[], t?: Translate) {
+	const section = tableSection(
+		{
+			exit: () => {},
+			shareUrl: async () => {},
+			act: (action) => acted.push(action),
+			call: {
+				join: () => {},
+				leave: () => {},
+				setSwitch: () => {},
+				retry: () => {},
+			},
 		},
-	});
+		t,
+	);
 	sections.push(section.element);
 	document.body.append(section.element);
 	return section;
@@ -118,5 +148,84 @@ describe("table section", () => {
 		expect(pressed()).toBe("true");
 		section.render(structuredClone(view));
 		expect(pressed()).toBe("true");
+	});
+
+	it("shows the cards of an action as cards with a suit symbol, red for hearts and diamonds", () => {
+		const section = mount([], translator("hu"));
+		section.render(turnView(afterDraw(), 1, { t: translator("hu") }));
+		const card = section.element.querySelector<HTMLButtonElement>(
+			".own-hand button.card",
+		);
+		card?.click();
+		const discard = section.element.querySelector(
+			'[data-testid="action-discard"]',
+		);
+		const pip = discard?.querySelector(".pip");
+		expect(discard?.textContent).toBe(`Eldobás: ${card?.textContent}`);
+		expect(pip?.textContent).toBe(card?.textContent);
+		expect(pip?.textContent).toMatch(/^(\d+|[JQKA])[♣♦♥♠]$|^Joker$/);
+		expect(pip?.classList.contains("red")).toBe(
+			/[♦♥]/.test(card?.textContent ?? ""),
+		);
+	});
+
+	it("asks only for messages that every language translates", () => {
+		const asked = new Set<string>();
+		const english = translator("en");
+		const t: Translate = (message, values) => {
+			asked.add(message);
+			return english(message, values);
+		};
+		const section = mount([], t);
+		const drawn = afterDraw();
+		const refused = {
+			id: "c1",
+			payload: { type: "action", hand: 1, action: { type: "draw" } },
+			status: "rejected" as const,
+		};
+		section.render(turnView(startMatch(7), 0, { t }));
+		section.render(
+			turnView(startMatch(7), 0, {
+				t,
+				failures: [
+					refused,
+					{ ...refused, id: "c2", reason: "draw before melding" },
+				],
+			}),
+		);
+		section.render(turnView(drawn, 1, { t }));
+		section.element
+			.querySelector<HTMLButtonElement>(".own-hand button.card")
+			?.click();
+		section.element.querySelector<HTMLButtonElement>(".sort-toggle")?.click();
+		section.setBotControls(true, ["E", "W"]);
+		section.setPlayerAutoplay(true, false, false, "");
+		section.setPlayerAutoplay(true, true, false, "");
+		section.setCountdown(1);
+		section.setCountdown(5);
+		const ended = {
+			...drawn,
+			hand: { ...drawn.hand, outcome: { kind: "stock" as const } },
+		};
+		section.render(turnView(ended, 2, { t }));
+		section.render(turnView({ ...ended, winner: 0 }, 2, { t }));
+		expect(asked.size).toBeGreaterThan(20);
+		const locales = [
+			"de",
+			"hu",
+			"no",
+			"es",
+			"pt",
+			"fr",
+			"it",
+			"nl",
+		] as const satisfies readonly Exclude<Locale, "en">[];
+		for (const locale of locales) {
+			const known = new Set(catalogKeys(locale));
+			expect(
+				[...asked].filter((message) => !known.has(message)),
+				locale,
+			).toEqual([]);
+		}
 	});
 });

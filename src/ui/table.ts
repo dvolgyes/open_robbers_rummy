@@ -16,6 +16,8 @@ import { robotArtwork } from "./robot-artwork";
 import {
 	type ActionOption,
 	type CardView,
+	type Label,
+	labelText,
 	type MeldView,
 	optionsFor,
 	type Position,
@@ -87,6 +89,30 @@ const CONNECTING_TEXT = "CONNECTING TO HOST";
 
 function isRed(suit: CardView["suit"]): boolean {
 	return suit === "H" || suit === "D";
+}
+
+/** A card in a line of text: its rank and suit symbol, red for hearts and diamonds, as on the hand's cards. */
+function cardPip(card: CardView): HTMLElement {
+	return el(
+		"span",
+		{
+			className: `pip${isRed(card.suit) ? " red" : ""}${card.suit === null ? " joker" : ""}`,
+		},
+		card.text,
+	);
+}
+
+/** The cards in a row of pips, separated by spaces so that the text reads as before. */
+function cardPips(cards: readonly CardView[]): Child[] {
+	return cards.flatMap((card, index) =>
+		index === 0 ? [cardPip(card)] : [" ", cardPip(card)],
+	);
+}
+
+function labelNodes(label: Label): Child[] {
+	return label.map((part) =>
+		part.kind === "text" ? part.text : cardPip(part.card),
+	);
 }
 
 /** The canasta table as the viewer sees it: the score strip, the partner and opponents around the stock and the discard pile, and the viewer's own hand with its actions at the bottom. */
@@ -337,9 +363,9 @@ export function tableSection(
 			order === "rank" ? "Sort by suit" : "Sort by rank",
 		);
 		actionBar.replaceChildren(
-			...offered.map((option) =>
-				button(
-					option.label,
+			...offered.map((option) => {
+				const node = button(
+					"",
 					() => {
 						selected.clear();
 						handlers.act(option.action);
@@ -350,10 +376,13 @@ export function tableSection(
 						attrs: {
 							"data-action": option.action.type,
 							"data-testid": `action-${option.action.type}`,
+							"aria-label": labelText(option.label),
 						},
 					},
-				),
-			),
+				);
+				node.append(...labelNodes(option.label));
+				return node;
+			}),
 		);
 		hint.textContent =
 			view.yourTurn && offered.length === 0 && selected.size === 0
@@ -691,7 +720,7 @@ export function tableSection(
 				className: meld.canasta ? "meld canasta" : "meld",
 				attrs: { "data-meld": meld.id, "data-rank": meld.rank },
 			},
-			meld.cards.map((card) => card.text).join(" "),
+			el("span", { className: "meld-cards" }, ...cardPips(meld.cards)),
 			...(meld.canasta
 				? [el("span", { className: "canasta-mark" }, t("canasta"))]
 				: []),
@@ -722,23 +751,23 @@ export function tableSection(
 						el(
 							"span",
 							{ className: "red-three-cards" },
-							side.redThrees.map((card) => card.text).join(" "),
+							...cardPips(side.redThrees),
 						),
 					]),
 		);
 	}
 
 	function actionItem(line: TableActionLine): HTMLElement {
-		// A pending action's reason says which players the host waits for.
+		// A pending action's reason says which players the host waits for. The model translated the reason.
 		const label = t(ACTION_STATUS[line.state]);
 		const status =
 			line.state === "not-accepted"
-				? `${label}: ${t(line.reason ?? "rejected")}`
-				: t(line.reason ?? ACTION_STATUS[line.state]);
+				? `${label}: ${line.reason ?? t("rejected")}`
+				: (line.reason ?? label);
 		return el(
 			"li",
 			{ attrs: { "data-state": line.state } },
-			el("span", { className: "text" }, line.text),
+			el("span", { className: "text" }, ...labelNodes(line.label)),
 			el("span", { className: "status" }, status),
 		);
 	}
@@ -768,7 +797,9 @@ export function tableSection(
 
 		for (const [index, side] of view.sides.entries()) renderSide(side, index);
 		stockCount.textContent = cardCount(view.stockCount);
-		pileTop.textContent = view.pile.top?.text ?? t("Empty");
+		pileTop.replaceChildren(
+			view.pile.top === undefined ? t("Empty") : cardPip(view.pile.top),
+		);
 		pileCount.textContent = cardCount(view.pile.count);
 		pileFrozen.hidden = !view.pile.frozen || view.pile.count === 0;
 		pileFrozen.textContent = t("Frozen for your side");
