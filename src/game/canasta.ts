@@ -180,6 +180,7 @@ function parseHand(value: unknown): HandState | undefined {
 		phase,
 		turnStart,
 		turnTaken,
+		meldedSeats,
 	} = value;
 	if (
 		turnTaken !== undefined &&
@@ -187,6 +188,11 @@ function parseHand(value: unknown): HandState | undefined {
 			Array.isArray(turnTaken) &&
 			turnTaken.every((id) => typeof id === "string")
 		)
+	)
+		return undefined;
+	if (
+		meldedSeats !== undefined &&
+		!(Array.isArray(meldedSeats) && meldedSeats.every(isEngineSeat))
 	)
 		return undefined;
 	if (!Array.isArray(hands) || hands.length !== 4) return undefined;

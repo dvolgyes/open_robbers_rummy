@@ -45,6 +45,11 @@ export interface HandSnapshot {
 	 * Absent in a hand stored before the field existed, which means none.
 	 */
 	readonly turnTaken?: readonly string[];
+	/**
+	 * The seats that melded, extended a meld, or took the pile in an earlier turn of this hand, which rules out
+	 * going out concealed. Absent in a hand stored before the field existed, which means any seat of a side with melds.
+	 */
+	readonly meldedSeats?: readonly Seat[];
 	readonly nextMeldNo: number;
 	readonly outcome: Outcome | null;
 }
@@ -120,6 +125,7 @@ export function newHand(input: NewHandInput): HandState {
 		turnMeldPoints: 0,
 		turnActions: 0,
 		turnTaken: [],
+		meldedSeats: [],
 		nextMeldNo: 1,
 		outcome: null,
 	};
@@ -396,9 +402,11 @@ function canGoOut(hand: HandState, team: TeamIndex): boolean {
 function checkOut(hand: HandState, seat: Seat): Step {
 	const team = teamOf(seat);
 	if (!canGoOut(hand, team)) return fail("the side needs a canasta to go out");
-	if (!initialSatisfied(hand, team))
+	const concealed = goesOutConcealed(hand, seat);
+	// A side with no meld before this turn may go out concealed after a stock draw without the minimum count.
+	const drewFromStock = hand.turnStart.phase === "play";
+	if (!initialSatisfied(hand, team) && !(concealed && drewFromStock))
 		return fail("the side has not made its initial meld");
-	const concealed = teamAt(hand.turnStart.teams, team).melds.length === 0;
 	return succeed({
 		...hand,
 		teams: withTeam(hand.teams, team, {
@@ -407,6 +415,30 @@ function checkOut(hand: HandState, seat: Seat): Step {
 		}),
 		outcome: { kind: "out", seat, concealed },
 	});
+}
+
+/**
+ * Going out concealed: the player melded nothing in an earlier turn, adds no card to a meld that the partner
+ * made before this turn, and lays a complete canasta in this turn.
+ */
+function goesOutConcealed(hand: HandState, seat: Seat): boolean {
+	const team = teamOf(seat);
+	const before = teamAt(hand.turnStart.teams, team).melds;
+	const meldedBefore =
+		hand.turnStart.meldedSeats?.includes(seat) ?? before.length > 0;
+	if (meldedBefore) return false;
+	const now = teamAt(hand.teams, team).melds;
+	const sizeBefore = new Map(
+		before.map((meld) => [meld.id, meld.cards.length]),
+	);
+	const addedToPartner = now.some(
+		(meld) =>
+			(sizeBefore.get(meld.id) ?? meld.cards.length) < meld.cards.length,
+	);
+	const laidCanasta = now.some(
+		(meld) => !sizeBefore.has(meld.id) && isCanasta(meld, hand.rules),
+	);
+	return !addedToPartner && laidCanasta;
 }
 
 /**
@@ -426,6 +458,10 @@ function passTurn(hand: HandState, seat: Seat): HandState {
 		turnMeldPoints: 0,
 		turnActions: 0,
 		turnTaken: [],
+		meldedSeats:
+			hand.turnActions > 0 && !hand.meldedSeats?.includes(seat)
+				? hand.meldedSeats && [...hand.meldedSeats, seat]
+				: hand.meldedSeats,
 	};
 	const next: HandSnapshot =
 		base.stock.length === 0 && !canTakePile({ ...base, turnStart: base })

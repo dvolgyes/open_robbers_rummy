@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	type Action,
 	applyAction,
 	buildDecks,
 	type Card,
@@ -11,6 +12,7 @@ import {
 	isRed3,
 	isWild,
 	legalActions,
+	type Meld,
 	newHand,
 	type Seat,
 	scoreHand,
@@ -42,7 +44,17 @@ function cardTotal(hand: HandState): number {
 function scenario(
 	base: HandState,
 	patch: Partial<
-		Pick<HandState, "hands" | "stock" | "pile" | "turn" | "phase" | "teams">
+		Pick<
+			HandState,
+			| "hands"
+			| "stock"
+			| "pile"
+			| "turn"
+			| "phase"
+			| "teams"
+			| "nextMeldNo"
+			| "meldedSeats"
+		>
 	>,
 ): HandState {
 	const next = { ...base, ...patch };
@@ -713,6 +725,174 @@ describe("hand flow", () => {
 		expect(result).toMatchObject({
 			ok: false,
 			reason: "the side needs a canasta to go out",
+		});
+	});
+
+	describe("going out concealed", () => {
+		/** Applies the actions in order and returns the last step; an earlier refusal throws. */
+		function play(hand: HandState, seat: Seat, actions: readonly Action[]) {
+			let current = hand;
+			let step: ReturnType<typeof applyAction> = { ok: true, hand };
+			for (const action of actions) {
+				step = applyAction(current, seat, action);
+				if (!step.ok && action !== actions.at(-1)) throw new Error(step.reason);
+				if (step.ok) current = step.hand;
+			}
+			return step;
+		}
+		const fives = ["0-5H", "0-5D", "0-5S", "0-5C", "1-5H", "1-5D", "1-5S"];
+		const layFives = (meldId: string): Action[] => [
+			{ type: "meld", cards: fives.slice(0, 3) },
+			{ type: "extend", meldId, cards: fives.slice(3) },
+		];
+		const kings: Meld = {
+			id: "m1",
+			rank: "K",
+			team: 1,
+			cards: cardsById(["0-KH", "0-KD", "0-KS"]),
+		};
+		/** Seat 1 has drawn from the stock; its partner, seat 3, melded kings in an earlier turn. */
+		const afterPartnerMeld = (own: readonly string[], melded: Seat[] = [3]) =>
+			scenario(newHand({ teamScores: [0, 0], dealer: 0, seed: 1 }), {
+				turn: 1,
+				phase: "play",
+				hands: [[], cardsById(own), [], []],
+				teams: [
+					{ melds: [], redThrees: [], initialMade: false },
+					{ melds: [kings], redThrees: [], initialMade: true },
+				],
+				nextMeldNo: 2,
+				meldedSeats: melded,
+			});
+		const outcome = (step: ReturnType<typeof applyAction>) =>
+			step.ok ? step.hand.outcome : step.reason;
+
+		it("scores concealed for a player who melds for the first time and lays a canasta, after the partner melded", () => {
+			const hand = afterPartnerMeld([...fives, "0-9C"]);
+			expect(
+				outcome(
+					play(hand, 1, [...layFives("m2"), { type: "discard", card: "0-9C" }]),
+				),
+			).toEqual({ kind: "out", seat: 1, concealed: true });
+		});
+
+		it("is not concealed when the player adds cards to the partner's meld", () => {
+			const hand = afterPartnerMeld([...fives, "1-KH", "0-9C"]);
+			expect(
+				outcome(
+					play(hand, 1, [
+						...layFives("m2"),
+						{ type: "extend", meldId: "m1", cards: ["1-KH"] },
+						{ type: "discard", card: "0-9C" },
+					]),
+				),
+			).toEqual({ kind: "out", seat: 1, concealed: false });
+		});
+
+		it("is not concealed when the player melded in an earlier turn of the hand", () => {
+			const first = play(
+				scenario(newHand({ teamScores: [-10, -10], dealer: 0, seed: 1 }), {
+					turn: 1,
+					phase: "play",
+					hands: [
+						[],
+						cardsById(["0-KH", "0-KD", "0-KS", "0-9C", "0-8C"]),
+						[],
+						[],
+					],
+				}),
+				1,
+				[
+					{ type: "meld", cards: ["0-KH", "0-KD", "0-KS"] },
+					{ type: "discard", card: "0-9C" },
+				],
+			);
+			if (!first.ok) throw new Error(first.reason);
+			const later = scenario(first.hand, {
+				turn: 1,
+				phase: "play",
+				hands: [[], cardsById([...fives, "1-9C"]), [], []],
+			});
+			expect(
+				outcome(
+					play(later, 1, [
+						...layFives("m2"),
+						{ type: "discard", card: "1-9C" },
+					]),
+				),
+			).toEqual({ kind: "out", seat: 1, concealed: false });
+		});
+
+		it("is not concealed when the player lays no canasta of their own", () => {
+			const hand = afterPartnerMeld(["0-5H", "0-5D", "0-5S", "0-9C"]);
+			const partnerCanasta = scenario(hand, {
+				teams: [
+					hand.teams[0],
+					{
+						...hand.teams[1],
+						melds: [
+							{
+								...kings,
+								cards: cardsById([
+									"0-KH",
+									"0-KD",
+									"0-KS",
+									"0-KC",
+									"1-KH",
+									"1-KD",
+									"1-KS",
+								]),
+							},
+						],
+					},
+				],
+			});
+			expect(
+				outcome(
+					play(partnerCanasta, 1, [
+						{ type: "meld", cards: ["0-5H", "0-5D", "0-5S"] },
+						{ type: "discard", card: "0-9C" },
+					]),
+				),
+			).toEqual({ kind: "out", seat: 1, concealed: false });
+		});
+
+		const unmelded = (phase: "draw" | "play", pile: readonly string[]) =>
+			scenario(newHand({ teamScores: [0, 0], dealer: 0, seed: 1 }), {
+				turn: 1,
+				phase,
+				pile: cardsById(pile),
+				hands: [[], cardsById([...fives, "0-9C"]), [], []],
+				teams: [
+					{ melds: [], redThrees: [], initialMade: false },
+					{ melds: [], redThrees: [], initialMade: false },
+				],
+				meldedSeats: [],
+			});
+
+		it("needs no initial minimum to go out concealed after a draw from the stock", () => {
+			// Seven fives are 35 points, below the 50 that a score of 0 needs.
+			expect(
+				outcome(
+					play(unmelded("play", ["0-KC"]), 1, [
+						...layFives("m1"),
+						{ type: "discard", card: "0-9C" },
+					]),
+				),
+			).toEqual({ kind: "out", seat: 1, concealed: true });
+		});
+
+		it("still needs the initial minimum to go out after taking the pile", () => {
+			const hand = unmelded("draw", ["1-5C"]);
+			expect(
+				outcome(
+					play(hand, 1, [
+						{ type: "takePile", cards: ["0-5H", "0-5D"] },
+						{ type: "extend", meldId: "m1", cards: fives.slice(2) },
+						{ type: "discard", card: "0-9C" },
+					]),
+				),
+			).toBe("the side has not made its initial meld");
 		});
 	});
 

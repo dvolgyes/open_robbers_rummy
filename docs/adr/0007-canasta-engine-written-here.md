@@ -67,6 +67,11 @@ Evidence, checked on 2026-10-22:
     Pagat: "It is against the rules in this case to meld all your cards except one."
     Amended 2026-10-22: before this change, only the pickup was refused, and a player who melded down to one card could only take the turn back.
   - A last stock card that is a red three ends the hand when it is drawn, so its drawer may not meld or discard.
+  - A player goes out concealed when the player melded nothing in an earlier turn of the hand, adds no card to the partner's melds, and lays a complete canasta in the last turn.
+    The partner may have melded before.
+    A side with no meld may go out concealed after a stock draw without the minimum count; after a pile pickup, the minimum applies.
+    Amended 2026-10-22: before this change, the bonus depended on the side having no meld at the start of the turn, and the minimum always applied.
+    The hand records the seats that melded in the optional `meldedSeats` field; a hand stored without it keeps the earlier rule until it ends.
 
 ## Consequences
 
