@@ -5,6 +5,7 @@ import {
 	CLASSIC_RULES,
 	type HandView,
 	isCanasta,
+	isWild,
 	legalActions,
 	type Meld,
 	type Outcome,
@@ -287,6 +288,8 @@ export interface ActionOption {
 	readonly action: Action;
 	/** The card ids the action uses from the viewer's hand. Empty for a draw and for a reset. */
 	readonly cards: readonly string[];
+	/** Offered also while no card is selected, although the action uses hand cards. */
+	readonly ready?: boolean;
 }
 
 function cardIdsOf(action: Action): readonly string[] {
@@ -392,8 +395,43 @@ function sameIds(a: readonly string[], sortedB: readonly string[]): boolean {
 }
 
 /**
+ * The pickups that need no selection: those with the fewest hand cards, and of those the fewest wild cards, one
+ * per label. Without them, a player sees no way to take the pile until the selection names the cards of a pickup.
+ */
+function withReadyPickups(
+	options: readonly ActionOption[],
+	view: HandView,
+): ActionOption[] {
+	const known = cardsById(view);
+	const wilds = (option: ActionOption): number =>
+		option.cards.filter((id) => {
+			const card = known.get(id);
+			return card !== undefined && isWild(card);
+		}).length;
+	const pickups = options.filter((option) => option.action.type === "takePile");
+	const fewest = Math.min(...pickups.map((option) => option.cards.length));
+	const natural = Math.min(
+		...pickups.filter((option) => option.cards.length === fewest).map(wilds),
+	);
+	const labels = new Set<string>();
+	return options.map((option) => {
+		if (
+			option.action.type !== "takePile" ||
+			option.cards.length !== fewest ||
+			wilds(option) !== natural
+		)
+			return option;
+		const text = labelText(option.label);
+		if (labels.has(text)) return option;
+		labels.add(text);
+		return { ...option, ready: true };
+	});
+}
+
+/**
  * The options that a selection of card ids can send: every option that names exactly the selected cards, and the
- * options that name no card (a draw, a reset). The selection is any set of ids; the engine validated the options.
+ * options that name no card (a draw, a reset). With no selection, the ready options also show. The selection is
+ * any set of ids; the engine validated the options.
  */
 export function optionsFor(
 	options: readonly ActionOption[],
@@ -401,7 +439,10 @@ export function optionsFor(
 ): ActionOption[] {
 	const chosen = [...selected].sort();
 	return options.filter(
-		(option) => option.cards.length === 0 || sameIds(option.cards, chosen),
+		(option) =>
+			option.cards.length === 0 ||
+			(chosen.length === 0 && option.ready === true) ||
+			sameIds(option.cards, chosen),
 	);
 }
 
@@ -667,8 +708,11 @@ export function tableView(input: TableViewInput): TableView {
 	const yourTurn =
 		phase === "play" && turnSeat === seat && canAct && dealWait === undefined;
 	const options = yourTurn
-		? legalActions(match.hand, engineSeat(seat)).map((action) =>
-				optionOf(view, action, t),
+		? withReadyPickups(
+				legalActions(match.hand, engineSeat(seat)).map((action) =>
+					optionOf(view, action, t),
+				),
+				view,
 			)
 		: [];
 

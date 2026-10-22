@@ -20,6 +20,7 @@ import {
 	type TableViewInput,
 	tableView,
 } from "../../src/ui/table-model";
+import { pairPickupMatch } from "../unit/canasta-fixtures";
 
 const sections: HTMLElement[] = [];
 
@@ -248,6 +249,21 @@ describe("table section", () => {
 			);
 			section.element.remove();
 		}
+	});
+
+	it("offers to take the pile with a pair from the hand before any card is selected", () => {
+		const acted: Action[] = [];
+		const section = mount(acted);
+		section.render(turnView(pairPickupMatch(), 0));
+		const pickup = section.element.querySelector<HTMLButtonElement>(
+			'[data-testid="action-takePile"]',
+		);
+		expect(pickup).not.toBeNull();
+		expect(
+			section.element.querySelector(".own-hand button.card.selected"),
+		).toBeNull();
+		pickup?.click();
+		expect(acted.map((action) => action.type)).toEqual(["takePile"]);
 	});
 
 	it("frames the cards that this turn drew or took, and only those", () => {

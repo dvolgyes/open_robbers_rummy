@@ -32,6 +32,7 @@ import {
 	type TableViewInput,
 	tableView,
 } from "../../src/ui/table-model";
+import { pairPickupMatch } from "./canasta-fixtures";
 
 const ROOM = "room-1";
 const CONFIG: RoomConfig = {
@@ -171,6 +172,35 @@ describe("offered actions", () => {
 		expect(view.options).toEqual([]);
 		expect(view.lines.map((line) => line.state)).toEqual(["pending"]);
 	});
+
+	it("a pickup that needs hand cards is offered before any card is selected, with the fewest and most natural cards", () => {
+		const match = pairPickupMatch();
+		const view = tableView(inputFor(stateOf(match), turnOf(match)));
+		const wild = new Set(
+			view.own
+				.filter((card) => card.rank === "2" || card.rank === "JK")
+				.map((card) => card.id),
+		);
+		const wilds = (option: ActionOption) =>
+			option.cards.filter((id) => wild.has(id)).length;
+		const pickups = view.options.filter(
+			(option) => option.action.type === "takePile",
+		);
+		const fewest = Math.min(...pickups.map((option) => option.cards.length));
+		const natural = Math.min(
+			...pickups.filter((option) => option.cards.length === fewest).map(wilds),
+		);
+		const shown = optionsFor(view.options, []).filter(
+			(option) => option.action.type === "takePile",
+		);
+		expect(shown.length).toBeGreaterThan(0);
+		for (const option of shown) {
+			expect(option.cards).toHaveLength(fewest);
+			expect(wilds(option)).toBe(natural);
+		}
+		const texts = shown.map((option) => labelText(option.label));
+		expect(new Set(texts).size).toBe(texts.length);
+	});
 });
 
 describe("score strip and piles", () => {
@@ -290,6 +320,20 @@ describe("optionsFor", () => {
 
 	it("the selection matches the cards of an option in any order", () => {
 		expect(optionsFor(options, ["b", "a"])).toEqual([draw, meldAB]);
+	});
+
+	it("an option offered without a selection shows until another selection is made", () => {
+		const pickupAB: ActionOption = {
+			key: "pickup-ab",
+			label: [{ kind: "text", text: "Take the pile with A and B" }],
+			action: { type: "takePile", cards: ["a", "b"] },
+			cards: ["a", "b"],
+			ready: true,
+		};
+		const all = [draw, pickupAB];
+		expect(optionsFor(all, [])).toEqual([draw, pickupAB]);
+		expect(optionsFor(all, ["a"])).toEqual([draw]);
+		expect(optionsFor(all, ["a", "b"])).toEqual([draw, pickupAB]);
 	});
 });
 
