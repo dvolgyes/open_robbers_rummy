@@ -1,8 +1,10 @@
 import {
 	type Action,
+	applyAction,
 	type Card,
 	type Seat as EngineSeat,
 	type HandState,
+	initialMeldMinimum,
 	type MatchState,
 	type TeamIndex,
 	teamOf,
@@ -105,8 +107,31 @@ export function offeredChoices(hand: HandState, seat: EngineSeat): Choice[] {
 		.map((action, index) => ({
 			index,
 			action,
-			label: actionLabel(action, view),
+			label: `${actionLabel(action, view)}${firstMeldNote(hand, seat, action)}`,
 		}));
+}
+
+/**
+ * Marks a meld that makes the side's first meld, or the points that a meld below the minimum reaches, because
+ * a model does not count the points itself and keeps the wild cards that the first meld needs.
+ */
+function firstMeldNote(
+	hand: HandState,
+	seat: EngineSeat,
+	action: Action,
+): string {
+	const side = teamOf(seat);
+	if (hand.teams[side]?.initialMade) return "";
+	const step = applyAction(hand, seat, action);
+	if (!step.ok || step.hand.turnMeldPoints <= hand.turnMeldPoints) return "";
+	const minimum = initialMeldMinimum(
+		hand.rules.initialMeld,
+		hand.teamScores[side] ?? 0,
+	);
+	const points = step.hand.turnMeldPoints;
+	return points >= minimum
+		? " (makes your side's first meld)"
+		: ` (first meld: ${points} of ${minimum} points, more melds needed this turn)`;
 }
 
 export function renderTurnPrompt(
@@ -144,6 +169,9 @@ export function renderTurnPrompt(
 		OWN_MELDS:
 			own.melds.map((meld) => meldLabel(meld, view)).join("\n") || "none",
 		OWN_RED_THREES: redThrees(own.redThrees),
+		FIRST_MELD: own.initialMade
+			? "made"
+			: `not made yet; it needs at least ${initialMeldMinimum(view.rules.initialMeld, view.teamScores[side])} points melded from your hand in one turn`,
 		OPPONENT_MELDS:
 			opponents.melds.map((meld) => meldLabel(meld, view)).join("\n") || "none",
 		OPPONENT_RED_THREES: redThrees(opponents.redThrees),

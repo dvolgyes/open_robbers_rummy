@@ -3,6 +3,7 @@ import {
 	applyAction,
 	cardPoints,
 	type HandState,
+	initialMeldMinimum,
 	isCanasta,
 	isWild,
 	legalActions,
@@ -19,8 +20,15 @@ const GOING_OUT = 1000;
 const WILD_COST = 25;
 
 /**
+ * The value of making the side's first meld. It ranks a first meld that needs two wild cards above a discard and
+ * above a part of it, while the wild card cost still ranks the first meld with fewer wild cards first.
+ */
+const FIRST_MELD = 40;
+
+/**
  * What putting `cards` on the table is worth beyond their count: a tenth of the bonus of each canasta that the
- * action makes, so a natural canasta ranks above a mixed one, less the cost of the wild cards.
+ * action makes, so a natural canasta ranks above a mixed one, and the value of the side's first meld when the
+ * action makes it, less the cost of the wild cards.
  */
 function tableValue(
 	hand: HandState,
@@ -50,7 +58,14 @@ function tableValue(
 				10,
 		0,
 	);
-	return bonus - wilds * WILD_COST;
+	const first =
+		after !== undefined &&
+		!hand.teams[team]?.initialMade &&
+		after.turnMeldPoints >=
+			initialMeldMinimum(hand.rules.initialMeld, hand.teamScores[team] ?? 0)
+			? FIRST_MELD
+			: 0;
+	return bonus + first - wilds * WILD_COST;
 }
 
 /**

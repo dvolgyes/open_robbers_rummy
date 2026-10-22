@@ -7,7 +7,8 @@ import {
 	decisionsRequestBody,
 	parseDecisionsResponse,
 } from "../../src/bot/decision-model";
-import { rankActions, scoreAction } from "../../src/bot/heuristic";
+import { botActions, rankActions, scoreAction } from "../../src/bot/heuristic";
+import { NODE_PROMPT_TEMPLATES } from "../../src/bot/node-prompts";
 import {
 	decisionFormat,
 	decisionState,
@@ -137,6 +138,111 @@ describe("heuristic ranking", () => {
 			scoreAction(hand, seat, { type: "extend", meldId, cards: ["0-2C"] });
 		expect(extend("eights")).toBeLessThan(discard);
 		expect(extend("sevens")).toBeGreaterThan(discard);
+	});
+
+	/** After the draw, the seat on turn holds `ids`; its side has not melded, the minimum is 50, and the pile is empty. */
+	function beforeFirstMeld(ids: readonly string[]): {
+		hand: HandState;
+		seat: EngineSeat;
+	} {
+		const match = startMatch(7);
+		const seat = match.hand.turn;
+		const drawn = applyAction(match.hand, seat, { type: "draw" });
+		if (!drawn.ok) throw new Error(drawn.reason);
+		const deck = buildDecks();
+		const own = ids.flatMap((id) => deck.filter((card) => card.id === id));
+		const hand: HandState = {
+			...drawn.hand,
+			pile: [],
+			hands: drawn.hand.hands.map((held, index) =>
+				index === seat ? own : held,
+			),
+		};
+		return { hand: { ...hand, turnStart: hand }, seat };
+	}
+
+	it("makes the side's first meld with the wild cards that it needs rather than discard", () => {
+		const { hand, seat } = beforeFirstMeld([
+			"0-QS",
+			"1-QS",
+			"0-2C",
+			"0-2D",
+			"0-4S",
+			"0-6C",
+			"0-8H",
+			"1-5C",
+			"0-10D",
+			"1-JH",
+			"0-KC",
+		]);
+		// Q Q 2 is 40 points; only with the second 2 does the turn reach 50.
+		let played = hand;
+		while (played.turn === seat && played.outcome === null) {
+			const best = botActions(played, seat)[0];
+			if (!best) throw new Error("no action");
+			const next = applyAction(played, seat, best);
+			if (!next.ok) throw new Error(next.reason);
+			played = next.hand;
+		}
+		expect(played.teams[teamOf(seat)]?.initialMade).toBe(true);
+		// A model reads the order: the meld that makes the first meld comes before a part of it.
+		expect(botActions(hand, seat)[0]).toEqual({
+			type: "meld",
+			cards: ["0-QS", "1-QS", "0-2C", "0-2D"],
+		});
+	});
+
+	it("makes the side's first meld with as few wild cards as it can", () => {
+		const { hand, seat } = beforeFirstMeld([
+			"0-QS",
+			"1-QS",
+			"0-2C",
+			"0-JK0",
+			"0-4S",
+			"0-6C",
+			"0-8H",
+			"1-5C",
+			"0-10D",
+			"1-JH",
+			"0-KC",
+		]);
+		expect(botActions(hand, seat)[0]).toEqual({
+			type: "meld",
+			cards: ["0-QS", "1-QS", "0-JK0"],
+		});
+	});
+
+	it("marks the options that make the side's first meld", () => {
+		const { hand, seat } = beforeFirstMeld([
+			"0-QS",
+			"1-QS",
+			"0-JK0",
+			"0-KH",
+			"1-KD",
+			"0-4S",
+			"0-6C",
+			"0-8H",
+			"1-5C",
+			"0-10D",
+			"1-JH",
+		]);
+		const label = (cards: readonly string[]) =>
+			offeredChoices(hand, seat).find(
+				(choice) =>
+					choice.action.type === "meld" &&
+					choice.action.cards.toSorted().join() === cards.toSorted().join(),
+			)?.label;
+		expect(label(["0-QS", "1-QS", "0-JK0"])).toContain(
+			"makes your side's first meld",
+		);
+		expect(label(["0-KH", "1-KD", "0-JK0"])).toContain(
+			"makes your side's first meld",
+		);
+		expect(
+			offeredChoices(hand, seat)
+				.filter((choice) => choice.action.type === "discard")
+				.every((choice) => !choice.label.includes("first meld")),
+		).toBe(true);
 	});
 
 	it("completes a canasta with a natural card rather than a wild card", () => {
@@ -316,6 +422,15 @@ describe("turn requests", () => {
 		const { match, seat } = openingTurn();
 		const request = turnRequest(match, 0, seat, TEMPLATES);
 		expect(request?.prompt).toContain("0: ");
+		expect(request?.prompt).not.toContain("{{");
+	});
+
+	it("tells the model whether its side has made the first meld, and its minimum", () => {
+		const { match, seat } = openingTurn();
+		const request = turnRequest(match, 0, seat, NODE_PROMPT_TEMPLATES);
+		expect(request?.prompt).toContain(
+			"Your side's first meld: not made yet; it needs at least 50 points",
+		);
 		expect(request?.prompt).not.toContain("{{");
 	});
 });
