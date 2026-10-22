@@ -167,6 +167,13 @@ export function decisionState(
 		seat: tableSeat(seat),
 		phase: view.phase,
 		own_cards: view.own.map(cardLabel),
+		hand_counts: Object.fromEntries(
+			SEATS.map((name, index) => [
+				SEAT_NAMES[name],
+				view.handCounts[index] ?? 0,
+			]),
+		),
+		turn_meld_points: view.turnMeldPoints,
 		stock_cards: view.stockCount,
 		pile_cards: view.pile.length,
 		pile_top: top ? cardLabel(top) : null,

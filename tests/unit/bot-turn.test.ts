@@ -10,6 +10,7 @@ import {
 import { rankActions, scoreAction } from "../../src/bot/heuristic";
 import {
 	decisionFormat,
+	decisionState,
 	MAX_CHOICES,
 	offeredChoices,
 	parseChoice,
@@ -26,7 +27,7 @@ import {
 } from "../../src/canasta";
 import { mulberry32 } from "../../src/canasta/random";
 import { engineSeat, tableSeat } from "../../src/game/canasta";
-import type { Seat } from "../../src/protocol";
+import { SEAT_NAMES, type Seat } from "../../src/protocol";
 
 const TEMPLATES = {
 	turn: "SEAT {{SEAT}} CHOICES\n{{CHOICES}}\nSTATE {{OWN_HAND}}",
@@ -280,6 +281,23 @@ describe("choice parsing", () => {
 		expect(parseDecisionsResponse(answer("1"), 2)).toBe(1);
 		expect(() => parseDecisionsResponse(answer("2"), 2)).toThrow();
 		expect(() => parseDecisionsResponse(answer("01"), 2)).toThrow();
+	});
+
+	// The melds stay out: with them, mercury-decide laid down Q Q Q JK in place of Q Q Q.
+	it("gives the Decisions model the size of each hand", () => {
+		const match = startMatch(7);
+		const seat = match.hand.turn;
+		const hands = match.hand.hands.map((held, index) =>
+			index === seat ? held.slice(0, 2) : held,
+		);
+		const state = decisionState(
+			{ ...match, hand: { ...match.hand, hands } },
+			seat,
+		);
+		expect(state).toMatchObject({
+			hand_counts: { [SEAT_NAMES[tableSeat(seat)]]: 2 },
+			turn_meld_points: 0,
+		});
 	});
 
 	it("sends one question whose criteria are the numbered labels", () => {
