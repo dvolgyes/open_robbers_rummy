@@ -135,18 +135,29 @@ function canEndTurn(
 			.map((card) => card.id)
 			.toSorted()
 			.join(",");
-	const melds = (hand.teams[teamOf(seat)]?.melds ?? [])
+	const side = hand.teams[teamOf(seat)];
+	const melds = (side?.melds ?? [])
 		.map((meld) => ids(meld.cards))
 		.toSorted()
 		.join("|");
 	const key = `${ids(cards)}/${melds}/${depth}`;
 	const known = seen.get(key);
 	if (known !== undefined) return known;
-	const result = legalActions(hand, seat).some((action) => {
-		if (action.type !== "meld" && action.type !== "extend") return false;
+	const steps = legalActions(hand, seat).flatMap((action) => {
+		if (action.type !== "meld" && action.type !== "extend") return [];
 		const step = applyAction(hand, seat, action);
-		return step.ok && canEndTurn(step.hand, seat, depth - 1, seen);
+		return step.ok ? [step.hand] : [];
 	});
+	// Below the first meld minimum, only a meld that adds points can reach it, and the melds that add the most reach
+	// it soonest. Cards taken with the pile add none, and with a large pile the search would otherwise try every
+	// combination of them for seconds.
+	const result = (
+		side?.initialMade
+			? steps
+			: steps
+					.filter((after) => after.turnMeldPoints > hand.turnMeldPoints)
+					.toSorted((a, b) => b.turnMeldPoints - a.turnMeldPoints)
+	).some((after) => canEndTurn(after, seat, depth - 1, seen));
 	seen.set(key, result);
 	return result;
 }

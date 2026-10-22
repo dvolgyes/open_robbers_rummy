@@ -21,7 +21,7 @@ import {
 	type Choice,
 	type PromptTemplates,
 } from "./strategy";
-import { chooseTurn, turnRequest } from "./turn";
+import { chooseTurn, turnKey, turnRequest } from "./turn";
 
 export interface HostBotSettings {
 	readonly apiKey: string;
@@ -208,6 +208,9 @@ export class HostBotRunner {
 		for (const seat of seats) {
 			// Only the seat whose turn it is has legal actions, so other seats are skipped here.
 			if (match.hand.turn !== engineSeat(seat)) continue;
+			// The table changes on every tick and ping. The choices take a search on the page's only thread, so a
+			// position that was already asked is skipped before they are computed again.
+			if (this.#processed.has(turnKey(match, state.actions, seat))) continue;
 			this.#templates ??= await loadBrowserPromptTemplates();
 			const request = turnRequest(match, state.actions, seat, this.#templates);
 			if (!request || this.#processed.has(request.key)) continue;

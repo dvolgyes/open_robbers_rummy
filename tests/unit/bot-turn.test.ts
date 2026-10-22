@@ -216,6 +216,76 @@ describe("offered choices", () => {
 			{ type: "resetTurn" },
 		]);
 	});
+
+	// The browser host computes the choices on the page's only thread. A side that has not melded takes a large
+	// pile with a meld below the minimum; the pile cards do not count toward it, and this position took 5 s.
+	it("are found quickly after a large pile is taken below the first meld minimum", () => {
+		const match = startMatch(7);
+		const seat = match.hand.turn;
+		const deck = buildDecks();
+		const cards = (ids: readonly string[]) =>
+			ids.flatMap((id) => deck.filter((card) => card.id === id));
+		const own = cards([
+			"0-7D",
+			"0-7S",
+			"0-10C",
+			"1-9S",
+			"1-AD",
+			"0-6D",
+			"1-8D",
+			"0-AC",
+			"0-9S",
+			"1-5S",
+			"0-4C",
+		]);
+		const pile = cards([
+			"1-5H",
+			"1-KC",
+			"0-2C",
+			"1-2H",
+			"0-8C",
+			"1-8S",
+			"0-4D",
+			"1-10H",
+			"1-9C",
+			"0-10S",
+			"0-3S",
+			"0-9H",
+			"0-9D",
+			"1-10D",
+			"1-4H",
+			"1-4C",
+			"1-8C",
+			"1-3S",
+			"0-4S",
+			"1-QC",
+			"0-JS",
+			"0-9C",
+			"1-JK1",
+			"0-5C",
+			"0-5S",
+			"0-6H",
+			"0-7H",
+		]);
+		const holding: HandState = {
+			...match.hand,
+			pile,
+			hands: match.hand.hands.map((held, index) =>
+				index === seat ? own : held,
+			),
+		};
+		const taken = applyAction({ ...holding, turnStart: holding }, seat, {
+			type: "takePile",
+			cards: ["0-7D", "0-7S"],
+		});
+		if (!taken.ok) throw new Error(taken.reason);
+		expect(taken.hand.turnMeldPoints).toBe(15);
+		expect(taken.hand.hands[seat]).toHaveLength(35);
+		const start = performance.now();
+		const choices = offeredChoices(taken.hand, seat);
+		expect(performance.now() - start).toBeLessThan(2500);
+		expect(choices[0]?.action.type).not.toBe("resetTurn");
+	}, 20_000);
 });
 
 describe("turn requests", () => {

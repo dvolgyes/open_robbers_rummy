@@ -31,6 +31,15 @@ export interface TurnRequest {
 	readonly state: Record<string, unknown>;
 }
 
+/** The key of one seat's decision in one position; a runner asks for each key once. */
+export function turnKey(
+	match: MatchState,
+	accepted: number,
+	seat: Seat,
+): string {
+	return `${actionPositionKey(match.handNo, accepted)}:${seat}`;
+}
+
 /** The request for one seat's turn now, or undefined when that seat has no legal action. */
 export function turnRequest(
 	match: MatchState,
@@ -42,7 +51,7 @@ export function turnRequest(
 	const choices = offeredChoices(match.hand, engine);
 	if (choices.length === 0) return undefined;
 	return {
-		key: `${actionPositionKey(match.handNo, accepted)}:${seat}`,
+		key: turnKey(match, accepted, seat),
 		choices,
 		prompt: renderTurnPrompt(match, engine, choices, templates),
 		state: decisionState(match, engine),
