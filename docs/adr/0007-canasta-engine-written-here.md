@@ -25,6 +25,8 @@ Evidence, checked on 2026-10-22:
   `applyAction` is the only authority: `legalActions` enumerates candidates and keeps only those that `applyAction` accepts.
 - Follow the classic four-player partnership rules, as stated on Pagat (https://www.pagat.com/rummy/canasta.html, checked 2026-10-22), with these points.
   Pagat states each of them for the classic game:
+  - A joker counts 50 points, an ace or a 2 counts 20, a king down to an 8 counts 10, and a 7 down to a 4, or a black three, counts 5.
+    Amended 2026-10-22: before this change, a 2 counted 50.
   - A player draws one card from the stock, or takes the whole discard pile.
   - The initial meld needs 15 points at a negative score, 50 from 0, 90 from 1500, and 120 from 3000.
   - A red three is set aside when dealt or drawn.

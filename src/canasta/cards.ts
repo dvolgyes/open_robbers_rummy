@@ -78,8 +78,8 @@ export function cardPoints(card: Pick<Card, "rank" | "suit">): number {
 	if (isBlack3(card)) return 5;
 	switch (card.rank) {
 		case "JK":
-		case "2":
 			return 50;
+		case "2":
 		case "A":
 			return 20;
 		case "8":

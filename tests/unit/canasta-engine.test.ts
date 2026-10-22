@@ -62,6 +62,19 @@ describe("cards", () => {
 		expect(deck.filter(isRed3)).toHaveLength(4);
 		expect(deck.filter(isBlack3)).toHaveLength(4);
 	});
+
+	it.each([
+		["0-JK0", 50],
+		["0-2S", 20],
+		["0-AH", 20],
+		["0-KD", 10],
+		["0-8C", 10],
+		["0-7H", 5],
+		["0-4S", 5],
+		["0-3C", 5],
+	])("counts %s as %i points", (id, points) => {
+		expect(cardPoints(byId(id))).toBe(points);
+	});
 });
 
 describe("meld validation", () => {
