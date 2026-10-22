@@ -3,10 +3,8 @@ import {
 	BrowserOpenRouterStrategy,
 	InsufficientBalanceError,
 } from "../../src/bot/browser-openrouter";
-import { chooseTurn, turnRequest } from "../../src/bot/turn";
-import { startMatch } from "../../src/canasta";
-import { tableSeat } from "../../src/game/canasta";
-import type { BotModel, Seat } from "../../src/protocol";
+import { chooseTurn, type TurnRequest } from "../../src/bot/turn";
+import type { BotModel } from "../../src/protocol";
 import { DECISION_BOT_MODELS } from "../../src/protocol";
 
 const SETTINGS = {
@@ -16,7 +14,11 @@ const SETTINGS = {
 	retryDelayMs: 0,
 };
 
-const TEMPLATES = { turn: "{{CHOICES}}" };
+const REQUEST: TurnRequest = {
+	labels: ["draw", "play", "end"],
+	prompt: "0: draw\n1: play\n2: end",
+	state: {},
+};
 
 function responseWithText(text: string): Response {
 	return new Response(
@@ -49,14 +51,6 @@ function stubTimers(): void {
 	});
 }
 
-function openingRequest() {
-	const match = startMatch(7);
-	const seat = tableSeat(match.hand.turn) as Seat;
-	const request = turnRequest(match, 0, seat, TEMPLATES);
-	if (!request) throw new Error("opening turn has no choices");
-	return request;
-}
-
 function strategy(
 	settings: Partial<typeof SETTINGS> = {},
 	onRateLimit: () => void = () => {},
@@ -86,14 +80,9 @@ describe("browser OpenRouter retry policy", () => {
 					: responseForChoice(0);
 			}),
 		);
-		const request = openingRequest();
+		const request = REQUEST;
 
-		expect(
-			await strategy().choose(
-				request.prompt,
-				request.choices.map((c) => c.label),
-			),
-		).toBe(0);
+		expect(await strategy().choose(request.prompt, request.labels)).toBe(0);
 		expect(requests.map((body) => body.model)).toEqual([
 			"inception/mercury-3",
 			"openai/gpt-6-luna",
@@ -105,13 +94,10 @@ describe("browser OpenRouter retry policy", () => {
 		stubTimers();
 		const fetchMock = vi.fn(async () => new Response("", { status: 402 }));
 		vi.stubGlobal("fetch", fetchMock);
-		const request = openingRequest();
+		const request = REQUEST;
 
 		await expect(
-			strategy().choose(
-				request.prompt,
-				request.choices.map((c) => c.label),
-			),
+			strategy().choose(request.prompt, request.labels),
 		).rejects.toBeInstanceOf(InsufficientBalanceError);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
@@ -120,13 +106,10 @@ describe("browser OpenRouter retry policy", () => {
 		stubTimers();
 		const fetchMock = vi.fn(async () => new Response("", { status: 503 }));
 		vi.stubGlobal("fetch", fetchMock);
-		const request = openingRequest();
+		const request = REQUEST;
 
 		await expect(
-			strategy().choose(
-				request.prompt,
-				request.choices.map((c) => c.label),
-			),
+			strategy().choose(request.prompt, request.labels),
 		).rejects.toThrow("OpenRouter request failed (503)");
 		expect(fetchMock).toHaveBeenCalledTimes(3);
 	});
@@ -144,10 +127,10 @@ describe("browser OpenRouter retry policy", () => {
 			)
 			.mockResolvedValueOnce(responseForChoice(0));
 		vi.stubGlobal("fetch", fetchMock);
-		const request = openingRequest();
+		const request = REQUEST;
 		const decision = strategy({ retryDelayMs: 5000 }).choose(
 			request.prompt,
-			request.choices.map((c) => c.label),
+			request.labels,
 		);
 		await vi.advanceTimersByTimeAsync(4999);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -158,13 +141,13 @@ describe("browser OpenRouter retry policy", () => {
 
 	it("routes decision models through the Decisions API and records cost", async () => {
 		stubTimers();
-		const request = openingRequest();
+		const request = REQUEST;
 		const fetchMock = vi.fn(
 			async (_input: RequestInfo | URL) =>
 				new Response(
 					JSON.stringify({
 						answers: {
-							canasta_choice: { type: "choice", choice: "1" },
+							turn_choice: { type: "choice", choice: "1" },
 						},
 						usage: { cost: 0.00001 },
 					}),
@@ -179,10 +162,7 @@ describe("browser OpenRouter retry policy", () => {
 				{ model: DECISION_BOT_MODELS[0] },
 				() => {},
 				onUsageCost,
-			).choose(
-				request.prompt,
-				request.choices.map((c) => c.label),
-			),
+			).choose(request.prompt, request.labels),
 		).toBe(1);
 		expect(fetchMock.mock.calls[0]?.[0]).toBe(
 			"https://openrouter.ai/api/alpha/decisions",
@@ -200,26 +180,26 @@ describe("fake model responses end in a legal action", () => {
 	];
 
 	it.each(badResponses)(
-		"uses the heuristic top choice for %s",
+		"uses the first option for %s",
 		async (_name, respond) => {
 			stubTimers();
 			vi.stubGlobal(
 				"fetch",
 				vi.fn(async () => respond()),
 			);
-			const request = openingRequest();
+			const request = REQUEST;
 			const messages: string[] = [];
 			const choice = await chooseTurn(
 				strategy({ retries: 0 }),
 				request,
 				(message) => messages.push(message),
 			);
-			expect(choice).toBe(request.choices[0]);
+			expect(choice).toBe(0);
 			expect(messages.length).toBeGreaterThan(0);
 		},
 	);
 
-	it("uses the heuristic top choice when the request times out", async () => {
+	it("uses the first option when the request times out", async () => {
 		stubTimers();
 		vi.stubGlobal(
 			"fetch",
@@ -227,13 +207,13 @@ describe("fake model responses end in a legal action", () => {
 				throw new TypeError("network timeout");
 			}),
 		);
-		const request = openingRequest();
+		const request = REQUEST;
 		const choice = await chooseTurn(
 			strategy({ retries: 0 }),
 			request,
 			() => {},
 		);
-		expect(choice).toBe(request.choices[0]);
+		expect(choice).toBe(0);
 	});
 
 	it("returns a valid option the model picks", async () => {
@@ -242,12 +222,12 @@ describe("fake model responses end in a legal action", () => {
 			"fetch",
 			vi.fn(async () => responseForChoice(1)),
 		);
-		const request = openingRequest();
+		const request = REQUEST;
 		const choice = await chooseTurn(
 			strategy({ retries: 0 }),
 			request,
 			() => {},
 		);
-		expect(choice).toBe(request.choices[1]);
+		expect(choice).toBe(1);
 	});
 });

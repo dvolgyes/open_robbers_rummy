@@ -1,6 +1,6 @@
 export const DECISIONS_ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
 
-const QUESTION_KEY = "canasta_choice";
+const QUESTION_KEY = "turn_choice";
 
 export function decisionsRequestBody(
 	model: string,
@@ -15,7 +15,7 @@ export function decisionsRequestBody(
 			[QUESTION_KEY]: {
 				type: "choice",
 				instructions:
-					"Which numbered option is the best action for this seat's turn in classic partnership canasta? Treat the supplied hand, hand counts, pile and stock counts as computed facts. Make the side's first meld as soon as possible, with the wild cards that it needs; the options that make it are marked. Keep 2s and jokers in the hand while the opponents are not close to going out; use them only to reach the first meld minimum, to complete a canasta, or to go out, and prefer the option with fewer wild cards when two do the same job. Do not add a wild card to a meld that is already on the table unless that completes a canasta or lets the seat go out. A natural canasta scores 500 and a mixed one 300. The opponents are close to going out when one of them has few cards or the stock is low; then complete canastas and meld cards to keep few points in the hand. Keep wild cards out of the discard pile. Assume opponents usually play well but may make ordinary mistakes.",
+					"Which numbered option is the best action for this player's turn? Treat the supplied state as computed facts. Assume opponents usually play well but may make ordinary mistakes.",
 				criteria: Object.fromEntries(
 					labels.map((label, index) => [String(index), label]),
 				),

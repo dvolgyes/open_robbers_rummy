@@ -1,11 +1,13 @@
 import { RTCPeerConnection as WeriftPeerConnection } from "werift";
 import { parseRoomSetup } from "../bookmark";
-import type { MatchState } from "../canasta";
 import {
 	actionPayload,
-	canastaModule,
-	parseCanastaState,
-} from "../game/canasta";
+	engineSeat,
+	handViewFor,
+	parseRummyState,
+	type RummyMatch,
+	rummyModule,
+} from "../game/rummy";
 import { newCommandId } from "../ids";
 import { randomNonce } from "../p2p/checks";
 import { readMeshConfig } from "../p2p/config";
@@ -16,31 +18,29 @@ import { MemoryStorage } from "../p2p/storage";
 import { TableController, tableIdentity } from "../p2p/table";
 import { trysteroMesh } from "../p2p/trystero";
 import type { RoomConfig, Seat } from "../protocol";
-import {
-	botModelOrder,
-	DEFAULT_BOT_SETUP,
-	isBotName,
-	SEATS,
-} from "../protocol";
+import { isBotName, SEATS } from "../protocol";
+import type { Action } from "../rummy";
 import { type SeatLocks, SeatMemory } from "../session";
-import { OpenRouterStrategy } from "./node-openrouter";
-import { NODE_PROMPT_TEMPLATES } from "./node-prompts";
+import { chooseAction, neverPlay } from "./policy";
 import { actionPositionKey } from "./position";
-import type { Choice } from "./strategy";
-import { chooseTurn, type TurnChooser, turnRequest } from "./turn";
+import { inlineThinker } from "./think";
+
+/**
+ * The search runs on the only thread of the process, so it stays well below the 5 s after which the peers count a
+ * late timer tick as a frozen page (`LATE_TICK_MS`).
+ */
+const CLI_THINK_MS = 2000;
 
 interface Options {
 	readonly url: URL;
 	readonly username?: string;
 	readonly random: boolean;
-	readonly model?: string;
 }
 
 function parseArgs(argv: readonly string[]): Options {
 	let urlText: string | undefined;
 	let username: string | undefined;
 	let random = false;
-	let model: string | undefined;
 	for (let index = 0; index < argv.length; index++) {
 		const value = argv[index];
 		if (value === "--random") {
@@ -49,10 +49,6 @@ function parseArgs(argv: readonly string[]): Options {
 			const name = argv[++index]?.trim();
 			if (!name) throw new Error("--user needs a player name");
 			username = name;
-		} else if (value === "--model") {
-			const name = argv[++index]?.trim();
-			if (!name) throw new Error("--model needs a model name");
-			model = name;
 		} else if (value?.startsWith("--")) {
 			throw new Error(`unknown option: ${value}`);
 		} else if (urlText === undefined && value !== undefined) {
@@ -78,7 +74,6 @@ function parseArgs(argv: readonly string[]): Options {
 		url,
 		...(username === undefined ? {} : { username }),
 		random,
-		...(model === undefined ? {} : { model }),
 	};
 }
 
@@ -118,34 +113,7 @@ async function run(options: Options): Promise<void> {
 				: `no seat named ${options.username} was found in the room link`,
 		);
 	}
-	const apiKey = options.random ? undefined : process.env.OPENROUTER_API_KEY;
-	const configuredModels = setup?.config.botSetup
-		? botModelOrder(setup.config.botSetup)
-		: botModelOrder(DEFAULT_BOT_SETUP);
-	const modelOrder = options.model
-		? [
-				options.model,
-				...configuredModels.filter((model) => model !== options.model),
-			]
-		: configuredModels;
-	const strategy = apiKey
-		? new OpenRouterStrategy(apiKey, {
-				model: modelOrder[0] as string,
-				fallbackModel: modelOrder[1] as (typeof configuredModels)[number],
-				modelOrder,
-				retries: setup?.config.botSetup?.retries,
-				retryDelayMs: setup?.config.botSetup?.retryDelayMs,
-			})
-		: undefined;
-	// --random picks among the offered options without a model, so it needs no key.
-	const chooser: TurnChooser | undefined = options.random
-		? {
-				choose: async (_prompt, labels) =>
-					Math.floor(Math.random() * labels.length),
-			}
-		: strategy;
-	if (chooser === undefined)
-		throw new Error("OPENROUTER_API_KEY is missing from .env");
+	const thinker = inlineThinker();
 	const meshResult = readMeshConfig(process.env);
 	if (!meshResult.ok) throw new Error(meshResult.error);
 
@@ -176,7 +144,7 @@ async function run(options: Options): Promise<void> {
 		storage,
 		locks,
 		memory,
-		module: canastaModule,
+		module: rummyModule,
 		hostEligible: false,
 		clock,
 		every: (ms, tick) => {
@@ -269,14 +237,14 @@ async function run(options: Options): Promise<void> {
 	};
 
 	const sendAction = async (
-		match: MatchState,
+		match: RummyMatch,
 		accepted: number,
 		seat: Seat,
 		position: string,
-		choice: Choice,
+		action: Action,
 		view: ReturnType<TableController["view"]>,
 	): Promise<void> => {
-		const currentState = parseCanastaState(
+		const currentState = parseRummyState(
 			view.table?.state ?? {},
 			identity.tableId,
 		);
@@ -288,13 +256,13 @@ async function run(options: Options): Promise<void> {
 		)
 			return;
 		const result = await controller.send(
-			actionPayload(identity.tableId, match, accepted, choice.action),
+			actionPayload(identity.tableId, match, accepted, action),
 		);
 		if (!result.ok)
 			throw new Error(`could not queue game action (${result.code})`);
 		sentKey = position;
 		sentFailureCount = view.failures.length;
-		console.log(`Sent ${choice.label} for ${seat}.`);
+		console.log(`Sent ${action.type} for ${seat}.`);
 	};
 
 	const drive = async (): Promise<void> => {
@@ -335,9 +303,9 @@ async function run(options: Options): Promise<void> {
 			startupTimer = undefined;
 		}
 		if (!view.ready || !view.table) return;
-		const state = parseCanastaState(view.table.state, identity.tableId);
+		const state = parseRummyState(view.table.state, identity.tableId);
 		const match = state?.match;
-		if (!state || !match || match.settled || match.winner !== null) return;
+		if (!state || !match || match.hand.outcome !== null) return;
 		if (view.outbox.length > 0) return;
 		const seat = view.seat;
 		const position = actionPositionKey(match.handNo, state.actions);
@@ -350,25 +318,21 @@ async function run(options: Options): Promise<void> {
 		if (strategyKey === position) return;
 		strategyKey = position;
 		try {
-			const request = turnRequest(
-				match,
-				state.actions,
-				seat,
-				NODE_PROMPT_TEMPLATES,
-			);
-			if (!request) return;
-			const choice = await chooseTurn(chooser, request, (message) =>
-				console.error(`${seat}: ${message}`),
-			);
-			await sendAction(match, state.actions, seat, position, choice, view);
+			const handView = handViewFor(match, seat);
+			// --random draws, ends and passes only, so it needs no search.
+			const action = options.random
+				? chooseAction(handView, engineSeat(seat), { maxNodes: 0 }, neverPlay)
+				: await thinker.choose(handView, engineSeat(seat), CLI_THINK_MS);
+			if (action === undefined) return;
+			await sendAction(match, state.actions, seat, position, action, view);
 		} catch (error) {
-			await stop(new Error(describeFailure(error, [apiKey ?? "", route.key])));
+			await stop(new Error(describeFailure(error, [route.key])));
 		}
 	};
 
 	removeListener = controller.onChange(() => {
 		void drive().catch((error: unknown) => {
-			void stop(new Error(describeFailure(error, [apiKey ?? "", route.key])));
+			void stop(new Error(describeFailure(error, [route.key])));
 		});
 	});
 	startupTimer = setTimeout(
@@ -382,7 +346,7 @@ async function run(options: Options): Promise<void> {
 	try {
 		await controller.start();
 		void drive().catch((error: unknown) => {
-			void stop(new Error(describeFailure(error, [apiKey ?? "", route.key])));
+			void stop(new Error(describeFailure(error, [route.key])));
 		});
 		await finished;
 	} finally {
@@ -396,8 +360,6 @@ try {
 	const options = parseArgs(process.argv.slice(2));
 	await run(options);
 } catch (error) {
-	console.error(
-		`Bot stopped: ${describeFailure(error, [process.env.OPENROUTER_API_KEY ?? ""])}`,
-	);
+	console.error(`Bot stopped: ${describeFailure(error, [])}`);
 	process.exitCode = 1;
 }

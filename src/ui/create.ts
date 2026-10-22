@@ -1,16 +1,9 @@
 import type { Bookmark } from "../bookmark";
-import {
-	normalizeHostApiKey,
-	readHostApiKey,
-	writeHostApiKey,
-} from "../bot/host-key";
-import type { HostBotSettings } from "../bot/host-runner";
-import { canastaModule } from "../game/canasta";
+import { rummyModule } from "../game/rummy";
 import { newCommandId } from "../ids";
 import { newTableKey } from "../p2p/link";
 import { CANNOT_STORE, createTable, tableIdentity } from "../p2p/table";
 import {
-	botModelOrder,
 	DEFAULT_BOT_SETUP,
 	parseBotSetup,
 	type RoomConfig,
@@ -21,7 +14,6 @@ import {
 import type { AppDeps, Dispose } from "./deps";
 import { el } from "./dom";
 import { checkCreateFields, DEFAULT_CREATE_FIELDS, storageText } from "./model";
-import { modelPriorityControl } from "./model-priority";
 
 /**
  * The create screen, prefilled from a bookmark (names and the creator's seat). Calls `onCreated` with the table key,
@@ -35,7 +27,7 @@ export function showCreate(
 		key: string,
 		config: RoomConfig,
 		seat: Seat,
-		hostBots?: HostBotSettings,
+		hostBots: boolean,
 	) => void,
 ): Dispose {
 	let disposed = false;
@@ -74,42 +66,6 @@ export function showCreate(
 		);
 	});
 
-	const apiKey = el("input", {
-		attrs: {
-			type: "password",
-			name: "openrouter-key",
-			autocomplete: "new-password",
-			"aria-label": deps.t("OpenRouter API key"),
-		},
-	});
-	apiKey.value = readHostApiKey(deps.browser);
-	apiKey.addEventListener("input", () => {
-		apiKey.value = normalizeHostApiKey(apiKey.value);
-	});
-	const setup = prefill.botSetup ?? DEFAULT_BOT_SETUP;
-	const modelPriority = modelPriorityControl(botModelOrder(setup), deps.t);
-	const retries = el("input", {
-		attrs: {
-			type: "number",
-			min: "0",
-			max: "10",
-			step: "1",
-			name: "bot-retries",
-			"aria-label": deps.t("Retries"),
-		},
-	});
-	retries.value = String(setup.retries);
-	const retryDelay = el("input", {
-		attrs: {
-			type: "number",
-			min: "1",
-			max: "60",
-			step: "1",
-			name: "bot-retry-delay",
-			"aria-label": deps.t("Wait between retries (seconds)"),
-		},
-	});
-	retryDelay.value = String(setup.retryDelayMs / 1000);
 	const errors = el("ul", {
 		className: "errors",
 		attrs: { role: "alert", "data-testid": "errors" },
@@ -141,27 +97,6 @@ export function showCreate(
 		),
 		errors,
 		submit,
-		el(
-			"fieldset",
-			{},
-			el("legend", {}, deps.t("Optional automated players")),
-			el("label", {}, `${deps.t("OpenRouter API key")} `, apiKey),
-			el(
-				"p",
-				{},
-				deps.t(
-					"Model priority: the first model is primary; after a server error, the bot tries the next model.",
-				),
-			),
-			modelPriority.element,
-			el("label", {}, `${deps.t("Retries")} `, retries),
-			el(
-				"label",
-				{},
-				`${deps.t("Wait between retries (seconds)")} `,
-				retryDelay,
-			),
-		),
 	);
 
 	const showErrors = (messages: readonly string[]): void => {
@@ -185,60 +120,20 @@ export function showCreate(
 			return;
 		}
 		const botSeats = SEATS.filter((item) => botChoices[item].checked);
-		const botSetup = parseBotSetup({
-			seats: botSeats,
-			model: modelPriority.value()[0],
-			fallbackModel: modelPriority.value()[1],
-			modelOrder: modelPriority.value(),
-			retries: Number(retries.value),
-			retryDelayMs: Number(retryDelay.value) * 1000,
-		});
-		if (botSetup === undefined) {
-			showErrors([
-				deps.t("Check the bot models, retry count, and retry delay."),
-			]);
-			return;
-		}
+		// The bots use the solver; the model fields stay for the kept OpenRouter transport.
+		const botSetup = parseBotSetup({ ...DEFAULT_BOT_SETUP, seats: botSeats });
+		if (botSetup === undefined) return;
 		const config: RoomConfig = { ...check.config, botSetup };
-		const normalizedApiKey = normalizeHostApiKey(apiKey.value);
-		apiKey.value = normalizedApiKey;
-		const hostBotSettings =
-			botSeats.length > 0
-				? {
-						apiKey: normalizedApiKey,
-						model: botSetup.model,
-						fallbackModel: botSetup.fallbackModel,
-						modelOrder: botModelOrder(botSetup),
-						retries: botSetup.retries,
-						retryDelayMs: botSetup.retryDelayMs,
-					}
-				: undefined;
-		if (hostBotSettings && !hostBotSettings.apiKey) {
-			showErrors([
-				deps.t("Enter an OpenRouter API key to run bot seats in this browser."),
-			]);
-			return;
-		}
-		if (hostBotSettings) {
-			try {
-				writeHostApiKey(deps.browser, apiKey.value);
-			} catch {
-				showErrors([
-					deps.t("This browser could not store the OpenRouter API key."),
-				]);
-				return;
-			}
-		}
 		showErrors([]);
 		submit.disabled = true;
 		submit.textContent = deps.t("Creating…");
-		void create(config, check.seat, hostBotSettings);
+		void create(config, check.seat, botSeats.length > 0);
 	});
 
 	async function create(
 		config: RoomConfig,
 		seat: Seat,
-		hostBotSettings?: HostBotSettings,
+		hostBots: boolean,
 	): Promise<void> {
 		const key = newTableKey();
 		const identity = await tableIdentity(key, deps.browser);
@@ -248,11 +143,11 @@ export function showCreate(
 			identity,
 			seat,
 			config,
-			module: canastaModule,
+			module: rummyModule,
 			newId: newCommandId,
 			clock: deps.clock,
 			memory: deps.memory,
-			hostBots: hostBotSettings !== undefined,
+			hostBots,
 		});
 		if (disposed) return;
 		if (!created.ok) {
@@ -264,7 +159,7 @@ export function showCreate(
 			return;
 		}
 		void deps.persist();
-		onCreated(key, config, seat, hostBotSettings);
+		onCreated(key, config, seat, hostBots);
 	}
 
 	root.replaceChildren(

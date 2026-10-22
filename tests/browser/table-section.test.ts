@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { Action, MatchState } from "../../src/canasta";
-import { applyAction, scoreHand, startMatch } from "../../src/canasta";
-import { type CanastaState, tableSeat } from "../../src/game/canasta";
+import type { RummyState } from "../../src/game/rummy";
 import {
 	catalogKeys,
 	type Locale,
@@ -9,19 +7,15 @@ import {
 	translator,
 } from "../../src/i18n";
 import { PROTOCOL_VERSION, SEATS } from "../../src/protocol";
+import { type Action, type HandState, rulesFor } from "../../src/rummy";
 import type { RosterRow } from "../../src/ui/model";
 import "../../src/ui/style.css";
 import { type TableHandlers, tableSection } from "../../src/ui/table";
 import {
-	type CardView,
-	type MeldView,
-	optionsFor,
-	type SideView,
 	type TableView,
 	type TableViewInput,
 	tableView,
 } from "../../src/ui/table-model";
-import { pairPickupMatch } from "../unit/canasta-fixtures";
 
 const sections: HTMLElement[] = [];
 
@@ -29,54 +23,77 @@ afterEach(() => {
 	for (const element of sections.splice(0)) element.remove();
 });
 
-/** The view of the seat that takes the first turn of a new match; another seat hosts. */
-function firstTurnView(): TableView {
-	return turnView(startMatch(7), 0);
+interface HandInput {
+	readonly turn?: number;
+	readonly opened?: boolean;
+	readonly preset?: "gamerules" | "wikipedia";
+	readonly outcome?: HandState["outcome"];
 }
 
-/** The match after the seat on turn drew from the stock, so it can meld and discard. */
-function afterDraw(): MatchState {
-	const match = startMatch(7);
-	const step = applyAction(match.hand, match.hand.turn, { type: "draw" });
-	if (!step.ok) throw new Error(step.reason);
-	return { ...match, hand: step.hand };
+/**
+ * South (engine seat 2) is the viewer and holds three hearts that extend the table run, the king of clubs, and a
+ * joker. East's latest play put the 7♥ on the table.
+ */
+function hand(input: HandInput = {}): HandState {
+	return {
+		rules: rulesFor(input.preset ?? "wikipedia", 4, true),
+		players: 4,
+		dealer: 1,
+		turn: input.turn ?? 2,
+		phase: "start",
+		hands: [
+			["1-2C", "1-4D"],
+			["1-6S"],
+			["0-8H", "0-9H", "0-10H", "0-KC", "JK0"],
+			["1-QD", "1-KD", "JK1"],
+		],
+		stock: ["1-3S", "1-4S"],
+		table: [
+			{ id: "m1", cards: ["0-5H", "0-6H", "0-7H"] },
+			{ id: "m2", cards: ["1-9C", "JK2", "1-9S"] },
+		],
+		opened: [true, true, input.opened ?? true, true],
+		lastPlay: { seat: 1, cards: ["0-7H"], meldIds: ["m1"] },
+		passes: 0,
+		nextMeldNo: 3,
+		outcome: input.outcome ?? null,
+	};
 }
 
-/** The view of the seat on turn; another seat hosts. */
-function turnView(
-	match: MatchState,
-	actions: number,
+/** The view of South; North hosts. */
+function viewOf(
+	match: HandState,
+	actions = 3,
 	overrides: Partial<TableViewInput> = {},
 ): TableView {
-	const seat = tableSeat(match.hand.turn);
-	const host = SEATS.find((item) => item !== seat) ?? "N";
-	const state: CanastaState = {
+	const state: RummyState = {
 		v: PROTOCOL_VERSION,
 		roomId: "room-1",
-		game: "canasta",
+		game: "rummy",
 		messages: 0,
 		matches: 1,
-		match,
+		lastDealer: 1,
+		match: { handNo: 1, hand: match },
 		actions,
 		reset: null,
 		media: {},
 	};
-	const roster: RosterRow[] = SEATS.map((item) => ({
-		seat: item,
-		label: item,
-		host: item === host,
-		you: item === seat,
+	const roster: RosterRow[] = SEATS.map((seat) => ({
+		seat,
+		label: seat,
+		host: seat === "N",
+		you: seat === "S",
 		state: "online",
 		releasable: false,
 	}));
 	return tableView({
 		config: { names: { N: "Ann", E: "Ben", S: "Cy", W: "Dee" } },
-		seat,
+		seat: "S",
 		state,
 		terminal: false,
 		present: new Set(SEATS),
 		roster,
-		hostSeat: host,
+		hostSeat: "N",
 		outbox: [],
 		failures: [],
 		undone: [],
@@ -91,17 +108,16 @@ function mount(
 ) {
 	const section = tableSection(
 		{
-			...extra,
 			exit: () => {},
 			shareUrl: async () => {},
 			act: (action) => acted.push(action),
-			selectionOptions: (view, selected) => optionsFor(view.options, selected),
 			call: {
 				join: () => {},
 				leave: () => {},
 				setSwitch: () => {},
 				retry: () => {},
 			},
+			...extra,
 		},
 		t,
 	);
@@ -110,30 +126,113 @@ function mount(
 	return section;
 }
 
-describe("table section", () => {
+function query<T extends Element = HTMLElement>(
+	root: HTMLElement,
+	selector: string,
+): T {
+	const found = root.querySelector<T>(selector);
+	if (found === null) throw new Error(`no ${selector}`);
+	return found;
+}
+
+function click(root: HTMLElement, selector: string): void {
+	query<HTMLButtonElement>(root, selector).click();
+}
+
+/** The card ids of each meld in the centre, in display order. */
+function meldIds(root: HTMLElement): string[][] {
+	return [...root.querySelectorAll('[data-testid="meld"]')].map((meld) =>
+		[...meld.querySelectorAll("[data-card]")].map(
+			(card) => card.getAttribute("data-card") ?? "",
+		),
+	);
+}
+
+describe("the other players", () => {
+	it("shows each other player in the top row with a dense strip of card backs and the count", () => {
+		const section = mount([]);
+		section.render(viewOf(hand()));
+		const opponents = query(section.element, '[data-testid="opponents"]');
+		const seats = [...opponents.querySelectorAll(".seat.opponent")].map(
+			(node) => node.getAttribute("data-testid"),
+		);
+		expect(seats).toEqual(["seat-W", "seat-N", "seat-E"]);
+		const west = query(opponents, '[data-testid="seat-W"]');
+		const strip = query(west, '[data-testid="card-count"]');
+		expect(strip.dataset.count).toBe("3");
+		expect(strip.querySelectorAll(".count-back")).toHaveLength(3);
+		expect(query(strip, ".count-number").textContent).toBe("3");
+		// The strip sits below the video tile, and the backs overlap.
+		const tile = query(west, ".tile").getBoundingClientRect();
+		expect(strip.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+			tile.bottom,
+		);
+		const [first, second] = [...strip.querySelectorAll(".count-back")].map(
+			(back) => back.getBoundingClientRect(),
+		);
+		expect((second?.left ?? 0) - (first?.left ?? 0)).toBeLessThan(
+			first?.width ?? 0,
+		);
+		// The player on turn: no other seat has the turn mark.
+		expect(opponents.querySelectorAll('[data-turn="true"]')).toHaveLength(0);
+	});
+});
+
+describe("the table", () => {
+	it("frames the cards of the latest play in gold, and shows the card a joker stands for", () => {
+		const section = mount([]);
+		section.render(viewOf(hand({ turn: 0 })));
+		const gold = [...section.element.querySelectorAll(".pip.gold")];
+		expect(gold.map((card) => card.getAttribute("data-card"))).toEqual([
+			"0-7H",
+		]);
+		expect(gold[0]?.getAttribute("title")).toBe("New on the table");
+		const frame = getComputedStyle(gold[0] as Element);
+		expect(frame.boxShadow).not.toBe("none");
+		const joker = query(section.element, '[data-card="JK2"]');
+		expect(joker.textContent).toMatch(/^★9/);
+		expect(joker.getAttribute("title")).toMatch(/^Joker as 9/);
+		// Not the viewer's turn: no draft editor.
+		expect(section.element.querySelector('[data-testid="meld-add"]')).toBe(
+			null,
+		);
+		expect(section.element.querySelector(".own-hand button.card")).toBe(null);
+	});
+
 	it("keeps the hand and the action buttons when a new view shows the same position", () => {
 		const acted: Action[] = [];
 		const section = mount(acted);
-		const view = firstTurnView();
-		expect(view.yourTurn).toBe(true);
+		const view = viewOf(hand());
 		section.render(view);
-		const draw = section.element.querySelector('[data-testid="action-draw"]');
-		const card = section.element.querySelector(".own-hand button.card");
-		expect(draw).not.toBeNull();
-		expect(card).not.toBeNull();
+		const draw = query(section.element, '[data-testid="action-draw"]');
+		const card = query(section.element, ".own-hand button.card");
 
 		// A beat or a roster change renders the same position again, as a new object.
 		section.render(structuredClone(view));
-		expect(draw?.isConnected).toBe(true);
-		expect(card?.isConnected).toBe(true);
+		expect(draw.isConnected).toBe(true);
+		expect(card.isConnected).toBe(true);
 
-		(draw as HTMLButtonElement).click();
-		expect(acted.map((action) => action.type)).toEqual(["draw"]);
+		draw.click();
+		expect(acted).toEqual([{ type: "draw" }]);
+	});
+
+	it("keeps a selected card selected after a render of the same position", () => {
+		const section = mount([]);
+		const view = viewOf(hand());
+		section.render(view);
+		click(section.element, '.own-hand [data-card="0-8H"]');
+		const pressed = () =>
+			query(section.element, '.own-hand [data-card="0-8H"]').getAttribute(
+				"aria-pressed",
+			);
+		expect(pressed()).toBe("true");
+		section.render(structuredClone(view));
+		expect(pressed()).toBe("true");
 	});
 
 	it("keeps the viewer's autoplay control when a new view shows the same seat", () => {
 		const section = mount([]);
-		const view = firstTurnView();
+		const view = viewOf(hand());
 		section.render(view);
 		section.setPlayerAutoplay(true, false, false, "");
 		const control = () =>
@@ -145,276 +244,176 @@ describe("table section", () => {
 		section.setPlayerAutoplay(true, true, false, "");
 		expect(control()?.textContent).toBe("Stop autoplay");
 	});
+});
 
-	it("shows a selected card at once, also after a render of the same position", () => {
-		const section = mount([]);
-		const view = firstTurnView();
-		section.render(view);
-		const pressed = () =>
-			section.element
-				.querySelector(".own-hand button.card")
-				?.getAttribute("aria-pressed");
-		section.element
-			.querySelector<HTMLButtonElement>(".own-hand button.card")
-			?.click();
-		expect(pressed()).toBe("true");
-		section.render(structuredClone(view));
-		expect(pressed()).toBe("true");
-	});
-
-	it("shows the cards of an action as cards with a suit symbol, red for hearts and diamonds", () => {
-		const section = mount([], translator("hu"));
-		section.render(turnView(afterDraw(), 1, { t: translator("hu") }));
-		const card = section.element.querySelector<HTMLButtonElement>(
-			".own-hand button.card",
-		);
-		card?.click();
-		const discard = section.element.querySelector(
-			'[data-testid="action-discard"]',
-		);
-		const pip = discard?.querySelector(".pip");
-		expect(discard?.textContent).toBe(`Eldobás: ${card?.textContent}`);
-		expect(pip?.textContent).toBe(card?.textContent);
-		expect(pip?.textContent).toMatch(/^(\d+|[JQKA])[♣♦♥♠]$|^Joker$/);
-		expect(pip?.classList.contains("red")).toBe(
-			/[♦♥]/.test(card?.textContent ?? ""),
-		);
-	});
-
-	it("shows the seat letters and the side names in the viewer's language, with whose side each is", () => {
-		const hu = translator("hu");
-		const section = mount([], hu);
-		const view = turnView(afterDraw(), 1, { t: hu });
-		section.render(view);
-		const avatars = [
-			...section.element.querySelectorAll<HTMLElement>(".tile .avatar"),
-		].map((avatar) => avatar.textContent);
-		expect(avatars).toHaveLength(3);
-		for (const letter of avatars)
-			expect(["É", "K", "D", "Ny"]).toContain(letter);
-		const texts = (selector: string): (string | null)[] =>
-			[...section.element.querySelectorAll<HTMLElement>(selector)].map(
-				(node) => node.textContent,
-			);
-		const expected = view.sides[0]?.mine
-			? ["É-D (miénk)", "K-Ny (övék)"]
-			: ["É-D (övék)", "K-Ny (miénk)"];
-		expect(texts(".side-title")).toEqual(expected);
-		expect(texts(".score-strip .side-label")).toEqual(expected);
-	});
-
-	it("shows the opponents' melds above the viewer's, each meld as columns of at most 8 cards", () => {
-		const card = (index: number): CardView => ({
-			id: `7C-${index}`,
-			rank: "7",
-			suit: "C",
-			text: "7♣",
-		});
-		const meld = (id: string, size: number): MeldView => ({
-			id,
-			rank: "7",
-			cards: Array.from({ length: size }, (_, index) => card(index)),
-			canasta: size >= 7,
-		});
-		const base = turnView(afterDraw(), 1);
-		for (const mineFirst of [true, false]) {
-			const side = (index: 0 | 1): SideView => ({
-				...base.sides[index],
-				mine: (index === 0) === mineFirst,
-				melds: [meld(`m${index}a`, 3), meld(`m${index}b`, 11)],
-			});
-			const sides = [side(0), side(1)] as const;
-			const section = mount([]);
-			section.render({ ...base, sides });
-			const blocks = [
-				...section.element.querySelectorAll<HTMLElement>(".side-block"),
-			];
-			expect(blocks.map((block) => block.dataset.mine)).toEqual([
-				"false",
-				"true",
-			]);
-			const [theirs, ours] = blocks.map((block) =>
-				block.getBoundingClientRect(),
-			);
-			expect(theirs?.bottom).toBeLessThanOrEqual(ours?.top ?? 0);
-			const long = section.element.querySelector('[data-meld="m0b"]');
-			const columns = [...(long?.querySelectorAll(".meld-column") ?? [])];
-			expect(
-				columns.map((column) => column.querySelectorAll(".pip").length),
-			).toEqual([8, 3]);
-			const pips = [...(columns[0]?.querySelectorAll(".pip") ?? [])].map(
-				(pip) => pip.getBoundingClientRect(),
-			);
-			for (const [index, rect] of pips.entries()) {
-				const above = pips[index - 1];
-				if (above !== undefined)
-					expect(rect.top).toBeGreaterThanOrEqual(above.bottom - 1);
-			}
-			const second = columns[1]?.getBoundingClientRect();
-			expect(second?.left).toBeGreaterThanOrEqual(
-				columns[0]?.getBoundingClientRect().right ?? Number.POSITIVE_INFINITY,
-			);
-			section.element.remove();
-		}
-	});
-
-	it("shows a side's first meld minimum until it melds, with the counting rule", () => {
-		const base = turnView(afterDraw(), 1);
-		const sides = [
-			{ ...base.sides[0], initialMeld: "First meld: 15 of 50 points" },
-			{ ...base.sides[1], initialMeld: "" },
-		] as const;
-		const section = mount([]);
-		section.render({ ...base, sides });
-		const lines = [
-			...section.element.querySelectorAll<HTMLElement>(".initial-meld"),
-		];
-		const shown = lines.filter((line) => line.getClientRects().length > 0);
-		expect(shown.map((line) => line.textContent)).toEqual([
-			"First meld: 15 of 50 points",
-		]);
-		expect(shown[0]?.title).toContain("only the top card counts");
-		section.element.remove();
-	});
-
-	it("frames new cards in gold and cards that fit a meld in red, each with a mark and a title", () => {
-		const base = turnView(afterDraw(), 1);
-		const [first, second] = base.own;
-		if (first === undefined || second === undefined)
-			throw new Error("no cards");
-		const section = mount([]);
-		section.render({ ...base, taken: [first.id], fits: [second.id] });
-		const card = (id: string) =>
-			section.element.querySelector<HTMLElement>(`[data-card="${id}"]`);
-		expect(card(first.id)?.className).toContain("taken");
-		expect(card(first.id)?.title).toBe("New this turn");
-		expect(card(second.id)?.className).toContain("fits");
-		expect(card(second.id)?.title).toBe("Fits a meld of your side");
-		const frame = (id: string) => getComputedStyle(card(id) as Element);
-		expect(frame(second.id).borderTopColor).not.toBe(
-			frame(first.id).borderTopColor,
-		);
-		expect(
-			getComputedStyle(card(second.id) as Element, "::after").content,
-		).not.toBe("none");
-		section.element.remove();
-	});
-
-	it("offers to take the pile with a pair from the hand before any card is selected", () => {
+describe("the draft", () => {
+	it("moves selected hand cards onto a meld and plays the whole table", () => {
 		const acted: Action[] = [];
 		const section = mount(acted);
-		section.render(turnView(pairPickupMatch(), 0));
-		const pickup = section.element.querySelector<HTMLButtonElement>(
-			'[data-testid="action-takePile"]',
-		);
-		expect(pickup).not.toBeNull();
-		expect(
-			section.element.querySelector(".own-hand button.card.selected"),
-		).toBeNull();
-		pickup?.click();
-		expect(acted.map((action) => action.type)).toEqual(["takePile"]);
-	});
+		section.render(viewOf(hand()));
+		const play = () =>
+			query<HTMLButtonElement>(section.element, '[data-testid="action-play"]');
+		expect(play().disabled).toBe(true);
 
-	it("frames the cards that this turn drew or took, and only those", () => {
-		const hu = translator("hu");
-		const section = mount([], hu);
-		const match = afterDraw();
-		const view = turnView(match, 1, { t: hu });
-		const drawnId = match.hand.turnTaken?.[0];
-		expect(drawnId).toBeDefined();
-		section.render(view);
-		const cards = [
-			...section.element.querySelectorAll<HTMLButtonElement>(
-				".own-hand button.card",
-			),
-		];
-		const marked = cards.filter((card) => card.classList.contains("taken"));
-		expect(marked.map((card) => card.dataset.card)).toEqual([drawnId]);
-		expect(marked[0]?.title).toBe("Új ebben a körben");
-		const plain = cards.find((card) => !card.classList.contains("taken"));
-		expect(plain).toBeDefined();
-		const frame = (card: Element | undefined) =>
-			card === undefined ? "" : getComputedStyle(card).boxShadow;
-		expect(frame(marked[0])).not.toBe(frame(plain));
-		expect(getComputedStyle(marked[0] as Element, "::after").content).not.toBe(
-			"none",
-		);
-	});
+		click(section.element, '.own-hand [data-card="0-8H"]');
+		click(section.element, '.own-hand [data-card="0-9H"]');
+		click(section.element, '[data-meld="0"] [data-testid="meld-add"]');
 
-	it("shows who went out and the hand score over the felt until the next hand", () => {
-		const section = mount([]);
-		const drawn = afterDraw();
-		const summary = () =>
-			section.element.querySelector<HTMLElement>(
-				'[data-testid="hand-summary"]',
-			);
-		section.render(turnView(drawn, 1));
-		expect(summary()?.checkVisibility()).toBe(false);
-
-		const hand = {
-			...drawn.hand,
-			outcome: { kind: "out" as const, seat: 1 as const, concealed: false },
-		};
-		const [first, second] = scoreHand(hand);
-		const ended = {
-			...drawn,
-			hand,
-			settled: true,
-			scores: [first.total, second.total] as const,
-		};
-		section.render(turnView(ended, 2, { seat: "E" }));
-		section.setCountdown(7);
-		const shown = summary();
-		expect(shown?.checkVisibility()).toBe(true);
-		expect(shown?.closest(".felt")).not.toBeNull();
-		expect(shown?.querySelector("h3")?.textContent).toBe("Ben (E-W) went out.");
-		const cells = (row: Element | undefined) =>
-			[...(row?.children ?? [])].map((cell) => cell.textContent);
-		const rows = [...(shown?.querySelectorAll("tr") ?? [])];
-		expect(cells(rows[0])).toEqual(["", "N-S (theirs)", "E-W (ours)"]);
-		expect(rows.map(cells).find((row) => row[0] === "Hand score")).toEqual([
-			"Hand score",
-			String(first.total),
-			String(second.total),
+		expect(meldIds(section.element)[0]).toEqual([
+			"0-5H",
+			"0-6H",
+			"0-7H",
+			"0-8H",
+			"0-9H",
 		]);
-		expect(shown?.textContent).toContain("Next hand in 7 seconds");
+		expect(
+			[...section.element.querySelectorAll(".pip.placed")].map((card) =>
+				card.getAttribute("data-card"),
+			),
+		).toEqual(["0-8H", "0-9H"]);
+		expect(section.element.querySelector('.own-hand [data-card="0-8H"]')).toBe(
+			null,
+		);
+		// The table melds go back in display order; the engine compares each meld as a set of cards.
+		play().click();
+		expect(acted).toEqual([
+			{
+				type: "play",
+				melds: [
+					["0-5H", "0-6H", "0-7H", "0-8H", "0-9H"],
+					["1-9C", "1-9S", "JK2"],
+				],
+			},
+		]);
 	});
 
-	it("announces the result of the match over the felt and offers a new game", () => {
+	it("outlines a meld that the rules refuse, names the reason, and undoes the changes", () => {
+		const section = mount([]);
+		section.render(viewOf(hand()));
+		click(section.element, '.own-hand [data-card="0-KC"]');
+		click(section.element, '[data-meld="0"] [data-testid="meld-add"]');
+
+		const meld = query(section.element, '[data-meld="0"]');
+		expect(meld.classList.contains("invalid")).toBe(true);
+		expect(query(meld, ".meld-problem").textContent).toBe(
+			"the cards of a run must share one suit",
+		);
+		expect(
+			query(section.element, '[data-testid="draft-hint"]').textContent,
+		).toBe("the cards of a run must share one suit");
+		expect(
+			query<HTMLButtonElement>(section.element, '[data-testid="action-play"]')
+				.disabled,
+		).toBe(true);
+
+		click(section.element, '[data-testid="action-reset"]');
+		expect(meldIds(section.element)[0]).toEqual(["0-5H", "0-6H", "0-7H"]);
+		expect(
+			section.element.querySelector('.own-hand [data-card="0-KC"]'),
+		).not.toBe(null);
+	});
+
+	it("makes a new meld, and takes its cards back to the hand", () => {
+		const section = mount([]);
+		section.render(viewOf(hand()));
+		for (const id of ["0-8H", "0-9H", "0-10H"])
+			click(section.element, `.own-hand [data-card="${id}"]`);
+		click(section.element, '[data-testid="new-meld"]');
+		expect(meldIds(section.element)).toHaveLength(3);
+		expect(
+			query<HTMLButtonElement>(section.element, '[data-testid="action-play"]')
+				.disabled,
+		).toBe(false);
+
+		click(section.element, '[data-meld="2"] [data-card="0-10H"]');
+		click(section.element, '[data-testid="action-to-hand"]');
+		expect(meldIds(section.element)[2]).toEqual(["0-8H", "0-9H"]);
+		expect(
+			section.element.querySelector('.own-hand [data-card="0-10H"]'),
+		).not.toBe(null);
+	});
+
+	it("keeps the table cards in place before the viewer's opening", () => {
+		const section = mount([]);
+		section.render(viewOf(hand({ preset: "gamerules", opened: false })));
+		click(section.element, '.own-hand [data-card="0-8H"]');
+		click(section.element, '[data-meld="0"] [data-testid="meld-add"]');
+		expect(meldIds(section.element)[0]).toEqual(["0-5H", "0-6H", "0-7H"]);
+		expect(
+			query(section.element, '[data-testid="draft-hint"]').textContent,
+		).toBe("before your opening, play only new melds");
+	});
+
+	it("loads the solver's suggestion into the draft when assist is on", async () => {
+		const asked: TableView[] = [];
+		const section = mount([], undefined, {
+			suggest: async (view) => {
+				asked.push(view);
+				return {
+					type: "play",
+					melds: [
+						["0-5H", "0-6H", "0-7H", "0-8H", "0-9H", "0-10H"],
+						["1-9C", "JK2", "1-9S"],
+					],
+				};
+			},
+		});
+		section.render(viewOf(hand()));
+		click(section.element, '[data-testid="action-suggest"]');
+		await expect.poll(() => meldIds(section.element)[0]?.length).toBe(6);
+		expect(asked).toHaveLength(1);
+		expect(
+			query<HTMLButtonElement>(section.element, '[data-testid="action-play"]')
+				.disabled,
+		).toBe(false);
+	});
+
+	it("says so when the solver finds no play", async () => {
+		const section = mount([], undefined, {
+			suggest: async () => ({ type: "draw" }),
+		});
+		section.render(viewOf(hand()));
+		click(section.element, '[data-testid="action-suggest"]');
+		await expect
+			.poll(
+				() => query(section.element, '[data-testid="draft-hint"]').textContent,
+			)
+			.toBe("The solver found no play.");
+	});
+});
+
+describe("the end of the game", () => {
+	it("names the winner, lists the penalties and offers a new game", () => {
 		let newGames = 0;
 		const section = mount([], undefined, {
 			newGame: () => {
 				newGames += 1;
 			},
 		});
-		const drawn = afterDraw();
-		const summary = () =>
-			section.element.querySelector<HTMLElement>(
-				'[data-testid="hand-summary"]',
-			);
-		const newGame = () =>
-			summary()?.querySelector<HTMLButtonElement>('[data-testid="new-game"]');
-		const ended = {
-			...drawn,
-			hand: {
-				...drawn.hand,
-				outcome: { kind: "out" as const, seat: 1 as const, concealed: false },
-			},
-			settled: true,
-		};
-		section.render(turnView(ended, 2, { seat: "E" }));
-		expect(newGame()?.checkVisibility()).toBeFalsy();
-
-		section.render(turnView({ ...ended, winner: 1 }, 2, { seat: "E" }));
-		expect(summary()?.checkVisibility()).toBe(true);
-		expect(summary()?.querySelector(".winner")?.textContent).toBe(
-			"Your side (E-W) won the match.",
+		const over = hand({ outcome: { kind: "out", seat: 1 } });
+		section.render(
+			viewOf({ ...over, hands: [["1-2C"], [], ["JK0"], ["1-QD"]] }),
 		);
-		expect(newGame()?.checkVisibility()).toBe(true);
-		newGame()?.click();
+		const summary = query(section.element, '[data-testid="hand-summary"]');
+		expect(summary.checkVisibility()).toBe(true);
+		expect(query(summary, ".winner").textContent).toBe("Ben won.");
+		expect(
+			[...summary.querySelectorAll("tbody tr")].map((row) => [
+				row.querySelector("th")?.textContent,
+				row.querySelector("td:last-child")?.textContent,
+			]),
+		).toEqual([
+			["Ben", "0"],
+			["Ann", "5"],
+			["Dee", "10"],
+			["Cy", "25"],
+		]);
+		click(summary, '[data-testid="new-game"]');
 		expect(newGames).toBe(1);
 	});
+});
 
+describe("texts", () => {
 	it("asks only for messages that every language translates", () => {
 		const asked = new Set<string>();
 		const english = translator("en");
@@ -422,39 +421,37 @@ describe("table section", () => {
 			asked.add(message);
 			return english(message, values);
 		};
-		const section = mount([], t);
-		const drawn = afterDraw();
+		const section = mount([], t, {
+			suggest: async () => undefined,
+			newGame: () => {},
+		});
 		const refused = {
 			id: "c1",
-			payload: { type: "action", hand: 1, action: { type: "draw" } },
+			payload: { type: "action", hand: 1, at: 3, action: { type: "draw" } },
 			status: "rejected" as const,
 		};
-		section.render(turnView(startMatch(7), 0, { t }));
+		section.render(viewOf(hand(), 3, { t }));
 		section.render(
-			turnView(startMatch(7), 0, {
+			viewOf(hand(), 3, {
 				t,
 				failures: [
 					refused,
-					{ ...refused, id: "c2", reason: "draw before melding" },
+					{ ...refused, id: "c2", reason: "it is not your turn" },
 				],
 			}),
 		);
-		section.render(turnView(drawn, 1, { t }));
-		section.element
-			.querySelector<HTMLButtonElement>(".own-hand button.card")
-			?.click();
-		section.element.querySelector<HTMLButtonElement>(".sort-toggle")?.click();
+		click(section.element, '.own-hand [data-card="0-KC"]');
+		click(section.element, '[data-meld="0"] [data-testid="meld-add"]');
+		click(section.element, '[data-meld="0"] [data-card="0-KC"]');
+		click(section.element, ".sort-toggle");
 		section.setBotControls(true, ["E", "W"]);
 		section.setPlayerAutoplay(true, false, false, "");
 		section.setPlayerAutoplay(true, true, false, "");
-		section.setCountdown(1);
-		section.setCountdown(5);
-		const ended = {
-			...drawn,
-			hand: { ...drawn.hand, outcome: { kind: "stock" as const } },
-		};
-		section.render(turnView(ended, 2, { t }));
-		section.render(turnView({ ...ended, winner: 0 }, 2, { t }));
+		section.render(
+			viewOf(hand({ preset: "gamerules", opened: false }), 4, { t }),
+		);
+		section.render(viewOf(hand({ turn: 0 }), 5, { t }));
+		section.render(viewOf(hand({ outcome: { kind: "blocked" } }), 6, { t }));
 		expect(asked.size).toBeGreaterThan(20);
 		const locales = [
 			"de",

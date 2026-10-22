@@ -2,41 +2,31 @@ import {
 	BOTS_PAUSED_PARAM,
 	botSeatsQuery,
 	botsPausedQuery,
-	parseBookmark,
 	parseBotsPaused,
 	SELECTED_PLAYER_PARAM,
 } from "../bookmark";
-import {
-	normalizeHostApiKey,
-	readHostApiKey,
-	writeHostApiKey,
-} from "../bot/host-key";
-import {
-	configuredBotSeats,
-	HostBotRunner,
-	type HostBotSettings,
-} from "../bot/host-runner";
+import { configuredBotSeats, HostBotRunner } from "../bot/host-runner";
+import type { Thinker } from "../bot/think";
+import { workerThinker } from "../bot/worker-thinker";
 import { CallController } from "../call/call";
 import { classify, readSignals, watchDeviceClass } from "../call/device-class";
 import { createCallSignaling } from "../call/signaling";
+import { chatPayload, checkMessageText } from "../game/chat";
 import {
 	actionPayload,
-	type CanastaState,
-	nextHandPayload,
-	parseCanastaState,
+	engineSeat,
+	handViewFor,
+	parseRummyState,
+	playingSeats,
+	type RummyState,
 	resetCancelPayload,
 	resetRequestPayload,
 	resetVotePayload,
 	startPayload,
-} from "../game/canasta";
-import { chatPayload, checkMessageText } from "../game/chat";
+} from "../game/rummy";
 import { tableLink } from "../p2p/link";
 import type { TableController, TableStatus } from "../p2p/table";
 import {
-	type BotModel,
-	botModelLabel,
-	botModelOrder,
-	DEFAULT_BOT_SETUP,
 	type JsonObject,
 	type RoomConfig,
 	SEATS,
@@ -66,15 +56,10 @@ import {
 	TEXT,
 	type TranscriptLine,
 } from "./model";
-import { modelPriorityControl } from "./model-priority";
 import { networkPanel } from "./network";
 import { remoteAudio } from "./remote-audio";
 import { tableSection } from "./table";
-import {
-	selectionOptions,
-	type TableViewInput,
-	tableView,
-} from "./table-model";
+import { type TableViewInput, tableView } from "./table-model";
 import type { TurnSound } from "./turn-sound";
 
 export interface RoomScreenHandlers extends Navigation {
@@ -97,30 +82,12 @@ function roomShareLink(pageUrl: string, key: string): string {
 	return tableLink(page.toString(), key);
 }
 
-function settingsFor(
-	config: RoomConfig | undefined,
-	apiKey: string,
-	modelOrderOverride?: readonly BotModel[],
-): HostBotSettings {
-	const setup = config?.botSetup ?? DEFAULT_BOT_SETUP;
-	const modelOrder = modelOrderOverride ?? botModelOrder(setup);
-	return {
-		apiKey,
-		...setup,
-		model: modelOrder[0] as BotModel,
-		fallbackModel: modelOrder[1] as BotModel,
-		modelOrder,
-	};
-}
-
 /** After these, the room stays on the screen but can no longer act. */
 const TERMINAL: ReadonlySet<TableStatus> = new Set([
 	"expired",
 	"superseded",
 	"incompatible",
 ]);
-
-const BOT_SPEND_STORAGE_KEY = "open-canasta.openrouter-spend-usd";
 
 /**
  * The room screen of the seat that this page holds. It renders the controller's view and sends through the
@@ -135,7 +102,7 @@ export function showRoom(
 	handlers: RoomScreenHandlers,
 	fallbackConfig?: RoomConfig,
 	autoCopy?: Promise<string>,
-	initialBotSettings?: HostBotSettings,
+	startBots = false,
 ): Dispose {
 	const tableId = controller.tableId;
 	let disposed = false;
@@ -188,13 +155,10 @@ export function showRoom(
 	let botRestorePending = false;
 	// A reload keeps paused bots paused: the host's URL carries the pause.
 	let botsPaused = parseBotsPaused(location.search);
-	let botBalancePaused = false;
-	let rateLimitTimer: number | undefined;
-	let botSpendUsd = readBotSpend();
-	let pendingBotSeat: Seat | undefined;
+	/** The solver behind the Suggest button; it starts with the first suggestion. */
+	let suggester: Thinker | undefined;
 	let remoteCallPresence: Partial<Record<Seat, RemoteCallPresence>> = {};
 	const botSeatOverrides = new Map<Seat, boolean>();
-	let botSettings = initialBotSettings;
 	let playerAutoplayPending = false;
 	let playerAutoplayStatus = "";
 	let playerAutoplayWasEnabled = false;
@@ -211,25 +175,13 @@ export function showRoom(
 			botRunner?.setSeatEnabled(targetSeat, false);
 			return "disabled";
 		}
-		const apiKey = readHostApiKey(deps.browser);
-		if (!apiKey.trim()) return "unavailable";
-		botSettings ??= settingsFor(
-			controller.view().table?.config,
-			apiKey,
-			modelOrderFromUrl(),
-		);
-		if (!botSettings.apiKey.trim()) botSettings = { ...botSettings, apiKey };
 		const enabledSeat = await controller.setBotSeat(targetSeat, true);
 		if (!enabledSeat) return "failed";
 		delegatedBotSeats.add(targetSeat);
 		if (botRunner) {
 			botRunner.setSeatEnabled(targetSeat, true);
 			setBotsPaused(false);
-			botBalancePaused = false;
 			botRunner.resume();
-			botStatus.textContent = deps.t(
-				"Autoplay is using this host's OpenRouter key.",
-			);
 			return "enabled";
 		}
 		const started = await startHostBots(targetSeat);
@@ -238,9 +190,6 @@ export function showRoom(
 			await controller.setBotSeat(targetSeat, false);
 			return "failed";
 		}
-		botStatus.textContent = deps.t(
-			"Autoplay is using this host's OpenRouter key.",
-		);
 		return "enabled";
 	});
 
@@ -254,136 +203,7 @@ export function showRoom(
 		attrs: { "data-testid": "retry-seat" },
 	});
 	const createNew = button(deps.t("Create new game"), handlers.createNew);
-	const botKey = el("input", {
-		attrs: {
-			type: "password",
-			autocomplete: "new-password",
-			"aria-label": deps.t("OpenRouter API key"),
-		},
-	});
-	botKey.addEventListener("input", () => {
-		botKey.value = normalizeHostApiKey(botKey.value);
-	});
-	const modelPriority = modelPriorityControl(
-		botModelOrder(
-			botSettings ??
-				settingsFor(
-					controller.view().table?.config ?? fallbackConfig,
-					readHostApiKey(deps.browser),
-					modelOrderFromUrl(),
-				),
-		),
-		deps.t,
-	);
 	const botStatus = el("p", { attrs: { role: "status" } });
-	const botSpendCounter = el("span", {
-		className: "bot-spend-counter",
-		attrs: {
-			"aria-label": deps.t("OpenRouter spending total"),
-			"data-testid": "bot-spend",
-		},
-	});
-	updateBotSpendCounter();
-	const rateLimitReminder = el(
-		"div",
-		{
-			className: "rate-limit-reminder",
-			attrs: { role: "status", "data-testid": "rate-limit-reminder" },
-		},
-		deps.t("Openrouter rate limit - I will retry in a moment"),
-	);
-	rateLimitReminder.hidden = true;
-	const showRateLimitReminder = (): void => {
-		rateLimitReminder.hidden = false;
-		if (rateLimitTimer !== undefined) window.clearTimeout(rateLimitTimer);
-		rateLimitTimer = window.setTimeout(() => {
-			rateLimitReminder.hidden = true;
-			rateLimitTimer = undefined;
-		}, 1000);
-	};
-	const keyDialog = el("dialog", {
-		attrs: {
-			"aria-labelledby": "api-key-title",
-			"data-testid": "api-key-dialog",
-		},
-	});
-	const modelDialog = el("dialog", {
-		attrs: {
-			"aria-labelledby": "bot-model-title",
-			"data-testid": "bot-model-dialog",
-		},
-	});
-	modelDialog.append(
-		el("h2", { attrs: { id: "bot-model-title" } }, deps.t("Choose bot model")),
-		el(
-			"p",
-			{},
-			deps.t(
-				"After a server error, the bot tries the next model in this order.",
-			),
-		),
-		modelPriority.element,
-		button(deps.t("Use model"), () => {
-			const modelOrder = modelPriority.value();
-			const current =
-				botSettings ??
-				settingsFor(
-					controller.view().table?.config ?? fallbackConfig,
-					readHostApiKey(deps.browser),
-					modelOrderFromUrl(),
-				);
-			botSettings = {
-				...current,
-				modelOrder,
-				model: modelOrder[0] as BotModel,
-				fallbackModel: modelOrder[1] as BotModel,
-			};
-			rememberBotModels(modelOrder);
-			botRunner?.updateSettings(botSettings);
-			botStatus.textContent = runningBotStatus();
-			modelDialog.close();
-			render();
-		}),
-		button(deps.t("Cancel"), () => modelDialog.close()),
-	);
-	keyDialog.append(
-		el(
-			"h2",
-			{ attrs: { id: "api-key-title" } },
-			deps.t("Set OpenRouter API key"),
-		),
-		el("label", {}, `${deps.t("OpenRouter API key")} `, botKey),
-		button(deps.t("Save key"), () => {
-			try {
-				const normalizedApiKey = normalizeHostApiKey(botKey.value);
-				botKey.value = normalizedApiKey;
-				writeHostApiKey(deps.browser, normalizedApiKey);
-				botSettings = settingsFor(
-					controller.view().table?.config ?? fallbackConfig,
-					normalizedApiKey,
-					botSettings?.modelOrder ?? modelOrderFromUrl(),
-				);
-				botRunner?.updateApiKey(normalizedApiKey);
-				if (botBalancePaused) {
-					botBalancePaused = false;
-					setBotsPaused(false);
-					botRunner?.resume();
-				}
-				keyDialog.close();
-				botStatus.textContent = "";
-				if (pendingBotSeat !== undefined) {
-					const target = pendingBotSeat;
-					pendingBotSeat = undefined;
-					manageBotSeat(target, true);
-				} else if (!botRunner) void startHostBots();
-			} catch {
-				botStatus.textContent = deps.t(
-					"This browser could not store the OpenRouter API key.",
-				);
-			}
-		}),
-		button(deps.t("Cancel"), () => keyDialog.close()),
-	);
 	const banner = el(
 		"div",
 		{ className: "banner", attrs: { role: "status", "data-testid": "banner" } },
@@ -437,16 +257,13 @@ export function showRoom(
 	/** The browser's answer to the persistence request (plan §4.3). */
 	let persisted: boolean | undefined;
 	/** The table as last rendered: an action is sent for the position the player saw. */
-	let shownState: CanastaState | undefined;
+	let shownState: RummyState | undefined;
 	/** The input of the table view as last built: the selected cards find their actions in it. */
 	let tableInput: TableViewInput | undefined;
 	/** The view models as last rendered. The controller notifies every tick; equal models keep their nodes. */
 	let shownRoom: string | undefined;
 	let shownTable: string | undefined;
-	let scoringHand: number | undefined;
-	let scoringStartedAt: number | undefined;
-	let scoringTimer: number | undefined;
-	/** The host command last sent for the table: the start, or the next hand by its number. */
+	/** The host command last sent for the table: the start, keyed by the match count. */
 	let hostCommandSent: string | undefined;
 	/** The reset request that the decision buttons answer. */
 	let resetRequestId: string | undefined;
@@ -464,14 +281,6 @@ export function showRoom(
 	};
 
 	function manageBotSeat(targetSeat: Seat, enabled: boolean): void {
-		if (enabled && !readHostApiKey(deps.browser)) {
-			pendingBotSeat = targetSeat;
-			botStatus.textContent = deps.t(
-				"Set an OpenRouter API key before switching a seat to a bot.",
-			);
-			if (!keyDialog.open) keyDialog.showModal();
-			return;
-		}
 		void controller.setBotSeat(targetSeat, enabled).then((ok) => {
 			if (!ok) {
 				botStatus.textContent = deps.t("The host could not change that seat.");
@@ -487,7 +296,6 @@ export function showRoom(
 				botRunner?.setSeatEnabled(targetSeat, true);
 				if (botRunner) {
 					setBotsPaused(false);
-					botBalancePaused = false;
 					botRunner.resume();
 				} else {
 					void startHostBots(targetSeat);
@@ -501,49 +309,6 @@ export function showRoom(
 					: runningBotStatus();
 			render();
 		});
-	}
-
-	function readBotSpend(): number {
-		try {
-			const stored = deps.browser?.getItem(BOT_SPEND_STORAGE_KEY);
-			if (stored === null || stored === undefined || stored.trim() === "")
-				return 0;
-			const amount = Number(stored);
-			return Number.isFinite(amount) &&
-				amount >= 0 &&
-				amount <= Number.MAX_SAFE_INTEGER
-				? amount
-				: 0;
-		} catch {
-			return 0;
-		}
-	}
-
-	function updateBotSpendCounter(): void {
-		botSpendCounter.textContent = `$${botSpendUsd.toFixed(5)}`;
-		botSpendCounter.title = `Five-decimal display. Exact total reported by OpenRouter: $${botSpendUsd.toFixed(10)} USD.`;
-	}
-
-	function recordBotSpend(cost: number): void {
-		const next = botSpendUsd + cost;
-		if (!Number.isFinite(next) || next > Number.MAX_SAFE_INTEGER) return;
-		botSpendUsd = next;
-		try {
-			deps.browser?.setItem(BOT_SPEND_STORAGE_KEY, String(botSpendUsd));
-		} catch {
-			// The counter remains available until this page closes if storage is unavailable.
-		}
-		updateBotSpendCounter();
-	}
-
-	function resetBotSpend(): void {
-		botSpendUsd = 0;
-		try {
-			deps.browser?.removeItem(BOT_SPEND_STORAGE_KEY);
-		} catch {
-			// Clearing this reminder does not depend on persistent storage.
-		}
-		updateBotSpendCounter();
 	}
 
 	function effectiveBotSeats(): Seat[] {
@@ -563,27 +328,7 @@ export function showRoom(
 		const count = effectiveBotSeats().length;
 		return count === 0
 			? deps.t("No bot seats are active.")
-			: deps.t("Running {count} bot seat(s) with {model}.", {
-					count,
-					model: botModelLabel(botSettings?.model ?? DEFAULT_BOT_SETUP.model),
-				});
-	}
-
-	function modelOrderFromUrl(): BotModel[] | undefined {
-		const setup = parseBookmark(location.search).botSetup;
-		return setup === undefined ? undefined : botModelOrder(setup);
-	}
-
-	function rememberBotModels(modelOrder: readonly BotModel[]): void {
-		const params = new URLSearchParams(location.search);
-		params.set("bot_model", modelOrder[0] as BotModel);
-		params.set("bot_fallback", modelOrder[1] as BotModel);
-		params.set("bot_models", modelOrder.join(","));
-		history.replaceState(
-			null,
-			"",
-			`${location.pathname}?${params.toString()}${location.hash}`,
-		);
+			: deps.t("Running {count} bot seat(s).", { count });
 	}
 
 	function setBotsPaused(paused: boolean): void {
@@ -644,10 +389,12 @@ export function showRoom(
 				});
 				render();
 			},
-			selectionOptions: (shown, selected) =>
-				tableInput === undefined
-					? []
-					: selectionOptions(tableInput, shown, selected),
+			suggest() {
+				const match = shownState?.match;
+				if (!match) return Promise.resolve(undefined);
+				suggester ??= workerThinker();
+				return suggester.choose(handViewFor(match, seat), engineSeat(seat));
+			},
 			setBotSeat(targetSeat, enabled) {
 				manageBotSeat(targetSeat, enabled);
 			},
@@ -798,36 +545,18 @@ export function showRoom(
 			},
 			() => undefined,
 		);
-	const setApiKey = button(deps.t("Set API key"), () => {
-		botKey.value = readHostApiKey(deps.browser);
-		if (!keyDialog.open) keyDialog.showModal();
-	});
-	const chooseModel = button(deps.t("Model"), () => {
-		const config = controller.view().table?.config ?? fallbackConfig;
-		botSettings ??= settingsFor(
-			config,
-			readHostApiKey(deps.browser),
-			modelOrderFromUrl(),
-		);
-		modelPriority.setValue(botSettings.modelOrder);
-		if (!modelDialog.open) modelDialog.showModal();
-	});
 	// A reset clears the scores and starts a new match once every other present player approves it. The new game
-	// button after a finished match sends the same request but keeps the bot cost counter.
+	// button after a finished match sends the same request.
 	function requestReset(): void {
 		actionError = undefined;
 		submit(resetRequestPayload(tableId), (reason) => {
 			actionError = deps.t("Reset not sent: {reason}", { reason });
 		});
 	}
-	const reset = button(
-		deps.t("Reset"),
-		() => {
-			resetBotSpend();
-			requestReset();
-		},
-		{ className: "reset-button", attrs: { "data-testid": "reset" } },
-	);
+	const reset = button(deps.t("Reset"), requestReset, {
+		className: "reset-button",
+		attrs: { "data-testid": "reset" },
+	});
 	const resetStatus = el("p", { className: "note", attrs: { role: "status" } });
 	const resetApprove = button(deps.t("Approve reset"), () => {
 		if (resetRequestId !== undefined)
@@ -873,7 +602,6 @@ export function showRoom(
 			void startHostBots();
 			return;
 		}
-		botBalancePaused = false;
 		botRunner.resume();
 		setBotsPaused(false);
 		botStatus.textContent = runningBotStatus();
@@ -892,17 +620,12 @@ export function showRoom(
 		el(
 			"div",
 			{ className: "room-control-row room-bot-controls" },
-			setApiKey,
-			chooseModel,
 			pauseBots,
 			resumeBots,
-			botSpendCounter,
 		),
 		// The table screen has its own language picker here; the page-wide one is hidden while a table shows.
 		languageControl(deps),
 		botStatus,
-		keyDialog,
-		modelDialog,
 	);
 
 	// A storage warning stays visible on every screen, so it sits in the stage, not in the drawer.
@@ -980,10 +703,8 @@ export function showRoom(
 		call?.setForm(form);
 	});
 	root.replaceChildren(room);
-	root.append(keyDialog);
-	root.append(rateLimitReminder);
 	if (camera) root.append(camera.element);
-	if (initialBotSettings) void startHostBots();
+	if (startBots) void startHostBots();
 
 	async function startHostBots(requiredSeat?: Seat): Promise<boolean> {
 		if (botRunner) return true;
@@ -999,55 +720,20 @@ export function showRoom(
 			);
 			return false;
 		}
-		botSettings ??= settingsFor(
-			config,
-			readHostApiKey(deps.browser),
-			modelOrderFromUrl(),
-		);
-		if (!botSettings.apiKey.trim()) {
-			botStatus.textContent = deps.t(
-				"Set an OpenRouter API key to run the bots.",
-			);
-			return false;
-		}
 		botStarting = true;
 		botAutoAttempted = true;
-		const runner = new HostBotRunner(
-			controller,
-			botSettings,
-			(kind, detail) => {
-				if (kind === "rate-limit") {
-					showRateLimitReminder();
-					return;
-				}
-				for (const delegatedSeat of delegatedBotSeats) {
-					delegatedBotSeats.delete(delegatedSeat);
-					botRunner?.setSeatEnabled(delegatedSeat, false);
-					void controller.setBotSeat(delegatedSeat, false);
-				}
-				if (kind === "balance") {
-					setBotsPaused(true);
-					botBalancePaused = true;
-					botStatus.textContent = deps.t(
-						"Insufficient OpenRouter balance. Bots are paused until you update the API key or balance.",
-					);
-				} else {
-					botRunner = undefined;
-					setBotsPaused(false);
-					botStatus.textContent =
-						detail ??
-						deps.t(
-							detail ??
-								"The bot request failed. Check the model and resume bots.",
-						);
-				}
-				render();
-			},
-			recordBotSpend,
-			(message) => {
-				botStatus.textContent = deps.t(message);
-			},
-		);
+		const runner = new HostBotRunner(controller, workerThinker(), (detail) => {
+			for (const delegatedSeat of delegatedBotSeats) {
+				delegatedBotSeats.delete(delegatedSeat);
+				void controller.setBotSeat(delegatedSeat, false);
+			}
+			botRunner = undefined;
+			setBotsPaused(false);
+			botStatus.textContent = deps.t("The bots stopped: {detail}", {
+				detail,
+			});
+			render();
+		});
 		if (
 			!(await runner.start(requiredSeat === undefined ? [] : [requiredSeat]))
 		) {
@@ -1196,8 +882,6 @@ export function showRoom(
 				SEATS.filter((targetSeat) => activeBotSet.has(targetSeat)).join(",")
 		)
 			rememberBotSeats(activeBots);
-		setApiKey.hidden = !view.hosting;
-		chooseModel.hidden = !view.hosting;
 		pauseBots.hidden =
 			!view.hosting || activeBots.length === 0 || botsPaused || !botRunner;
 		resumeBots.hidden =
@@ -1215,8 +899,7 @@ export function showRoom(
 			!botsPaused &&
 			!botRestorePending &&
 			activeBots.length > 0 &&
-			view.hosting &&
-			readHostApiKey(deps.browser)
+			view.hosting
 		)
 			void startHostBots();
 		const terminal = view.seat !== seat || TERMINAL.has(view.status);
@@ -1285,7 +968,7 @@ export function showRoom(
 		const state =
 			view.table === null
 				? undefined
-				: (parseCanastaState(view.table.state, tableId) ?? null);
+				: (parseRummyState(view.table.state, tableId) ?? null);
 		remoteCallPresence = {};
 		for (const targetSeat of SEATS) {
 			const record = state?.media[targetSeat];
@@ -1330,30 +1013,6 @@ export function showRoom(
 						})
 					: deps.t("{requester} asks to reset the game.", { requester });
 		}
-		// A settled hand with no winner waits for its countdown, then the host deals the next hand.
-		const settledHand =
-			state?.match?.settled && state.match.winner === null
-				? state.match.handNo
-				: undefined;
-		if (settledHand !== scoringHand) {
-			if (scoringTimer !== undefined) window.clearInterval(scoringTimer);
-			scoringHand = settledHand;
-			scoringStartedAt =
-				settledHand === undefined
-					? undefined
-					: (view.table?.lastActivityAt ?? Date.now());
-			scoringTimer =
-				settledHand === undefined
-					? undefined
-					: window.setInterval(render, 1000);
-		}
-		const scoringCountdown =
-			scoringStartedAt === undefined
-				? 10
-				: Math.max(
-						0,
-						Math.ceil((scoringStartedAt + 10_000 - Date.now()) / 1000),
-					);
 		memory?.update({
 			records: state?.media,
 			outbox: view.outbox.map((item) => item.payload),
@@ -1367,25 +1026,13 @@ export function showRoom(
 			roster: model.roster,
 			bots: new Set(activeBots),
 			hostSeat: view.hostSeat,
-			scoringCountdown,
 			outbox: view.outbox,
 			failures: view.failures,
 			undone: view.undone,
 			t: deps.t,
 		};
 		const tableModel = tableView(tableInput);
-		const displayBotModel = view.hosting
-			? (botSettings?.model ??
-				config.botSetup?.model ??
-				DEFAULT_BOT_SETUP.model)
-			: (config.botSetup?.model ??
-				modelOrderFromUrl()?.[0] ??
-				DEFAULT_BOT_SETUP.model);
-		table.setBotControls(
-			view.hosting && !botRestorePending,
-			activeBots,
-			displayBotModel,
-		);
+		table.setBotControls(view.hosting && !botRestorePending, activeBots);
 		if (!view.hosting) delegatedBotSeats.clear();
 		const rosterHost = JSON.stringify(view.roster?.auth ?? null);
 		if (rosterHost !== playerAutoplayHost) {
@@ -1410,26 +1057,18 @@ export function showRoom(
 		currentTurnKey = yourTurn
 			? `${tableModel.handNo}:${tableModel.at}:${seat}`
 			: undefined;
-		document.title = `${yourTurn ? "TURN - " : ""}Open Canasta: ${config.names[seat]} (${deps.t(seat)})`;
+		document.title = `${yourTurn ? "TURN - " : ""}Open Robber's Rummy: ${config.names[seat]} (${deps.t(seat)})`;
 		checkTurnAlert();
 		// The lobby uses the table layout, so it looks like the game; only the game controls differ while waiting.
 		root.dataset.screen = "table";
 		root.dataset.waiting = String(tableModel.phase === "waiting");
-		const tableKey = JSON.stringify(
-			tableModel.scoring
-				? {
-						...tableModel,
-						scoring: { ...tableModel.scoring, countdown: undefined },
-					}
-				: tableModel,
-		);
+		const tableKey = JSON.stringify(tableModel);
 		if (tableKey !== shownTable) {
 			shownTable = tableKey;
 			table.render(tableModel);
 		}
-		table.setCountdown(tableModel.scoring?.countdown);
-		// The host starts the match once all four seats are connected, and deals each next hand after the countdown.
-		// The start key counts the matches, so the host starts again after a reset; nothing is dealt while a reset waits.
+		// The host starts the game once every playing seat is connected. The start key counts the games, so the host
+		// starts again after a reset; nothing is dealt while a reset waits.
 		const hostCommand =
 			!view.hosting ||
 			terminal ||
@@ -1438,18 +1077,13 @@ export function showRoom(
 			state.reset !== null
 				? undefined
 				: state.match === null
-					? present.size === SEATS.length
+					? playingSeats(config).every((player) => present.has(player))
 						? {
 								key: `start:${state.matches}`,
 								payload: startPayload(tableId),
 							}
 						: undefined
-					: settledHand !== undefined && scoringCountdown === 0
-						? {
-								key: `next:${settledHand}`,
-								payload: nextHandPayload(tableId),
-							}
-						: undefined;
+					: undefined;
 		if (hostCommand !== undefined && hostCommand.key !== hostCommandSent) {
 			hostCommandSent = hostCommand.key;
 			submit(hostCommand.payload, () => {
@@ -1484,8 +1118,7 @@ export function showRoom(
 	return () => {
 		disposed = true;
 		botRunner?.stop();
-		if (rateLimitTimer !== undefined) window.clearTimeout(rateLimitTimer);
-		if (scoringTimer !== undefined) window.clearInterval(scoringTimer);
+		suggester?.close();
 		stopWatching();
 		window.removeEventListener("resize", updateRoomCanvasScale);
 		root.style.removeProperty("--room-canvas-scale");

@@ -60,20 +60,17 @@ describe("localization", () => {
 		}
 	});
 
-	it("translates the canasta table texts, with their values, in each language", () => {
+	it("translates the rummy table texts, with their values, in each language", () => {
 		expect(translator("de")("{count} cards", { count: 3 })).toBe("3 Karten");
-		expect(translator("hu")("Hand {number}", { number: 2 })).toBe(
-			"2. leosztás",
+		expect(translator("hu")("Game {number}", { number: 2 })).toBe("2. játszma");
+		expect(translator("fr")("{name} went out.", { name: "Ann" })).toBe(
+			"Ann est sorti.",
 		);
-		expect(
-			translator("fr")("{name} ({side}) went out.", {
-				name: "Ann",
-				side: "N-S",
-			}),
-		).toBe("Ann (N-S) sort.");
 		for (const locale of ["de", "hu", "no", ...newLocales] as const)
 			expect(
-				translator(locale)("Your turn: draw from the stock, or take the pile."),
-			).not.toBe("Your turn: draw from the stock, or take the pile.");
+				translator(locale)(
+					"Your turn: lay cards on the table, or draw a card.",
+				),
+			).not.toBe("Your turn: lay cards on the table, or draw a card.");
 	});
 });

@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { legalActions } from "../../src/canasta";
 import {
 	actionPayload,
-	createCanastaModule,
+	createRummyModule,
 	engineSeat,
-	parseCanastaState,
+	parseRummyState,
 	startPayload,
-} from "../../src/game/canasta";
+} from "../../src/game/rummy";
 import {
 	type ElectionEffect,
 	type ElectionEvent,
@@ -26,6 +25,7 @@ import {
 import type { Entry } from "../../src/p2p/wire";
 import type { JsonObject, Seat } from "../../src/protocol";
 import { randomBelowFrom } from "../../src/random";
+import { legalActions } from "../../src/rummy";
 import {
 	type Endpoint,
 	FakeMesh,
@@ -36,7 +36,7 @@ import {
 import { CONFIG, commandId, TABLE } from "./p2p-fixtures";
 
 /**
- * Plan §8, P5: four pages play a hand over the fake mesh with the real election, replication and canasta rules.
+ * Plan §8, P5: four pages play a hand over the fake mesh with the real election, replication and rummy rules.
  * The host crashes during the play; another page becomes the host after the absence timeout and the hand goes
  * on; the old host reopens on its stored replica, takes its seat back, and the hand finishes. Every message
  * passes the wire validators, so a malformed one fails the run.
@@ -250,7 +250,7 @@ class Sim {
 	}
 
 	#module() {
-		return createCanastaModule(randomBelowFrom(xorshift(this.#seed + 7)));
+		return createRummyModule(randomBelowFrom(xorshift(this.#seed + 7)));
 	}
 
 	#newId(): string {
@@ -340,13 +340,14 @@ class Sim {
 			return null;
 		if (!replication.engine && !replication.follower.ready) return null;
 		if ((replication.outbox?.items.length ?? 1) > 0) return null;
-		const state = parseCanastaState(table.state, TABLE);
-		if (!state) throw new Error("the table state is not a canasta table");
+		const state = parseRummyState(table.state, TABLE);
+		if (!state) throw new Error("the table state is not a rummy table");
 		const seat = page.browser.seat;
 		if (!state.match)
 			return page.election.mode.kind === "hosting" ? startPayload(TABLE) : null;
 		const { match } = state;
-		if (match.settled) return null;
+		if (match.hand.outcome !== null) return null;
+		// The random players never lay cards: they draw until the stock is empty, then pass until the game is blocked.
 		const actions = legalActions(match.hand, engineSeat(seat));
 		if (actions.length === 0) return null;
 		const action = actions[this.#random() % actions.length];
@@ -355,19 +356,14 @@ class Sim {
 	}
 }
 
-/** Every card of the deck: in hands, the stock, the pile, the melds and the set-aside red threes. */
+/** Every card of the deck: in hands, the stock and the melds. */
 function cardsIn(state: JsonObject): number {
-	const hand = parseCanastaState(state, TABLE)?.match?.hand;
+	const hand = parseRummyState(state, TABLE)?.match?.hand;
 	if (!hand) return 0;
-	const onTable = hand.teams.flatMap((team) => [
-		...team.melds.flatMap((meld) => meld.cards),
-		...team.redThrees,
-	]);
 	return (
 		hand.hands.flat().length +
 		hand.stock.length +
-		hand.pile.length +
-		onTable.length
+		hand.table.flatMap((meld) => meld.cards).length
 	);
 }
 
@@ -389,7 +385,7 @@ function placeless(entry: Entry | undefined) {
 function finished(page: SimPage): boolean {
 	const state = page.replication.log?.table?.state;
 	return state
-		? parseCanastaState(state, TABLE)?.match?.settled === true
+		? parseRummyState(state, TABLE)?.match?.hand.outcome != null
 		: false;
 }
 
@@ -506,8 +502,8 @@ describe("four pages play a board across a host crash", () => {
 			}
 			const ids = reference.entries.map((entry) => entry.id);
 			expect(new Set(ids).size).toBe(ids.length);
-			const state = parseCanastaState(reference.table.state, TABLE);
-			expect(state?.match?.settled).toBe(true);
+			const state = parseRummyState(reference.table.state, TABLE);
+			expect(state?.match?.hand.outcome).toEqual({ kind: "blocked" });
 			expect(cardsIn(reference.table.state)).toBe(108);
 			expect(reference.entries.some((entry) => entry.auth.term === 2)).toBe(
 				true,
@@ -535,7 +531,7 @@ describe("four pages play a board across a host crash", () => {
 					expect(resent).toBeUndefined();
 					expect(undone).toEqual([["N", [crashed.id]]]);
 				} else {
-					// R4: every canasta action needs all four seats, so the new host keeps the action waiting until North is
+					// R4: every game action needs all four seats, so the new host keeps the action waiting until North is
 					// back. Rebinding the same holder and generation adds no seat entry; the delayed action takes the next
 					// log position.
 					const back = reference.entries.find(

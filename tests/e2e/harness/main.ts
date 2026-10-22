@@ -6,16 +6,15 @@ import {
 	createCallSignaling,
 	type SignalingEnd,
 } from "../../../src/call/signaling";
-import { legalActions } from "../../../src/canasta";
+import { chatPayload } from "../../../src/game/chat";
 import {
 	actionPayload,
-	type CanastaState,
-	canastaModule,
 	engineSeat,
-	parseCanastaState,
+	parseRummyState,
+	type RummyState,
+	rummyModule,
 	startPayload,
-} from "../../../src/game/canasta";
-import { chatPayload } from "../../../src/game/chat";
+} from "../../../src/game/rummy";
 import { newCommandId } from "../../../src/ids";
 import { randomNonce } from "../../../src/p2p/checks";
 import {
@@ -39,6 +38,7 @@ import {
 import { trysteroMesh } from "../../../src/p2p/trystero";
 import { frame } from "../../../src/p2p/wire";
 import type { RoomConfig, Seat } from "../../../src/protocol";
+import { legalActions } from "../../../src/rummy";
 import { guardedStorage, SeatMemory, webSeatLocks } from "../../../src/session";
 
 /**
@@ -81,7 +81,7 @@ export interface Harness {
 	choose(seat: Seat): Promise<ChooseResult>;
 	send(text: string): Promise<SubmitResult>;
 	/**
-	 * Takes the first legal canasta action when this page's seat is the actor, otherwise null. The engine lists
+	 * Takes the first legal rummy action when this page's seat is the actor, otherwise null. The engine lists
 	 * only actions that it accepts, so any sequence of these actions is legal.
 	 */
 	act(): Promise<SubmitResult | null>;
@@ -197,7 +197,7 @@ async function open(
 		storage: await storage(),
 		locks,
 		memory,
-		module: canastaModule,
+		module: rummyModule,
 		clock,
 		every: (ms, run) => {
 			const timer = setInterval(run, ms);
@@ -221,10 +221,10 @@ function seated(): TableController {
 	return controller;
 }
 
-function currentState(table: TableController): CanastaState {
+function currentState(table: TableController): RummyState {
 	const state = table.view().table?.state;
-	const parsed = state ? parseCanastaState(state, table.tableId) : undefined;
-	if (!parsed) throw new Error("the table has no canasta state");
+	const parsed = state ? parseRummyState(state, table.tableId) : undefined;
+	if (!parsed) throw new Error("the table has no rummy state");
 	return parsed;
 }
 
@@ -265,7 +265,7 @@ window.ocHarness = {
 			identity,
 			seat,
 			config: CONFIG,
-			module: canastaModule,
+			module: rummyModule,
 			newId: newCommandId,
 			clock,
 			memory,

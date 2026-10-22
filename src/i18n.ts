@@ -1,4 +1,4 @@
-import { withCanastaTexts } from "./i18n-canasta";
+import { withRummyTexts } from "./i18n-rummy";
 import { additionalCatalogs } from "./i18n-translations";
 
 export type Locale =
@@ -25,7 +25,7 @@ export const englishTranslator: Translate = (message, values = {}) =>
 	);
 
 const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
-	withCanastaTexts({
+	withRummyTexts({
 		de: {
 			Language: "Sprache",
 			Automatic: "Automatisch",

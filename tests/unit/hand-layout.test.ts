@@ -4,21 +4,21 @@ import { sortHand } from "../../src/ui/hand-layout";
 const card = (rank: string, suit: string | null) => ({ rank, suit });
 
 describe("sortHand by rank", () => {
-	it("orders 3 low to A, then 2, then jokers, and suits within a rank", () => {
+	it("orders A low to K, then jokers, and suits within a rank", () => {
 		const hand = [
 			card("JK", null),
 			card("2", "C"),
 			card("A", "H"),
 			card("3", "S"),
-			card("10", "D"),
+			card("K", "D"),
 			card("3", "C"),
 		];
 		expect(sortHand(hand, "rank")).toEqual([
-			card("3", "C"),
-			card("3", "S"),
-			card("10", "D"),
 			card("A", "H"),
 			card("2", "C"),
+			card("3", "C"),
+			card("3", "S"),
+			card("K", "D"),
 			card("JK", null),
 		]);
 	});
@@ -32,18 +32,18 @@ describe("sortHand by rank", () => {
 });
 
 describe("sortHand by suit", () => {
-	it("orders clubs, diamonds, hearts, spades, then jokers, each suit by rank", () => {
+	it("orders clubs, diamonds, hearts, spades, then jokers, each suit A to K", () => {
 		const hand = [
 			card("JK", null),
 			card("9", "S"),
 			card("3", "H"),
-			card("2", "C"),
+			card("A", "C"),
 			card("4", "C"),
 			card("K", "D"),
 		];
 		expect(sortHand(hand, "suit")).toEqual([
+			card("A", "C"),
 			card("4", "C"),
-			card("2", "C"),
 			card("K", "D"),
 			card("3", "H"),
 			card("9", "S"),

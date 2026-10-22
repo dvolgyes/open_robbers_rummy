@@ -1,6 +1,5 @@
 import type { RoomSetup } from "../bookmark";
-import type { HostBotSettings } from "../bot/host-runner";
-import { canastaModule } from "../game/canasta";
+import { rummyModule } from "../game/rummy";
 import { newCommandId } from "../ids";
 import { randomNonce } from "../p2p/checks";
 import {
@@ -54,7 +53,7 @@ export function showTable(
 	seatHint?: Seat,
 	bootstrap?: RoomSetup,
 	autoCopy?: Promise<string>,
-	hostBots?: HostBotSettings,
+	hostBots = false,
 ): Dispose {
 	let disposed = false;
 	const turnAlert = turnSound();
@@ -95,7 +94,7 @@ export function showTable(
 
 	const showConnecting = (): void => {
 		shown = undefined;
-		document.title = "Open Canasta";
+		document.title = "Open Robber's Rummy";
 		root.replaceChildren(message(el("p", {}, deps.t(TEXT.connecting))));
 	};
 
@@ -126,7 +125,7 @@ export function showTable(
 			storage: deps.storage,
 			locks: deps.locks,
 			memory: deps.memory,
-			module: canastaModule,
+			module: rummyModule,
 			clock: deps.clock,
 			every: (ms, run) => {
 				const timer = setInterval(run, ms);
@@ -170,7 +169,7 @@ export function showTable(
 		}
 		if (view.seat !== null) {
 			navigation.rememberSeat(view.seat);
-			document.title = `Open Canasta: ${view.table?.config.names[view.seat] ?? SEAT_NAMES[view.seat]} (${deps.t(view.seat)})`;
+			document.title = `Open Robber's Rummy: ${view.table?.config.names[view.seat] ?? SEAT_NAMES[view.seat]} (${deps.t(view.seat)})`;
 			shown = undefined;
 			notice = undefined;
 			roomSeat = view.seat;
@@ -191,7 +190,7 @@ export function showTable(
 			);
 			return;
 		}
-		document.title = "Open Canasta";
+		document.title = "Open Robber's Rummy";
 		const screen = lobbyScreen({
 			status: view.status,
 			supersededBy: view.supersededBy,
@@ -319,7 +318,7 @@ export function showTable(
 
 	return () => {
 		disposed = true;
-		document.title = "Open Canasta";
+		document.title = "Open Robber's Rummy";
 		document.removeEventListener("visibilitychange", onVisible);
 		window.removeEventListener("online", onWake);
 		window.removeEventListener("pageshow", onWake);

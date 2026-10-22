@@ -571,35 +571,6 @@ main:has(> .room) {
 	justify-content: space-between;
 }
 
-.model-priority-list {
-	display: grid;
-	gap: 0.25rem;
-	padding-left: 1.8rem;
-}
-
-.model-priority-list li {
-	display: flex;
-	align-items: center;
-	gap: 0.35rem;
-}
-
-.model-priority-label {
-	flex: 1;
-}
-
-.model-priority-list button {
-	margin: 0;
-	padding: 0.15rem 0.45rem;
-}
-
-.bot-spend-counter {
-	margin-right: auto;
-	margin-left: auto;
-	font-variant-numeric: tabular-nums;
-	font-weight: 700;
-	white-space: nowrap;
-}
-
 .mobile-bot-controls {
 	display: grid;
 	gap: 0.3rem;
@@ -852,8 +823,8 @@ main[data-screen="table"] > .room {
 	margin-bottom: 0.5rem;
 }
 
-/* The canasta table: a score strip, the felt with the four seats and the centre, then the own hand and its actions. */
-.canasta-table {
+/* The rummy table: the status head, the felt with the other players, the melds and the own hand, then the call. */
+.rummy-table {
 	--card-h: 3.6rem;
 	--card-w: calc(var(--card-h) * 0.68);
 	display: flex;
@@ -862,11 +833,10 @@ main[data-screen="table"] > .room {
 	min-width: 0;
 }
 
-.score-strip {
+.table-head {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 0.5rem 1rem;
-	align-items: center;
+	flex-direction: column;
+	gap: 0.15rem;
 	padding: 0.5rem 0.75rem;
 	border: 1px solid var(--line);
 	border-radius: 0.5rem;
@@ -874,34 +844,11 @@ main[data-screen="table"] > .room {
 	color: var(--fg);
 }
 
-.score-strip .side {
-	display: flex;
-	align-items: baseline;
-	gap: 0.35rem;
-	padding: 0.1rem 0.5rem;
-	border-radius: 0.3rem;
-}
-
-.score-strip .side[data-mine="true"] {
-	background: #e3efe7;
-}
-
-.side-label {
-	font-weight: 600;
-}
-
-.side-score {
-	font-size: 1.5rem;
-	font-weight: 700;
-	font-variant-numeric: tabular-nums;
-}
-
-.score-strip .meta {
+.table-head .meta {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.25rem 0.8rem;
 	align-items: baseline;
-	margin-left: auto;
 }
 
 .table-heading {
@@ -909,18 +856,7 @@ main[data-screen="table"] > .room {
 	font-size: 1rem;
 }
 
-.target {
-	color: var(--muted);
-	font-size: 0.9rem;
-}
-
-.table-status {
-	display: flex;
-	flex-direction: column;
-	gap: 0.15rem;
-}
-
-.table-status p {
+.table-head p {
 	margin: 0;
 }
 
@@ -983,20 +919,13 @@ main[data-screen="table"] > .room {
 	text-align: end;
 }
 
-/* The hand score and the match score close the table. */
-.score-table tbody tr:nth-last-child(-n + 2) {
-	border-top: 1px solid var(--muted);
-	font-weight: 700;
+.score-table .cards-left {
+	max-width: 18rem;
+	text-align: start;
 }
 
-.score-table tbody tr:nth-last-child(-n + 2) th {
+.score-table tr[data-winner="true"] {
 	font-weight: 700;
-}
-
-.countdown {
-	margin: 0.6rem 0 0;
-	color: var(--muted);
-	font-size: 0.9rem;
 }
 
 .commands {
@@ -1019,19 +948,20 @@ main[data-screen="table"] > .room {
 	color: #b3261e;
 }
 
-.canasta-table .felt {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 1fr);
-	grid-template-areas:
-		"top top top"
-		"left centre right"
-		"bottom bottom bottom";
-	gap: 0.6rem;
-	align-items: center;
+.rummy-table .felt {
+	position: relative;
 	margin: 0;
 }
 
-.canasta-table .seat {
+/* The other players sit in one row at the top, in turn order after the viewer. */
+.opponents {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.6rem;
+}
+
+.rummy-table .seat {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -1040,11 +970,11 @@ main[data-screen="table"] > .room {
 }
 
 /* The bot control hangs below the tile on one line, so the tile keeps room for it above the name row. */
-.canasta-table .tile {
+.rummy-table .tile {
 	margin-bottom: 1.5rem;
 }
 
-.canasta-table .seat .seat-label .name {
+.rummy-table .seat .seat-label .name {
 	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1052,11 +982,7 @@ main[data-screen="table"] > .room {
 	overflow-wrap: normal;
 }
 
-.card.joker {
-	font-size: calc(var(--card-h) * 0.2);
-}
-
-.canasta-table .tile-bot-control {
+.rummy-table .tile-bot-control {
 	left: 50%;
 	width: max-content;
 	max-width: none;
@@ -1071,29 +997,41 @@ main[data-screen="table"] > .room {
 	gap: 0.4rem;
 }
 
-.seat-top {
-	grid-area: top;
+/* A player's card count: a dense strip of thin card backs, then the number. */
+.count-strip {
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+	max-width: 100%;
+	font-size: 0.8rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
 }
 
-.seat-left {
-	grid-area: left;
+.count-backs {
+	display: flex;
+	min-width: 0;
+	max-width: 8rem;
+	overflow: hidden;
+	padding-left: 0.3rem;
 }
 
-.seat-right {
-	grid-area: right;
+.count-back {
+	flex: none;
+	width: 0.45rem;
+	height: 0.9rem;
+	margin-left: -0.3rem;
+	border: 1px solid #ffffff;
+	border-radius: 0.1rem;
+	background: repeating-linear-gradient(45deg, #4b5d6e 0 2px, #6d8193 2px 4px);
 }
 
-.seat-bottom {
-	grid-area: bottom;
-}
-
-/* The piles on top, then the opponents' melds above the viewer's own. */
+/* The stock, then every meld on the table. */
 .centre {
-	grid-area: centre;
-	display: grid;
-	grid-template-columns: minmax(0, 1fr);
+	display: flex;
+	flex-direction: column;
 	gap: 0.5rem;
-	align-items: start;
+	align-items: stretch;
 	min-width: 0;
 }
 
@@ -1109,142 +1047,79 @@ main[data-screen="table"] > .room {
 	white-space: nowrap;
 }
 
-.piles {
-	grid-column: 1 / -1;
+/* The stock is one line of text: the label, then the count. */
+.stock {
 	display: flex;
-	flex-wrap: wrap;
-	align-items: stretch;
-	gap: 0.5rem;
-	justify-content: center;
-}
-
-/* Each pile is one line of text: the label, then the counts. */
-.stock,
-.pile {
-	display: flex;
-	flex-wrap: wrap;
+	align-self: center;
 	align-items: baseline;
-	justify-content: center;
-	gap: 0.1rem 0.45rem;
+	gap: 0.45rem;
 	padding: 0.35rem 0.5rem;
 	border-radius: 0.4rem;
 	background: var(--card-bg);
 	color: var(--card-fg);
 }
 
-.stock .label,
-.pile .label {
+.stock .label {
 	font-size: 0.75rem;
 	color: var(--muted);
 }
 
-.stock-count,
-.pile-count {
+.stock-count {
 	font-weight: 700;
 	font-variant-numeric: tabular-nums;
 }
 
-.pile-top {
-	font-size: 1.1rem;
-	font-weight: 700;
-}
-
-.pile-frozen {
-	color: #b3261e;
-	font-size: 0.8rem;
-	font-weight: 700;
-}
-
-.pile-frozen:empty {
-	display: none;
-}
-
-/* The side's name and its red threes share the first line, so the melds keep the height. */
-.side-block {
-	display: grid;
-	grid-template-columns: auto 1fr;
-	align-items: baseline;
-	gap: 0.25rem 1rem;
-	min-width: 0;
-	padding: 0.4rem 0.6rem;
-	border-radius: 0.4rem;
-	background: var(--card-bg);
-	color: var(--card-fg);
-}
-
-.side-title {
-	margin: 0;
-	font-size: 0.95rem;
-}
-
 .melds {
-	grid-column: 1 / -1;
-	grid-row: 2;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-start;
-	gap: 0.3rem;
-	font-size: 0.8rem;
+	justify-content: center;
+	gap: 0.35rem;
 }
 
-/* A meld is a vertical stack of its cards; a meld of more than 8 cards continues in a second column. */
+/* A meld is one row of small card faces; on the viewer's turn a + button at its end takes the selected cards. */
 .meld {
 	display: inline-flex;
-	flex-direction: column;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 0.15rem;
-	padding: 0.15rem 0.25rem;
+	padding: 0.2rem 0.25rem;
 	border: 1px solid var(--line);
 	border-radius: 0.3rem;
+	background: var(--card-bg);
+	color: var(--card-fg);
 	font-variant-numeric: tabular-nums;
 }
 
 .meld-cards {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 0.15rem;
 }
 
-.meld-column {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
+/* A draft meld that the rules refuse: a red outline and the reason below the cards. */
+.meld.invalid {
+	border-color: var(--fit);
+	box-shadow: 0 0 0 2px var(--fit);
 }
 
-.meld.canasta {
-	border-color: var(--accent);
+.meld-problem {
+	flex-basis: 100%;
+	color: var(--fit);
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+.meld-add {
+	min-width: 1.8rem;
+	padding: 0.1rem 0.4rem;
 	font-weight: 700;
 }
 
-.canasta-mark {
-	color: var(--accent);
-	font-size: 0.7rem;
-	font-weight: 700;
-	text-transform: uppercase;
-}
-
-.red-threes {
-	grid-row: 1;
-	grid-column: 2;
-	justify-self: end;
-	margin: 0;
-	font-size: 0.85rem;
-}
-
-/* Until the side melds, its first meld minimum shows under the melds. */
-.initial-meld {
-	grid-column: 1 / -1;
-	margin: 0;
-	font-size: 0.8rem;
-	cursor: help;
-}
-
-.initial-meld:empty {
-	display: none;
-}
-
-.red-three-cards {
-	color: var(--red-suit);
-	font-weight: 700;
+.new-meld {
+	border-style: dashed;
+	background: transparent;
+	color: var(--felt-fg);
 }
 
 .none {
@@ -1252,22 +1127,8 @@ main[data-screen="table"] > .room {
 	font-size: 0.85rem;
 }
 
-/* The backs of a hand are drawn in CSS: a neutral pattern, with no card artwork. */
-.backs {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: center;
-}
-
-.card-back {
-	flex: none;
-	width: calc(var(--card-h) * 0.4);
-	height: calc(var(--card-h) * 0.56);
-	margin: 0.15rem -0.4rem 0 0;
-	border: 1px solid #ffffff;
-	border-radius: 0.2rem;
-	background: repeating-linear-gradient(45deg, #4b5d6e 0 3px, #6d8193 3px 6px);
-	box-shadow: 0 1px 2px rgb(0 0 0 / 35%);
+.melds .none {
+	color: var(--felt-fg);
 }
 
 .own-hand {
@@ -1304,62 +1165,13 @@ main[data-screen="table"] > .room {
 
 .card.joker {
 	color: #5b3a89;
+	font-size: calc(var(--card-h) * 0.2);
 }
 
 .card.selected {
 	border-color: var(--accent);
 	box-shadow: inset 0 0 0 2px var(--accent);
 	transform: translateY(-0.35rem);
-}
-
-/* A card that this turn drew or took from the pile: a gold frame, and a star for a reader who does not see the colour. */
-.card.taken {
-	position: relative;
-	border-color: var(--gold);
-	box-shadow:
-		0 0 0 2px var(--gold),
-		0 0 0.6rem rgb(200 150 12 / 60%);
-}
-
-.card.taken.selected {
-	box-shadow:
-		inset 0 0 0 2px var(--accent),
-		0 0 0 2px var(--gold),
-		0 0 0.6rem rgb(200 150 12 / 60%);
-}
-
-.card.taken::after {
-	content: "★";
-	position: absolute;
-	top: 0.15rem;
-	right: 0.2rem;
-	color: var(--gold);
-	font-size: calc(var(--card-h) * 0.16);
-	line-height: 1;
-}
-
-/* After the first action of the turn, a natural card that can extend a meld of the side: a red frame and a plus. */
-.card.fits {
-	position: relative;
-	border-color: var(--fit);
-	box-shadow: 0 0 0 2px var(--fit);
-}
-
-.card.fits.selected {
-	box-shadow:
-		inset 0 0 0 2px var(--accent),
-		0 0 0 2px var(--fit);
-}
-
-.card.fits::after {
-	content: "+";
-	position: absolute;
-	top: 0.1rem;
-	right: 0.2rem;
-	color: var(--fit);
-	font-size: calc(var(--card-h) * 0.18);
-	font-weight: 700;
-	line-height: 1;
 }
 
 .card:focus-visible {
@@ -1388,16 +1200,58 @@ main[data-screen="table"] > .room {
 	color: #5b3a89;
 }
 
-/* Melds and the pile already sit on a card face. */
-.meld .pip,
-.pile-top .pip,
-.red-threes .pip {
-	padding: 0;
-	border: none;
+/* A card in a meld: a small card face, as a button on the viewer's turn. */
+.meld .pip {
+	position: relative;
+	min-width: 1.7rem;
+	padding: 0.25rem 0.2rem;
+	border-color: var(--line);
+	background: var(--card-bg);
+	font-size: calc(var(--card-h) * 0.26);
+	line-height: 1;
+	text-align: center;
 }
 
-.meld .pip {
+.meld button.pip {
+	cursor: pointer;
+}
+
+.meld .pip.red {
+	color: var(--red-suit);
+}
+
+.meld .pip.joker {
+	color: #5b3a89;
+}
+
+/* Cards that the latest play put on the table: a gold frame, and a star for a reader who does not see the colour. */
+.pip.gold {
+	border-color: var(--gold);
+	box-shadow:
+		0 0 0 2px var(--gold),
+		0 0 0.6rem rgb(200 150 12 / 60%);
+}
+
+.pip.gold::after {
+	content: "★";
+	position: absolute;
+	top: -0.45rem;
+	right: -0.3rem;
+	color: var(--gold);
+	font-size: 0.65rem;
 	line-height: 1;
+}
+
+/* Hand cards that the viewer's draft puts on the table. */
+.pip.placed {
+	border-color: var(--accent);
+	background: #e3efe7;
+}
+
+.pip.selected {
+	border-color: var(--accent);
+	box-shadow: inset 0 0 0 2px var(--accent);
+	transform: translateY(-0.2rem);
 }
 
 /* The sort control and the hint on the left, the actions on the right, in one row where they fit. */
@@ -1424,7 +1278,7 @@ main[data-screen="table"] > .room {
 }
 
 /* The hand's hint is on the felt, where the grey ink is too faint. */
-.canasta-table .hint {
+.rummy-table .hint {
 	color: var(--felt-fg);
 }
 
@@ -1448,12 +1302,8 @@ main[data-screen="table"] > .room {
 
 /* Phone: the table, the footer and the drawer stack in one column; the card and the seats shrink to fit 390px. */
 @media (max-width: 40rem) {
-	.canasta-table {
+	.rummy-table {
 		--card-h: 3.1rem;
-	}
-
-	.score-strip .meta {
-		margin-left: 0;
 	}
 
 	.room-control-row {
@@ -1478,9 +1328,8 @@ body:has(main[data-screen="table"]) main {
 /*
  * Wide landscape screen: the room is one felt canvas of 1920×1080 CSS pixels, which room-view scales to fit the
  * window, as the bridge table did. The stage, the table, the felt and the footer give their children to one room
- * grid. The partner sits between the opponents in the top row. The left column holds the scores and the status,
- * with the call in the bottom-left corner. The centre holds the piles and the melds, with the own hand at the
- * bottom. The right column holds the players and messages, with the room controls in the bottom-right corner.
+ * grid. The other players fill the top row across all columns. The left column holds the status, with the call in
+ * the bottom-left corner. The centre holds the stock and the melds, with the own hand at the bottom. The right column holds the players and messages, with the room controls in the bottom-right corner.
  * The side columns fill the auto rows in order; the 1fr row takes the rest of the height.
  */
 @media (min-width: 64rem) and (orientation: landscape) {
@@ -1518,57 +1367,32 @@ body:has(main[data-screen="table"]) main {
 	}
 
 	.room > .stage,
-	.room .canasta-table,
-	.room .canasta-table > .felt,
+	.room .rummy-table,
+	.room .rummy-table > .felt,
 	.room > .room-footer {
 		display: contents;
 	}
 
-	/* Everything else is a side panel in the left column, below the left opponent. */
+	/* Everything else is a side panel in the left column, below the other players. */
 	.room > *,
 	.room > .stage > *,
-	.room .canasta-table > * {
+	.room .rummy-table > * {
 		grid-column: 1;
 		margin-bottom: 0.6rem;
 	}
 
-	.room .score-strip {
-		order: -2;
-	}
-
-	.room .table-status {
+	.room .table-head {
 		order: -1;
-		padding: 0.5rem 0.75rem;
-		border-radius: 0.5rem;
-		background: var(--panel);
-		color: var(--fg);
 	}
 
-	.room .table-status:not(:has(> :not(:empty))) {
-		display: none;
-	}
-
-	.room .seat-left,
-	.room .seat-top,
-	.room .seat-right {
+	.room .opponents {
+		grid-column: 1 / -1;
 		grid-row: 1;
 		align-self: start;
 	}
 
-	.room .seat-left {
-		grid-column: 1;
-	}
-
-	.room .seat-top {
-		grid-column: 2;
-	}
-
-	.room .seat-right {
-		grid-column: 3;
-	}
-
-	/* A centre taller than its rows, such as two sides with 8-card melds, starts below the partner and uses the free
-	 * space above the hand, which sits lower than the room controls in the last row. */
+	/* A centre taller than its rows, such as a late table with many melds, starts below the other players and uses the
+	 * free space above the hand, which sits lower than the room controls in the last row. */
 	.room .centre {
 		grid-column: 2;
 		grid-row: 2 / -2;
@@ -1617,7 +1441,7 @@ body:has(main[data-screen="table"]) main {
 		flex-wrap: wrap;
 	}
 
-	.room .canasta-table {
+	.room .rummy-table {
 		--card-h: 4.4rem;
 	}
 
@@ -1625,17 +1449,6 @@ body:has(main[data-screen="table"]) main {
 	.room .tile {
 		width: 12rem;
 		height: 9rem;
-	}
-
-	/* The two scores share the first line of the narrow column; the hand details go below them. */
-	.score-strip .side ~ .side {
-		margin-left: auto;
-	}
-
-	.score-strip .meta {
-		order: 1;
-		flex-basis: 100%;
-		margin-left: 0;
 	}
 }
 

@@ -261,7 +261,7 @@ export class BrowserOpenRouterStrategy {
 						: {
 								model,
 								instructions:
-									'You are a canasta player. Your final response must be exactly one JSON object of the form {"choice": N}, where N is the number of one supplied option. Do not include explanations, markdown, or hidden reasoning in the final response.',
+									'You are a card game player. Your final response must be exactly one JSON object of the form {"choice": N}, where N is the number of one supplied option. Do not include explanations, markdown, or hidden reasoning in the final response.',
 								input: prompt,
 								max_output_tokens: decisionOutputTokenLimit(model),
 								reasoning: reasoningSettings(

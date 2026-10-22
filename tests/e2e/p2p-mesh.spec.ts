@@ -6,7 +6,7 @@ import {
 	test,
 } from "@playwright/test";
 import type { StoredCallRecord } from "../../src/call/record";
-import { parseCanastaState, tableSeat } from "../../src/game/canasta";
+import { parseRummyState, tableSeat } from "../../src/game/rummy";
 import { HOST_LOST_MS, SEAT_GRACE_MS } from "../../src/p2p/limits";
 import type { TableView } from "../../src/p2p/table";
 import type { Seat } from "../../src/protocol";
@@ -311,7 +311,7 @@ const SEAT_NAMES = { N: "North", E: "East", S: "South", W: "West" } as const;
 async function firstPlayer(page: Page): Promise<Seat> {
 	const record = (await view(page))?.table;
 	const match = record
-		? parseCanastaState(record.state, record.tableId)?.match
+		? parseRummyState(record.state, record.tableId)?.match
 		: undefined;
 	if (!match) throw new Error("no hand is dealt");
 	return tableSeat(match.hand.turn);

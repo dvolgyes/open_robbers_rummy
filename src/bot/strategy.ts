@@ -1,34 +1,5 @@
-import {
-	type Action,
-	applyAction,
-	type Card,
-	type Seat as EngineSeat,
-	type HandState,
-	initialMeldMinimum,
-	type MatchState,
-	type TeamIndex,
-	teamOf,
-	viewFor,
-} from "../canasta";
-import { tableSeat } from "../game/canasta";
-import { SEAT_NAMES, SEATS } from "../protocol";
-import { actionLabel, cardLabel, meldLabel } from "./canasta-text";
-import { botActions } from "./heuristic";
-
 export const BOT_MODEL = "inception/mercury-3";
 export const BOT_FALLBACK_MODEL = "openai/gpt-6-luna";
-
-/** The most options a model sees. The top of the heuristic ranking is always among them. */
-export const MAX_CHOICES = 40;
-
-const SIDE_NAMES: Readonly<Record<TeamIndex, string>> = {
-	0: "North-South",
-	1: "East-West",
-};
-
-function otherSide(side: TeamIndex): TeamIndex {
-	return side === 0 ? 1 : 0;
-}
 
 export type ReasoningEffort = "low" | "medium" | "none";
 
@@ -58,17 +29,6 @@ export function reasoningSettings(
 	};
 }
 
-export interface PromptTemplates {
-	readonly turn: string;
-}
-
-/** One legal action the model may pick, numbered as the model sees it. */
-export interface Choice {
-	readonly index: number;
-	readonly action: Action;
-	readonly label: string;
-}
-
 class MissingDecisionTextError extends Error {
 	constructor(shape: readonly string[]) {
 		super(
@@ -78,144 +38,10 @@ class MissingDecisionTextError extends Error {
 	}
 }
 
-function renderTemplate(
-	template: string,
-	values: Readonly<Record<string, string>>,
-): string {
-	const rendered = template.replace(
-		/\{\{([A-Z_]+)\}\}/g,
-		(_placeholder, key: string) => {
-			const value = values[key];
-			if (value === undefined)
-				throw new Error(`missing prompt template value: ${key}`);
-			return value;
-		},
-	);
-	if (/\{\{[A-Z_]+\}\}/.test(rendered))
-		throw new Error("prompt template contains an unknown placeholder");
-	return rendered;
-}
-
-/**
- * The legal actions ordered by the heuristic, cut to `MAX_CHOICES`. Numbering starts at 0, and choice 0
- * is the heuristic's first pick, so it doubles as the fallback when no model answers.
- */
-export function offeredChoices(hand: HandState, seat: EngineSeat): Choice[] {
-	const view = viewFor(hand, seat);
-	return botActions(hand, seat)
-		.slice(0, MAX_CHOICES)
-		.map((action, index) => ({
-			index,
-			action,
-			label: `${actionLabel(action, view)}${firstMeldNote(hand, seat, action)}`,
-		}));
-}
-
-/**
- * Marks a meld that makes the side's first meld, or the points that a meld below the minimum reaches, because
- * a model does not count the points itself and keeps the wild cards that the first meld needs.
- */
-function firstMeldNote(
-	hand: HandState,
-	seat: EngineSeat,
-	action: Action,
-): string {
-	const side = teamOf(seat);
-	if (hand.teams[side]?.initialMade) return "";
-	const step = applyAction(hand, seat, action);
-	if (!step.ok || step.hand.turnMeldPoints <= hand.turnMeldPoints) return "";
-	const minimum = initialMeldMinimum(
-		hand.rules.initialMeld,
-		hand.teamScores[side] ?? 0,
-	);
-	const points = step.hand.turnMeldPoints;
-	return points >= minimum
-		? " (makes your side's first meld)"
-		: ` (first meld: ${points} of ${minimum} points, more melds needed this turn)`;
-}
-
-export function renderTurnPrompt(
-	match: MatchState,
-	seat: EngineSeat,
-	choices: readonly Choice[],
-	templates: PromptTemplates,
-): string {
-	const view = viewFor(match.hand, seat);
-	const side = teamOf(seat);
-	const other = otherSide(side);
-	const own = view.teams[side];
-	const opponents = view.teams[other];
-	const top = view.pile.at(-1);
-	const redThrees = (cards: readonly Card[]) =>
-		cards.length ? cards.map(cardLabel).join(" ") : "none";
-	const name = tableSeat(seat);
-	return renderTemplate(templates.turn, {
-		SEAT: `${SEAT_NAMES[name]} (${name})`,
-		SIDE: SIDE_NAMES[side],
-		SCORES: `your side ${match.scores[side]}, opponents ${match.scores[other]}`,
-		TARGET: String(view.rules.targetScore),
-		PHASE:
-			view.phase !== "draw"
-				? "play (meld, extend, discard, or go out)"
-				: view.stockCount > 0
-					? "draw (take the stock or the pile first)"
-					: "draw (the stock is empty: take the pile, or end the hand)",
-		OWN_HAND: view.own.length ? view.own.map(cardLabel).join(" ") : "empty",
-		HAND_COUNTS: SEATS.map(
-			(name, index) => `${SEAT_NAMES[name]} ${view.handCounts[index] ?? 0}`,
-		).join(", "),
-		STOCK: `${view.stockCount} cards`,
-		PILE: top ? `${view.pile.length} cards, top ${cardLabel(top)}` : "empty",
-		OWN_MELDS:
-			own.melds.map((meld) => meldLabel(meld, view)).join("\n") || "none",
-		OWN_RED_THREES: redThrees(own.redThrees),
-		FIRST_MELD: own.initialMade
-			? "made"
-			: `not made yet; it needs at least ${initialMeldMinimum(view.rules.initialMeld, view.teamScores[side])} points melded from your hand in one turn`,
-		OPPONENT_MELDS:
-			opponents.melds.map((meld) => meldLabel(meld, view)).join("\n") || "none",
-		OPPONENT_RED_THREES: redThrees(opponents.redThrees),
-		TURN_MELD_POINTS: String(view.turnMeldPoints),
-		CHOICES: choices
-			.map((choice) => `${choice.index}: ${choice.label}`)
-			.join("\n"),
-	});
-}
-
-/** Builds only the facts this seat may know: its own hand, public piles and melds, and the scores. */
-export function decisionState(
-	match: MatchState,
-	seat: EngineSeat,
-): Record<string, unknown> {
-	const view = viewFor(match.hand, seat);
-	const side = teamOf(seat);
-	const top = view.pile.at(-1);
-	return {
-		hand_number: match.handNo,
-		seat: tableSeat(seat),
-		phase: view.phase,
-		own_cards: view.own.map(cardLabel),
-		hand_counts: Object.fromEntries(
-			SEATS.map((name, index) => [
-				SEAT_NAMES[name],
-				view.handCounts[index] ?? 0,
-			]),
-		),
-		turn_meld_points: view.turnMeldPoints,
-		stock_cards: view.stockCount,
-		pile_cards: view.pile.length,
-		pile_top: top ? cardLabel(top) : null,
-		scores: {
-			own_side: match.scores[side],
-			opponents: match.scores[otherSide(side)],
-		},
-	};
-}
-
 export function decisionFormat(count: number) {
 	return {
 		type: "json_schema" as const,
-		name: "canasta_choice",
+		name: "turn_choice",
 		strict: true,
 		schema: {
 			type: "object",
