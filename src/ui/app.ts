@@ -8,40 +8,9 @@ import {
 import { parseRoute, tableFragment } from "../p2p/link";
 import { showCreate } from "./create";
 import type { AppDeps, Dispose, Navigation } from "./deps";
-import { copyToClipboard, el } from "./dom";
+import { copyToClipboard } from "./dom";
 import { showLinkProblem, showTable } from "./join";
-
-const LOCALE_STORAGE_KEY = "open_canasta.locale";
-
-function languageControl(deps: AppDeps): HTMLElement {
-	const select = el("select", {
-		attrs: { "aria-label": deps.t("Language"), title: deps.t("Language") },
-	});
-	select.disabled = deps.browser === undefined;
-	for (const [value, label] of [
-		["auto", `🌐 ${deps.t("Automatic")}`],
-		["en", "🇬🇧 English"],
-		["de", "🇩🇪 Deutsch"],
-		["hu", "🇭🇺 Magyar"],
-		["no", "🇳🇴 Norsk (bokmål)"],
-		["es", "🇪🇸 Español"],
-		["pt", "🇵🇹 Português"],
-		["fr", "🇫🇷 Français"],
-		["it", "🇮🇹 Italiano"],
-		["nl", "🇳🇱 Nederlands"],
-	] as const) {
-		const option = el("option", { attrs: { value } }, label);
-		option.selected =
-			value === "auto" ? deps.savedLocale === undefined : value === deps.locale;
-		select.append(option);
-	}
-	select.addEventListener("change", () => {
-		if (select.value === "auto") deps.browser?.removeItem(LOCALE_STORAGE_KEY);
-		else deps.browser?.setItem(LOCALE_STORAGE_KEY, select.value);
-		location.reload();
-	});
-	return el("label", { className: "language-control" }, select);
-}
+import { languageControl } from "./language-control";
 
 /**
  * Routes on the URL fragment: empty → create, `#v=p2p-v1&k=<key>` → the table. The query prefills the create screen

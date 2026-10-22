@@ -810,8 +810,8 @@ button.call-join[data-in-call="true"] {
 }
 /*
  * Table screen: one column, the table above the footer with the room controls and the drawer.
- * The page has no fixed canvas, so the table works from a 390px phone up. A wide landscape screen
- * puts the parts outside the felt in a second column (see the rule at the end of this file).
+ * This form has no fixed canvas, so the table works from a 390px phone up. A wide landscape screen
+ * shows the whole room as one scaled 16:9 felt canvas (see the rule at the end of this file).
  */
 
 main[data-screen="table"] > .room {
@@ -1271,6 +1271,11 @@ main[data-screen="table"] > .room {
 	font-size: 0.9rem;
 }
 
+/* The hand's hint is on the felt, where the grey ink is too faint. */
+.canasta-table .hint {
+	color: var(--felt-fg);
+}
+
 .sort-toggle {
 	border-color: var(--line);
 	background: var(--panel);
@@ -1304,40 +1309,168 @@ main[data-screen="table"] > .room {
 	}
 }
 
+/* The table screen has its own language picker in the room controls. */
+body:has(main[data-screen="table"]) > .language-control {
+	display: none;
+}
+
+body:has(main[data-screen="table"]) main {
+	padding-top: 1rem;
+}
+
+.room-controls .language-control {
+	position: static;
+	margin: 0;
+}
+
 /*
- * Wide landscape screen, such as 16:9: the felt fills the left column, and the scores, the status, the call
- * and the room controls stack in a column on its right. The stage and the table give their children to the
- * room grid. The side column fills the auto rows in order; the last row takes the rest of the felt's height,
- * so a short side column does not spread out.
+ * Wide landscape screen: the room is one felt canvas of 1920×1080 CSS pixels, which room-view scales to fit the
+ * window, as the bridge table did. The stage, the table, the felt and the footer give their children to one room
+ * grid. The partner sits between the opponents in the top row. The left column holds the scores and the status,
+ * with the call in the bottom-left corner. The centre holds the piles and the melds, with the own hand at the
+ * bottom. The right column holds the players and messages, with the room controls in the bottom-right corner.
+ * The side columns fill the auto rows in order; the 1fr row takes the rest of the height.
  */
 @media (min-width: 64rem) and (orientation: landscape) {
-	main:has(> .room) {
-		max-width: 100rem;
+	html:has(main[data-screen="table"]),
+	body:has(main[data-screen="table"]) {
+		height: 100%;
+		overflow: hidden;
+		background: #000000;
+		font-size: 20px;
+	}
+
+	body:has(main[data-screen="table"]) main[data-screen="table"] {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		width: 1920px;
+		max-width: none;
+		height: 1080px;
+		margin: 0;
+		padding: 0;
+		overflow: hidden;
+		transform: translate(-50%, -50%) scale(var(--room-canvas-scale, 1));
+		transform-origin: center;
 	}
 
 	main[data-screen="table"] > .room {
-		grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
-		grid-template-rows: repeat(12, auto) 1fr;
-		gap: 0 1rem;
+		--side: 22rem;
+		height: 100%;
+		padding: 0.8rem;
+		grid-template-columns: var(--side) minmax(0, 1fr) var(--side);
+		grid-template-rows: auto repeat(8, auto) minmax(0, 1fr) auto;
+		gap: 0 1.2rem;
+		background: var(--felt);
+		color: var(--felt-fg);
 	}
 
 	.room > .stage,
-	.room .canasta-table {
+	.room .canasta-table,
+	.room .canasta-table > .felt,
+	.room > .room-footer {
 		display: contents;
 	}
 
+	/* Everything else is a side panel in the left column, below the left opponent. */
 	.room > *,
 	.room > .stage > *,
 	.room .canasta-table > * {
-		grid-column: 2;
+		grid-column: 1;
 		margin-bottom: 0.6rem;
 	}
 
-	.room .canasta-table > .felt {
-		grid-column: 1;
-		grid-row: 1 / -1;
+	.room .score-strip {
+		order: -2;
+	}
+
+	.room .table-status {
+		order: -1;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.5rem;
+		background: var(--panel);
+		color: var(--fg);
+	}
+
+	.room .table-status:not(:has(> :not(:empty))) {
+		display: none;
+	}
+
+	.room .seat-left,
+	.room .seat-top,
+	.room .seat-right {
+		grid-row: 1;
 		align-self: start;
-		margin-bottom: 0;
+	}
+
+	.room .seat-left {
+		grid-column: 1;
+	}
+
+	.room .seat-top {
+		grid-column: 2;
+	}
+
+	.room .seat-right {
+		grid-column: 3;
+	}
+
+	.room .centre {
+		grid-column: 2;
+		grid-row: 2 / -2;
+		align-self: center;
+		align-content: center;
+		margin: 0;
+	}
+
+	.room .seat-bottom {
+		grid-column: 2;
+		grid-row: -2;
+		align-self: end;
+		margin: 0;
+	}
+
+	.room .dock {
+		grid-column: 1;
+		grid-row: -2;
+		align-self: end;
+		margin: 0;
+	}
+
+	.room .room-drawer {
+		grid-column: 3;
+		grid-row: 2 / -2;
+		align-self: start;
+		max-height: 100%;
+		min-height: 0;
+		overflow: auto;
+		background: var(--panel);
+		color: var(--fg);
+	}
+
+	.room .room-controls {
+		grid-column: 3;
+		grid-row: -2;
+		align-self: end;
+		margin: 0;
+		padding: 0.5rem;
+		border-radius: 0.5rem;
+		background: var(--panel);
+		color: var(--fg);
+	}
+
+	.room .room-control-row {
+		flex-wrap: wrap;
+	}
+
+	.room .canasta-table {
+		--card-h: 4.4rem;
+	}
+
+	/* The video tiles are larger than the cards, so a call shows faces. */
+	.room .tile {
+		width: 12rem;
+		height: 9rem;
 	}
 
 	/* The two scores share the first line of the narrow column; the hand details go below them. */

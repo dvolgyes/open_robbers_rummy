@@ -127,9 +127,14 @@ const TABLE_PARTS: Readonly<Record<string, string>> = {
 
 /**
  * Own place lowest, partner highest, left opponent leftmost, right opponent rightmost; a tile in each other
- * place and none for the viewer; no two parts of the table overlap.
+ * place and none for the viewer; no two parts of the table overlap. In the one-row form the partner shares the
+ * top row with the opponents, between them.
  */
-async function expectRotation(page: Page, viewer: SeatKey): Promise<void> {
+async function expectRotation(
+	page: Page,
+	viewer: SeatKey,
+	form: "row" | "around",
+): Promise<void> {
 	const around = AROUND[viewer];
 	for (const [place, seat] of [
 		["top", around.partner],
@@ -152,12 +157,31 @@ async function expectRotation(page: Page, viewer: SeatKey): Promise<void> {
 		expect(at("bottom").y, `own place below ${other}`).toBeGreaterThan(
 			at(other).y,
 		);
-	for (const other of ["left", "right", "bottom"])
-		expect(at("top").y, `partner above ${other}`).toBeLessThan(at(other).y);
 	expect(at("left").x, "left opponent left of the right one").toBeLessThan(
 		at("right").x,
 	);
 	expectApart(rects, Object.keys(TABLE_PARTS));
+	if (form === "around") {
+		for (const other of ["left", "right", "bottom"])
+			expect(at("top").y, `partner above ${other}`).toBeLessThan(at(other).y);
+		return;
+	}
+	const tiles = await measure(page, {
+		top: ".seat-top .tile",
+		left: ".seat-left .tile",
+		right: ".seat-right .tile",
+	});
+	for (const side of ["left", "right"])
+		expect(
+			Math.abs(shown(tiles, side).y - shown(tiles, "top").y),
+			`${side} tile in the partner's row`,
+		).toBeLessThanOrEqual(1);
+	expect(at("top").x, "partner right of the left opponent").toBeGreaterThan(
+		at("left").x,
+	);
+	expect(at("top").x, "partner left of the right opponent").toBeLessThan(
+		at("right").x,
+	);
 }
 
 /** The page does not scroll sideways, and the named parts show inside the window without page scroll. */
@@ -188,34 +212,86 @@ async function expectFit(
 	}
 }
 
-/** The parts outside the felt: the scores, the call dock, and the room controls with the drawer. */
+/** The parts that are not seats: the scores, the call dock, the room controls, the drawer and the language. */
 const SIDE_PARTS: Readonly<Record<string, string>> = {
 	scores: '[data-testid="score-strip"]',
 	dock: ".dock",
-	footer: ".room-footer",
+	controls: '[data-testid="room-controls"]',
+	drawer: '[data-testid="room-drawer"]',
+	language: ".room .language-control",
 };
 
+/** How near to its corner of the canvas a corner part must be, as a part of the canvas size. */
+const CORNER = 0.03;
+
 /**
- * On a wide landscape window the parts outside the felt sit in a column to its right, so a 16:9 screen
- * shows the whole table; on a phone the dock and the footer sit below the felt.
+ * On a wide landscape window the room is one 16:9 felt canvas, scaled to fit the window: every part is on the
+ * felt, the call dock is in its bottom-left corner, and the room controls with the language are in its
+ * bottom-right corner. On a phone the dock and the room controls sit below the felt.
  */
 async function expectSideParts(
 	page: Page,
-	place: "right" | "below",
+	form: "canvas" | "below",
 ): Promise<void> {
-	const rects = await measure(page, { felt: ".felt", ...SIDE_PARTS });
-	const felt = shown(rects, "felt");
-	if (place === "right") {
-		for (const name of Object.keys(SIDE_PARTS))
-			expect(shown(rects, name).x, `${name} right of the felt`).toBeGreaterThan(
-				right(felt) - SUBPIXEL,
+	const rects = await measure(page, {
+		felt: ".felt",
+		room: ".room",
+		...SIDE_PARTS,
+	});
+	if (form === "below") {
+		const felt = shown(rects, "felt");
+		for (const name of ["dock", "controls"])
+			expect(shown(rects, name).y, `${name} below the felt`).toBeGreaterThan(
+				bottom(felt) - SUBPIXEL,
 			);
 		return;
 	}
-	for (const name of ["dock", "footer"])
-		expect(shown(rects, name).y, `${name} below the felt`).toBeGreaterThan(
-			bottom(felt) - SUBPIXEL,
+	const view = await page.evaluate(() => ({
+		width: window.innerWidth,
+		height: window.innerHeight,
+	}));
+	const room = shown(rects, "room");
+	expect(room.width / room.height, "16:9 canvas").toBeCloseTo(16 / 9, 2);
+	expect(
+		Math.max(room.width / view.width, room.height / view.height),
+		"the canvas fills the window in one direction",
+	).toBeCloseTo(1, 2);
+	for (const name of Object.keys(SIDE_PARTS)) {
+		const part = shown(rects, name);
+		expect(part.x, `${name} on the felt`).toBeGreaterThanOrEqual(
+			room.x - SUBPIXEL,
 		);
+		expect(part.y, `${name} on the felt`).toBeGreaterThanOrEqual(
+			room.y - SUBPIXEL,
+		);
+		expect(right(part), `${name} on the felt`).toBeLessThanOrEqual(
+			right(room) + SUBPIXEL,
+		);
+		expect(bottom(part), `${name} on the felt`).toBeLessThanOrEqual(
+			bottom(room) + SUBPIXEL,
+		);
+	}
+	const dock = shown(rects, "dock");
+	expect(dock.x - room.x, "call dock at the left edge").toBeLessThan(
+		room.width * CORNER,
+	);
+	expect(bottom(room) - bottom(dock), "call dock at the bottom").toBeLessThan(
+		room.height * CORNER,
+	);
+	const controls = shown(rects, "controls");
+	expect(
+		right(room) - right(controls),
+		"room controls at the right edge",
+	).toBeLessThan(room.width * CORNER);
+	expect(
+		bottom(room) - bottom(controls),
+		"room controls at the bottom",
+	).toBeLessThan(room.height * CORNER);
+	expect(
+		overlap(shown(rects, "language"), controls),
+		"the language with the room controls",
+	).toBeGreaterThan(0);
+	expectApart(rects, ["scores", "dock", "controls", "drawer"]);
 }
 
 /** The viewer's own hand and its action buttons. */
@@ -257,17 +333,17 @@ test("1: desktop, first hand: each of the four viewers sits at the bottom, with 
 		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play", {
 			timeout: CONNECT_MS,
 		});
-		await expectRotation(tab[seat], seat);
+		await expectRotation(tab[seat], seat, "row");
 	}
 
 	// North dealt, so East acts first: its window shows the hand and the action buttons without page scroll,
 	// also on a low laptop window.
 	await expect(tab.E.getByTestId("action-draw")).toBeVisible();
 	await expectFit(tab.E, OWN_PARTS);
-	await expectSideParts(tab.E, "right");
+	await expectSideParts(tab.E, "canvas");
 	await tab.E.setViewportSize(LOW_LAPTOP);
 	await expectFit(tab.E, OWN_PARTS);
-	await expectSideParts(tab.E, "right");
+	await expectSideParts(tab.E, "canvas");
 	await tab.E.setViewportSize({ width: 1280, height: 720 });
 });
 
@@ -286,7 +362,7 @@ test("2: a phone shows the table without sideways scroll, with the own hand and 
 		await phoneTab.setViewportSize(size);
 		await test.step(`${size.width}×${size.height}`, async () => {
 			const page = phoneTab as Page;
-			await expectRotation(page, "N");
+			await expectRotation(page, "N", "around");
 			await expectSideParts(page, "below");
 			await page.locator(".own-hand").scrollIntoViewIfNeeded();
 			const view = await page.evaluate(() => ({

@@ -44,6 +44,7 @@ import type { CallDisplay, RemoteCallPresence } from "./call-model";
 import { cameraSetup } from "./camera-setup";
 import type { AppDeps, Dispose, Navigation } from "./deps";
 import { button, el } from "./dom";
+import { languageControl } from "./language-control";
 import {
 	type Banner,
 	bannerFor,
@@ -865,6 +866,8 @@ export function showRoom(
 			resumeBots,
 			botSpendCounter,
 		),
+		// The table screen has its own language picker here; the page-wide one is hidden while a table shows.
+		languageControl(deps),
 		botStatus,
 		keyDialog,
 		modelDialog,
@@ -918,6 +921,13 @@ export function showRoom(
 	// The room has one responsive layout; deviceForm remains the call policy for camera support.
 	room.dataset.form = "desktop";
 	table.setForm("desktop");
+	// A wide landscape window shows the room as one 1920×1080 canvas (see style.css); this is its scale to fit.
+	const updateRoomCanvasScale = (): void => {
+		const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+		root.style.setProperty("--room-canvas-scale", String(scale));
+	};
+	updateRoomCanvasScale();
+	window.addEventListener("resize", updateRoomCanvasScale);
 	const pageIsVisible = (): boolean => document.visibilityState === "visible";
 	const checkTurnAlert = (): void => {
 		if (
@@ -1443,6 +1453,8 @@ export function showRoom(
 		if (rateLimitTimer !== undefined) window.clearTimeout(rateLimitTimer);
 		if (scoringTimer !== undefined) window.clearInterval(scoringTimer);
 		stopWatching();
+		window.removeEventListener("resize", updateRoomCanvasScale);
+		root.style.removeProperty("--room-canvas-scale");
 		unsubscribe();
 		unsubscribeCamera?.();
 		camera?.dispose();
