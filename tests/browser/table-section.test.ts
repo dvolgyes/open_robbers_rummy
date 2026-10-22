@@ -185,6 +185,93 @@ describe("the other players", () => {
 	});
 });
 
+/** Six players: the four of `hand`, then Player 5 with one card and Player 6 with two. */
+function sixPlayers(): HandState {
+	const four = hand();
+	return {
+		...four,
+		players: 6,
+		hands: [...four.hands, ["0-2S"], ["0-3S", "0-4S"]],
+		opened: [...four.opened, true, true],
+	};
+}
+
+const SIX_NAMES = {
+	"1": "Ann",
+	"2": "Ben",
+	"3": "Cy",
+	"4": "Dee",
+	"5": "Eve",
+	"6": "Flo",
+};
+
+describe("the other players at tables of two and six", () => {
+	it("keeps five other players in one row at phone width, in turn order after the viewer", () => {
+		const section = mount([]);
+		section.element.style.width = "358px";
+		section.render(
+			viewOf(sixPlayers(), 3, {
+				config: { names: SIX_NAMES, table: DEFAULT_TABLE_SETUP },
+			}),
+		);
+		const opponents = query(section.element, '[data-testid="opponents"]');
+		const seats = [
+			...opponents.querySelectorAll<HTMLElement>(".seat.opponent"),
+		];
+		expect(seats.map((node) => node.getAttribute("data-testid"))).toEqual([
+			"seat-4",
+			"seat-5",
+			"seat-6",
+			"seat-1",
+			"seat-2",
+		]);
+		const tops = seats.map((node) =>
+			Math.round(node.getBoundingClientRect().top),
+		);
+		expect(new Set(tops).size).toBe(1);
+		expect(opponents.scrollWidth).toBeLessThanOrEqual(opponents.clientWidth);
+		const box = opponents.getBoundingClientRect();
+		for (const node of seats) {
+			const rect = node.getBoundingClientRect();
+			expect(rect.left).toBeGreaterThanOrEqual(box.left);
+			expect(rect.right).toBeLessThanOrEqual(box.right);
+		}
+		expect(
+			seats.map(
+				(node) => query(node, '[data-testid="card-count"]').dataset.count,
+			),
+		).toEqual(["3", "1", "2", "2", "1"]);
+	});
+
+	it("shows the one other player of a two-player table", () => {
+		const two: HandState = {
+			...hand(),
+			players: 2,
+			turn: 0,
+			dealer: 1,
+			hands: [["1-2C", "1-4D"], ["1-6S"]],
+			opened: [true, true],
+			lastPlay: null,
+		};
+		const section = mount([]);
+		section.render(
+			viewOf(two, 3, {
+				seat: "1",
+				config: {
+					names: { "1": "Ann", "2": "Ben" },
+					table: DEFAULT_TABLE_SETUP,
+				},
+			}),
+		);
+		const opponents = query(section.element, '[data-testid="opponents"]');
+		expect(
+			[...opponents.querySelectorAll(".seat.opponent")].map((node) =>
+				node.getAttribute("data-testid"),
+			),
+		).toEqual(["seat-2"]);
+	});
+});
+
 describe("the table", () => {
 	it("frames the cards of the latest play in gold, and shows the card a joker stands for", () => {
 		const section = mount([]);

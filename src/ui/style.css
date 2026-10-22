@@ -827,6 +827,7 @@ main[data-screen="table"] > .room {
 .rummy-table {
 	--card-h: 3.6rem;
 	--card-w: calc(var(--card-h) * 0.68);
+	--tile-w: calc(var(--card-h) * 4 / 3);
 	display: flex;
 	flex-direction: column;
 	gap: 0.6rem;
@@ -953,10 +954,12 @@ main[data-screen="table"] > .room {
 	margin: 0;
 }
 
-/* The other players sit in one row at the top, in turn order after the viewer. */
+/* The other players sit in one row at the top, in turn order after the viewer. Five players fit at phone width: each
+ * column shrinks below the tile width, and the tile keeps its 4:3 shape. */
 .opponents {
-	display: flex;
-	flex-wrap: wrap;
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: minmax(0, var(--tile-w));
 	justify-content: center;
 	gap: 0.6rem;
 }
@@ -972,6 +975,18 @@ main[data-screen="table"] > .room {
 /* The bot control hangs below the tile on one line, so the tile keeps room for it above the name row. */
 .rummy-table .tile {
 	margin-bottom: 1.5rem;
+}
+
+/* The opponent tiles fill their column; see .opponents. */
+.rummy-table .opponents .tile {
+	width: 100%;
+	height: auto;
+	aspect-ratio: 4 / 3;
+}
+
+.rummy-table .opponents .seat-label {
+	justify-content: center;
+	max-width: 100%;
 }
 
 .rummy-table .seat .seat-label .name {
@@ -1443,6 +1458,7 @@ body:has(main[data-screen="table"]) main {
 
 	.room .rummy-table {
 		--card-h: 4.4rem;
+		--tile-w: 12rem;
 	}
 
 	/* The video tiles are larger than the cards, so a call shows faces. */
