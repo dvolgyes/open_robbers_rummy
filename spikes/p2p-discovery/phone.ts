@@ -4,7 +4,7 @@
 
 import { getRelaySockets, joinRoom, selfId } from "@trystero-p2p/torrent";
 
-const APP_ID = "libre-bridge-phone-probe";
+const APP_ID = "open-canasta-phone-probe";
 // The handover's STUN server. No TURN.
 const RTC_CONFIG: RTCConfiguration = {
 	iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],

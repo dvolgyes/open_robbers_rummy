@@ -1,5 +1,9 @@
 # Test results
 
+History: this file records the bridge game, before the conversion to canasta.
+The peer-to-peer layer and the call stayed, but the rules, the table screen, and the bots changed.
+The tests of the canasta version are in [test-results-canasta.md](test-results-canasta.md).
+
 Date: 2026-10-19.
 This file records the tests of the peer-to-peer version (plan increments P0–P11, commits 1969c9e and later).
 The tests of the Supabase version are in [test-results-supabase.md](test-results-supabase.md); that evidence does not apply to this version.

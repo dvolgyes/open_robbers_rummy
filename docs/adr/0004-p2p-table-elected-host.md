@@ -3,6 +3,7 @@
 Status: accepted (2026-10-19).
 It supersedes [ADR 0001](0001-room-link-access-and-json-state.md) and amends [ADR 0003](0003-call-signaling-authorization.md).
 Room URL setup and post-expiry bootstrap are amended by [ADR 0005](0005-reusable-room-link-bootstrap.md).
+Amended for canasta on 2026-10-22: the table identifier prefix is now `open-canasta|table|`, and every game action needs all four seats (see the notes under Presence and the table identifier).
 
 ## Context
 
@@ -37,6 +38,7 @@ Link and identity:
 - The link is `<page>#v=p2p-v1&k=<K>`, where K is 32 bytes from the platform CSPRNG in base64url.
   The fragment never reaches the web server, and the code never logs K.
 - The table identifier is the first 22 characters of base64url(SHA-256("libre-bridge|table|" + K)).
+  Canasta amendment (2026-10-22): the prefix is now `"open-canasta|table|"` (`src/p2p/keys.ts`), so a bridge link and a canasta link never meet at the same table.
   SHA-256 derives identifiers only; there is no custom cryptography.
 - Each browser has a random client identifier per table in localStorage.
   Only the host receives it, and the host derives the seat holder from it, so a player cannot copy another player's holder from the roster.
@@ -93,6 +95,7 @@ Presence (owner requirement R4):
   The 20 s rule is necessary because a frozen page keeps its WebRTC link.
 - A deal and a bid need all four seats; a card needs all seats except dummy.
   The host checks this in the bridge module and refuses with a reason such as "Waiting for South to come back"; the page disables the controls and shows the same text.
+  Canasta amendment (2026-10-22): canasta has no dummy, so every game action, including the deal of the next hand, needs all four seats (`src/game/canasta.ts`).
 
 Call signaling (amends ADR 0003):
 

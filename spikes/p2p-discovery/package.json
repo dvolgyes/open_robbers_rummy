@@ -1,8 +1,8 @@
 {
-	"name": "libre-bridge-p2p-discovery-probe",
+	"name": "open-canasta-p2p-discovery-probe",
 	"version": "0.0.0",
 	"private": true,
-	"description": "Throwaway probe: can public WebTorrent trackers connect the browsers of one bridge table? It does not touch the app.",
+	"description": "Throwaway probe: can public WebTorrent trackers connect the browsers of one card table? It does not touch the app.",
 	"type": "module",
 	"scripts": {
 		"dev": "../../node_modules/.bin/vite --port 4180 --strictPort",

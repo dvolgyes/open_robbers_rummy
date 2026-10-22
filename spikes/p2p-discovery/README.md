@@ -1,7 +1,7 @@
 # P2P discovery probe
 
 This probe answers one question before the Supabase-to-P2P migration starts.
-Can public WebTorrent trackers connect the browsers of one bridge table?
+Can public WebTorrent trackers connect the browsers of one card table?
 The probe is not app code.
 It does not change `src/`, the root `package.json` or the root lockfile.
 Trystero is installed only here, with an exact version and its own lockfile.

@@ -1,6 +1,7 @@
 # ADR 0002: Bridge rules from @bridge-tools/core behind one adapter
 
-Status: accepted (2026-10-18)
+Status: superseded (2026-10-22) by [ADR 0007](0007-canasta-engine-written-here.md); the game is now canasta, and `@bridge-tools/core` is removed.
+It was accepted on 2026-10-18.
 
 ## Context
 

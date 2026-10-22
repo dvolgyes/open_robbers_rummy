@@ -1,9 +1,9 @@
 {
-	"name": "opentrick",
+	"name": "open-canasta",
 	"version": "0.1.0",
 	"private": true,
 	"license": "SEE LICENSE IN LICENSE",
-	"description": "Four-player contract bridge in the browser, peer to peer: public trackers for the first contact, WebRTC for the game and the call.",
+	"description": "Four-player partnership canasta in the browser, peer to peer: public trackers for the first contact, WebRTC for the game and the call.",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
@@ -17,7 +17,6 @@
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {
-		"@bridge-tools/core": "0.3.1",
 		"@openrouter/agent": "0.11.0",
 		"@trystero-p2p/torrent": "0.26.0",
 		"werift": "0.25.1"

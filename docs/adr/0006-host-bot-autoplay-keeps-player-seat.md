@@ -1,6 +1,7 @@
 # ADR 0006: Host bot autoplay keeps the player's seat
 
 Status: accepted (2026-10-20).
+Amended for canasta on 2026-10-22: "bridge actions" in this record now means the canasta game actions; the decision is unchanged.
 
 ## Context
 
