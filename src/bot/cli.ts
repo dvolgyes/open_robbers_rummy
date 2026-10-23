@@ -111,7 +111,7 @@ async function run(options: Options): Promise<void> {
 	if (initialCandidates?.length === 0) {
 		throw new Error(
 			options.username === undefined
-				? "no seat named bot or robot was found in the table link"
+				? "no seat named bot was found in the table link"
 				: `no seat named ${options.username} was found in the table link`,
 		);
 	}
@@ -204,7 +204,7 @@ async function run(options: Options): Promise<void> {
 			await stop(
 				new Error(
 					options.username === undefined
-						? "no seat named bot or robot was found"
+						? "no seat named bot was found"
 						: `no seat named ${options.username} was found`,
 				),
 			);

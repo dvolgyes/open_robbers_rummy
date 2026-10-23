@@ -107,9 +107,9 @@ export function isSeat(value: unknown): value is Seat {
 	);
 }
 
-/** Seat names containing "bot" or "robot" are reserved for an automated player. */
+/** The seat name "bot", in any case, marks a seat for the bot CLI; "Botond" or "Abbott" is a player's name. */
 export function isBotName(name: string): boolean {
-	return /bot|robot/i.test(name);
+	return name.trim().toLowerCase() === "bot";
 }
 
 export function isNonNegativeInteger(value: unknown): value is number {

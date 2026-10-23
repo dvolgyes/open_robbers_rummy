@@ -1,11 +1,5 @@
 import { PROJECT_ID } from "../project";
-import {
-	isBotName,
-	type Seat,
-	seatName,
-	seatsOf,
-	type TableConfig,
-} from "../protocol";
+import { type Seat, seatsOf, type TableConfig } from "../protocol";
 import { deriveHolder } from "./keys";
 
 export interface BotSeatClaim {
@@ -14,11 +8,10 @@ export interface BotSeatClaim {
 	readonly id: string;
 }
 
+/** The seats with a Bot choice; the host's bots play only these, so a seat named bot stays free for the bot CLI. */
 export function botSeats(config: TableConfig): Seat[] {
 	return seatsOf(config).filter(
-		(seat) =>
-			config.botSetup?.seats.includes(seat) === true ||
-			isBotName(seatName(config, seat)),
+		(seat) => config.botSetup?.seats.includes(seat) === true,
 	);
 }
 

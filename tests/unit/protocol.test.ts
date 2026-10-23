@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	envelopeEvent,
+	isBotName,
 	parseTableConfig,
 	SEATS,
 	seatLabel,
@@ -86,6 +87,13 @@ describe("parseTableConfig", () => {
 describe("seat helpers", () => {
 	it("labels a seat with its direction and predefined name", () => {
 		expect(seatLabel(CONFIG, "1")).toBe("Player 1 — player1");
+	});
+
+	it("takes only the name bot, in any case, as a bot name", () => {
+		for (const name of ["bot", "Bot", " BOT "])
+			expect(isBotName(name), name).toBe(true);
+		for (const name of ["Botond", "Abbott", "Talbot", "robot", "bots", ""])
+			expect(isBotName(name), name).toBe(false);
 	});
 });
 
