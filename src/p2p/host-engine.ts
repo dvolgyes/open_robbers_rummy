@@ -59,7 +59,9 @@ export type HostStop =
 	/** The partition changed under the host: another tab took the seat. */
 	| "conflict"
 	/** The table expired; its replicas are deleted. */
-	| "expired";
+	| "expired"
+	/** A request threw; this page stops hosting, and the error is in the console. */
+	| "fault";
 
 export interface HostDeps {
 	readonly log: LocalLog;
@@ -490,7 +492,11 @@ export class HostEngine {
 	// Requests
 
 	#enqueue(work: () => Promise<void>): void {
-		this.#queue = this.#queue.then(work);
+		this.#queue = this.#queue.then(work).catch((error: unknown) => {
+			// A host that still beats but answers nobody freezes the table; stopping lets another seat host.
+			console.error("The host stopped after an error:", error);
+			this.#halt("fault");
+		});
 	}
 
 	async #hello(peer: string, hello: Hello): Promise<void> {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chatModule, chatPayload } from "../../src/game/chat";
 import type { GameModule } from "../../src/game/module";
 import type { Authority } from "../../src/p2p/authority";
@@ -866,6 +866,30 @@ describe("commands", () => {
 		expect(rig.log.seqOf(commandId(10))).toBeUndefined();
 		expect(rig.stops).toEqual(["storage"]);
 		expect(rig.host.stopped).toBe(true);
+	});
+
+	it("stops hosting when a request throws, and answers the next request", async () => {
+		const rig = await new Rig().create();
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		rig.to(PLAYER2);
+		const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+		const commit = vi
+			.spyOn(rig.storage, "commit")
+			.mockRejectedValueOnce(new Error("a defect"));
+		await rig.command(PLAYER2, 10, gen);
+		commit.mockRestore();
+		await rig.command(PLAYER2, 11, gen);
+		expect(rig.to(PLAYER2)).toContainEqual({
+			k: "result",
+			id: commandId(11),
+			status: "not_host",
+		});
+		expect(rig.stops).toEqual(["fault"]);
+		expect(logged).toHaveBeenCalledWith(
+			"The host stopped after an error:",
+			expect.objectContaining({ message: "a defect" }),
+		);
+		logged.mockRestore();
 	});
 
 	it("stops with conflict when the stored host changes under it", async () => {
