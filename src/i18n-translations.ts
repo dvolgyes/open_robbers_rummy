@@ -1111,12 +1111,12 @@ const rows: readonly TranslationRow[] = [
 		"Microfoonaudio verzenden",
 	],
 	[
-		"Send this link to the three other players. Each one opens it and takes a seat.",
-		"Envía este enlace a los otros tres jugadores. Cada uno lo abre y ocupa un asiento.",
-		"Envie esta ligação aos outros três jogadores. Cada um abre-a e ocupa um lugar.",
-		"Envoyez ce lien aux trois autres joueurs. Chacun l'ouvre et prend une place.",
-		"Invia questo link agli altri tre giocatori. Ognuno lo apre e prende posto.",
-		"Stuur deze link naar de drie andere spelers. Iedereen opent de link en neemt een plaats in.",
+		"Send this link to the people who play at this table. Each one opens it and takes a free seat.",
+		"Envía este enlace a quienes juegan en esta mesa. Cada uno lo abre y ocupa un asiento libre.",
+		"Envie esta ligação a quem joga nesta mesa. Cada um abre-a e ocupa um lugar livre.",
+		"Envoyez ce lien aux personnes qui jouent à cette table. Chacun l'ouvre et prend une place libre.",
+		"Invia questo link a chi gioca a questo tavolo. Ognuno lo apre e prende un posto libero.",
+		"Stuur deze link naar de mensen die aan deze tafel spelen. Iedereen opent de link en neemt een vrije plaats in.",
 	],
 	["Sending", "Enviando", "A enviar", "Envoi", "Invio", "Verzenden"],
 	[

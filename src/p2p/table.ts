@@ -233,7 +233,7 @@ export interface TableView {
 	readonly seatError: SeatCode | null;
 	readonly release: ReleaseResult | null;
 	readonly peers: readonly PeerView[];
-	/** The peers of the three other seats are connected and passed the connection check. */
+	/** The peers of the other seats in play, except bot seats, are connected and passed the connection check. */
 	readonly allConnected: boolean;
 	readonly network: MeshDiagnostics | null;
 	/** STUN found a public address for this page (a server-reflexive candidate). */

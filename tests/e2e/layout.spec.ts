@@ -454,6 +454,12 @@ test("5: a table of two shows the one other player above the centre", async () =
 		await expectRotation(page, "2", SIX.slice(0, 2));
 		await expectFit(page, OWN_PARTS);
 		await expectSideParts(page, "canvas");
+		await expect(
+			page.locator(".links p"),
+			"the share note names no number of players",
+		).toHaveText(
+			"Send this link to the people who play at this table. Each one opens it and takes a free seat.",
+		);
 	} finally {
 		await page.close();
 	}

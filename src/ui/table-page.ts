@@ -37,7 +37,7 @@ import { CallMemory } from "./call-memory";
 import type { CallDisplay, RemoteCallPresence } from "./call-model";
 import { cameraSetup } from "./camera-setup";
 import type { AppDeps, Dispose, Navigation } from "./deps";
-import { button, el } from "./dom";
+import { button, copyToClipboard, el } from "./dom";
 import { languageControl } from "./language-control";
 import {
 	type Banner,
@@ -516,40 +516,25 @@ export function showTablePage(
 			"p",
 			{},
 			deps.t(
-				"Send this link to the three other players. Each one opens it and takes a seat.",
+				"Send this link to the people who play at this table. Each one opens it and takes a free seat.",
 			),
 		),
-		button(deps.t("Copy table link"), async () => {
-			try {
-				await navigator.clipboard.writeText(
-					tableShareLink(deps.pageUrl(), key),
-				);
-			} catch {
-				// This secondary link control has no status text.
-			}
-		}),
+		button(deps.t("Copy table link"), () => copyLink()),
 	);
-	const copyTableLink = button(
-		deps.t("Copy link"),
-		async () => {
-			try {
-				await navigator.clipboard.writeText(
-					tableShareLink(deps.pageUrl(), key),
-				);
-				turnAlert.beep();
-			} catch {
-				// Clipboard failure stays silent, and does not signal success.
-			}
-		},
-		{ attrs: { "data-testid": "copy-table-url" } },
-	);
-	if (autoCopy)
-		void autoCopy.then(
-			(message) => {
-				if (message === "Copied.") turnAlert.beep();
-			},
-			() => undefined,
-		);
+	const copyTableLink = button(deps.t("Copy link"), () => copyLink(), {
+		attrs: { "data-testid": "copy-table-url" },
+	});
+	// A copy beeps when the link is on the clipboard; otherwise the action note says why.
+	function showCopy(message: string): void {
+		const copied = message === "Copied.";
+		actionError = copied ? undefined : deps.t(message);
+		if (copied) turnAlert.beep();
+		render();
+	}
+	async function copyLink(): Promise<void> {
+		showCopy(await copyToClipboard(tableShareLink(deps.pageUrl(), key)));
+	}
+	if (autoCopy) void autoCopy.then(showCopy);
 	// A reset clears the scores and starts a new match once every other present player approves it. The new game
 	// button after a finished match sends the same request.
 	function requestReset(): void {

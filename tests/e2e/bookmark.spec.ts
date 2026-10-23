@@ -61,9 +61,20 @@ test("create opens the game and selects the host seat in the page URL", async ()
 		0,
 	);
 	await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
-	await expect(page.locator(".copy-status")).toHaveCount(0);
 	link = await page.evaluate(() => navigator.clipboard.readText());
 	expect(link).toMatch(TABLE_LINK);
+	await expect(page.getByTestId("action-note")).toBeHidden();
+});
+
+test("a copy that the browser refuses tells the player why", async () => {
+	await page.evaluate(() => {
+		navigator.clipboard.writeText = () =>
+			Promise.reject(new DOMException("refused", "NotAllowedError"));
+	});
+	await page.getByRole("button", { name: "Copy link" }).click();
+	await expect(page.getByTestId("action-note")).toHaveText(
+		"Could not copy the link. Allow clipboard access and try again.",
+	);
 });
 
 test("the other players see the names and can choose a seat from the shared URL", async () => {

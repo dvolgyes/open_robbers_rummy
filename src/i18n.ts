@@ -282,8 +282,8 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Table call": "Tischanruf",
 			Storage: "Speicher",
 			failed: "fehlgeschlagen",
-			"Send this link to the three other players. Each one opens it and takes a seat.":
-				"Sende diesen Link an die drei anderen Spieler. Jeder öffnet ihn und wählt einen Platz.",
+			"Send this link to the people who play at this table. Each one opens it and takes a free seat.":
+				"Sende diesen Link an die Leute, die an diesem Tisch spielen. Jeder öffnet ihn und wählt einen freien Platz.",
 			"At most {count} tracker URLs are allowed (VITE_TRACKER_URLS).":
 				"Es sind höchstens {count} Tracker-URLs erlaubt (VITE_TRACKER_URLS).",
 			"Not a valid wss: tracker URL in VITE_TRACKER_URLS: {url}":
@@ -646,8 +646,8 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Table call": "Asztalhívás",
 			Storage: "Tárhely",
 			failed: "sikertelen",
-			"Send this link to the three other players. Each one opens it and takes a seat.":
-				"Küldd el ezt a hivatkozást a másik három játékosnak. Mindenki nyissa meg és foglaljon helyet.",
+			"Send this link to the people who play at this table. Each one opens it and takes a free seat.":
+				"Küldd el ezt a hivatkozást azoknak, akik ennél az asztalnál játszanak. Mindenki nyissa meg, és foglaljon egy szabad helyet.",
 			"At most {count} tracker URLs are allowed (VITE_TRACKER_URLS).":
 				"Legfeljebb {count} tracker URL használható (VITE_TRACKER_URLS).",
 			"Not a valid wss: tracker URL in VITE_TRACKER_URLS: {url}":
@@ -929,8 +929,8 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"Prøv å koble til samtalen med {name} igjen",
 			"Running {count} bot seat(s) with {model}.":
 				"Kjører {count} botplasser med {model}.",
-			"Send this link to the three other players. Each one opens it and takes a seat.":
-				"Send denne lenken til de tre andre spillerne. Alle åpner den og velger en plass.",
+			"Send this link to the people who play at this table. Each one opens it and takes a free seat.":
+				"Send denne lenken til dem som spiller ved dette bordet. Alle åpner den og velger en ledig plass.",
 			"Set an OpenRouter API key before switching a seat to a bot.":
 				"Angi en OpenRouter API-nøkkel før du bytter en plass til en bot.",
 			"Set an OpenRouter API key to run the bots.":
