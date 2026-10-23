@@ -1005,6 +1005,23 @@ main[data-screen="table"] > .room {
 	white-space: nowrap;
 }
 
+/* The words of the bot control fit only below a wide tile, as on the wide landscape canvas. Below a narrower tile
+ * the control shows its icon and keeps the words as its name, so five controls fit in a phone row. */
+.rummy-table .opponents .tile {
+	container-type: inline-size;
+}
+
+@container (width < 8rem) {
+	.rummy-table .tile-bot-control .bot-control-text {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+	}
+}
+
 .player-control {
 	display: flex;
 	flex-wrap: wrap;

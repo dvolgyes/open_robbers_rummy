@@ -243,6 +243,29 @@ describe("the other players at tables of two and six", () => {
 		).toEqual(["3", "1", "2", "2", "1"]);
 	});
 
+	it("keeps the host's bot controls of five other players inside the row and apart at phone width", () => {
+		const section = mount([]);
+		section.element.style.width = "320px";
+		section.render(
+			viewOf(sixPlayers(), 3, {
+				config: { names: SIX_NAMES, table: DEFAULT_TABLE_SETUP },
+			}),
+		);
+		section.setBotControls(true, ["5"]);
+		const opponents = query(section.element, '[data-testid="opponents"]');
+		const box = opponents.getBoundingClientRect();
+		const controls = [
+			...opponents.querySelectorAll<HTMLElement>(".tile-bot-control"),
+		].map((node) => node.getBoundingClientRect());
+		expect(controls).toHaveLength(5);
+		for (const [index, rect] of controls.entries()) {
+			expect(rect.left).toBeGreaterThanOrEqual(box.left - 0.5);
+			expect(rect.right).toBeLessThanOrEqual(box.right + 0.5);
+			const next = controls[index + 1];
+			if (next) expect(rect.right).toBeLessThanOrEqual(next.left + 0.5);
+		}
+	});
+
 	it("shows the one other player of a two-player table", () => {
 		const two: HandState = {
 			...hand(),

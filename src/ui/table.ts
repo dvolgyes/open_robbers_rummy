@@ -114,6 +114,22 @@ function cardPip(card: CardView): HTMLElement {
 	return el("span", { className: `pip${suitClasses(card)}` }, card.text);
 }
 
+/** The host's bot control of a seat: the icon and the words. A narrow tile shows only the icon; see style.css. */
+function botControlLabel(
+	control: HTMLElement,
+	isBot: boolean,
+	t: Translate,
+): void {
+	control.replaceChildren(
+		isBot ? "👱 " : "🤖 ",
+		el(
+			"span",
+			{ className: "bot-control-text" },
+			t(isBot ? "Switch to player" : "Switch to bot"),
+		),
+	);
+}
+
 /**
  * The rummy table as the viewer sees it: the other players in a row at the top, the melds on the table in the
  * middle, and the viewer's own hand with its actions at the bottom. On the viewer's turn, the melds and the hand
@@ -598,9 +614,7 @@ export function tableSection(
 		if (artworkUrl !== undefined) botArtworkImage.src = artworkUrl;
 		botArtworkImage.hidden = !isBot || artworkUrl === undefined;
 		botFallback.hidden = artworkUrl !== undefined;
-		botControl.textContent = isBot
-			? `👱 ${t("Switch to player")}`
-			: `🤖 ${t("Switch to bot")}`;
+		botControlLabel(botControl, isBot, t);
 		botControl.dataset.bot = String(isBot);
 		const callPresence = el("span", {
 			className: "tile-call-presence",
@@ -753,9 +767,7 @@ export function tableSection(
 			spot.botFallback.hidden = artworkUrl !== undefined;
 			spot.botOverlay.hidden = !isBot;
 			spot.botControl.hidden = !hosting;
-			spot.botControl.textContent = isBot
-				? `👱 ${t("Switch to player")}`
-				: `🤖 ${t("Switch to bot")}`;
+			botControlLabel(spot.botControl, isBot, t);
 			spot.botControl.dataset.bot = String(isBot);
 		}
 		// The host's autoplay control is part of the seat label, so the labels render again.
