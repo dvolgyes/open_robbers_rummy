@@ -70,6 +70,12 @@ async function seatTable(
 		await expect(hostRows(page)).toHaveAttribute("data-seat", "4", {
 			timeout: CONNECT_MS,
 		});
+		// The roster comes before the table; a page that never got the table holds no seat to host from.
+		await expect(page.getByTestId("table")).toHaveAttribute(
+			"data-phase",
+			/^(?!loading$)/,
+			{ timeout: CONNECT_MS },
+		);
 		tab[seat] = page;
 	}
 	return { link, tab, player4 };
