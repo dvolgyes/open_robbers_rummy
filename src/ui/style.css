@@ -579,7 +579,7 @@ main:has(> .table-page) {
 	margin: 0;
 }
 
-/* Dock: the call panel bottom-left, the game controls bottom-center. */
+/* Dock: the call panel, in the bottom-right corner of the wide table. */
 
 .dock {
 	display: flex;
@@ -1021,7 +1021,8 @@ main[data-screen="table"] > .table-page {
 	gap: 0.4rem;
 }
 
-/* A player's card count: a dense strip of thin card backs, then the number. */
+/* A player's card count: a dense strip of thin card backs, then the number. --back-scale sizes the backs, their
+ * overlap and their pattern together. */
 .count-strip {
 	display: flex;
 	align-items: center;
@@ -1035,19 +1036,23 @@ main[data-screen="table"] > .table-page {
 .count-backs {
 	display: flex;
 	min-width: 0;
-	max-width: 8rem;
+	max-width: calc(8rem * var(--back-scale, 1));
 	overflow: hidden;
-	padding-left: 0.3rem;
+	padding-left: calc(0.3rem * var(--back-scale, 1));
 }
 
 .count-back {
 	flex: none;
-	width: 0.45rem;
-	height: 0.9rem;
-	margin-left: -0.3rem;
-	border: 1px solid #ffffff;
-	border-radius: 0.1rem;
-	background: repeating-linear-gradient(45deg, #4b5d6e 0 2px, #6d8193 2px 4px);
+	width: calc(0.45rem * var(--back-scale, 1));
+	height: calc(0.9rem * var(--back-scale, 1));
+	margin-left: calc(-0.3rem * var(--back-scale, 1));
+	border: calc(1px * var(--back-scale, 1)) solid #ffffff;
+	border-radius: calc(0.1rem * var(--back-scale, 1));
+	background: repeating-linear-gradient(
+		45deg,
+		#4b5d6e 0 calc(2px * var(--back-scale, 1)),
+		#6d8193 calc(2px * var(--back-scale, 1)) calc(4px * var(--back-scale, 1))
+	);
 }
 
 /* The stock, then every meld on the table. */
@@ -1351,10 +1356,11 @@ body:has(main[data-screen="table"]) main {
 
 /*
  * Wide landscape screen: the table is one felt canvas of 1920×1080 CSS pixels, which table-page.ts scales to fit the
- * window. The stage, the table, the felt and the footer give their children to one table
- * grid. The other players fill the top row across all columns. The left column holds the status, with the call in
- * the bottom-left corner. The centre holds the stock and the melds, with the own hand at the bottom. The right column holds the players and messages, with the table controls in the bottom-right corner.
- * The side columns fill the auto rows in order; the 1fr row takes the rest of the height.
+ * window. The stage, the table and the footer give their children to one table grid of two columns.
+ * The felt fills the left column over all rows: the other players at the top, the stock and the melds in the middle,
+ * and the own hand at the bottom, all from the left edge. The side panel at the right edge holds, from the top, the
+ * table controls, the game description and the status, the players and messages in the 1fr row, and the call in the
+ * bottom-right corner. The side panel fills the auto rows in order; the 1fr row takes the rest of the height.
  */
 @media (min-width: 64rem) and (orientation: landscape) {
 	html:has(main[data-screen="table"]),
@@ -1383,8 +1389,8 @@ body:has(main[data-screen="table"]) main {
 		--side: 22rem;
 		height: 100%;
 		padding: 0.8rem;
-		grid-template-columns: var(--side) minmax(0, 1fr) var(--side);
-		grid-template-rows: auto repeat(8, auto) minmax(0, 1fr) auto;
+		grid-template-columns: minmax(0, 1fr) var(--side);
+		grid-template-rows: repeat(10, auto) minmax(0, 1fr) auto;
 		gap: 0 1.2rem;
 		background: var(--felt);
 		color: var(--felt-fg);
@@ -1392,56 +1398,70 @@ body:has(main[data-screen="table"]) main {
 
 	.table-page > .stage,
 	.table-page .rummy-table,
-	.table-page .rummy-table > .felt,
 	.table-page > .table-page-footer {
 		display: contents;
 	}
 
-	/* Everything else is a side panel in the left column, below the other players. */
+	/* Everything else is in the side panel, below the table controls and the game description. */
 	.table-page > *,
 	.table-page > .stage > *,
 	.table-page .rummy-table > * {
-		grid-column: 1;
+		grid-column: 2;
 		margin-bottom: 0.6rem;
+	}
+
+	.table-page .table-page-controls {
+		order: -2;
 	}
 
 	.table-page .table-head {
 		order: -1;
 	}
 
-	.table-page .opponents {
-		grid-column: 1 / -1;
-		grid-row: 1;
-		align-self: start;
+	.table-page .rummy-table > .felt {
+		grid-column: 1;
+		grid-row: 1 / -1;
+		align-self: stretch;
+		margin: 0;
+		padding: 0;
+		border-radius: 0;
 	}
 
-	/* A centre taller than its rows, such as a late table with many melds, starts below the other players and uses the
-	 * free space above the hand, which sits lower than the table controls in the last row. */
+	.table-page .opponents {
+		--back-scale: 2;
+		justify-content: start;
+	}
+
+	/* The centre takes the height between the other players and the hand; a centre taller than that, such as a late
+	 * table with many melds, starts below the other players. */
 	.table-page .centre {
-		grid-column: 2;
-		grid-row: 2 / -2;
-		align-self: safe center;
-		align-content: center;
-		margin: 0;
+		flex: 1 0 auto;
+		justify-content: safe center;
+	}
+
+	.table-page .stock {
+		align-self: flex-start;
+	}
+
+	.table-page .melds,
+	.table-page .own-hand {
+		justify-content: flex-start;
 	}
 
 	.table-page .seat-bottom {
-		grid-column: 2;
-		grid-row: -2;
-		align-self: end;
-		margin: 0;
+		align-items: flex-start;
 	}
 
 	.table-page .dock {
-		grid-column: 1;
+		grid-column: 2;
 		grid-row: -2;
 		align-self: end;
 		margin: 0;
 	}
 
 	.table-page .table-page-drawer {
-		grid-column: 3;
-		grid-row: 2 / -2;
+		grid-column: 2;
+		grid-row: -3;
 		align-self: start;
 		max-height: 100%;
 		min-height: 0;
@@ -1451,10 +1471,6 @@ body:has(main[data-screen="table"]) main {
 	}
 
 	.table-page .table-page-controls {
-		grid-column: 3;
-		grid-row: -2;
-		align-self: end;
-		margin: 0;
 		padding: 0.5rem;
 		border-radius: 0.5rem;
 		background: var(--panel);

@@ -200,21 +200,38 @@ async function expectFit(
 	}).toPass({ timeout: 5_000 });
 }
 
-/** The parts that are not seats: the call dock, the table controls, the drawer and the language. */
+/** The parts that are not seats: the call dock, the table controls, the game description, the drawer and the language. */
 const SIDE_PARTS: Readonly<Record<string, string>> = {
 	dock: ".dock",
 	controls: '[data-testid="table-page-controls"]',
+	head: ".table-head",
 	drawer: '[data-testid="table-page-drawer"]',
 	language: ".table-page .language-control",
 };
 
+/** The first item of each row on the felt: the first other player's tile, the stock, the first meld and the first own card. */
+const FELT_STARTS: Readonly<Record<string, string>> = {
+	"first tile": '[data-testid="opponents"] .tile',
+	stock: ".stock",
+	"first meld": ".melds > *",
+	"first card": ".own-hand > *",
+};
+
 /** How near to its corner of the canvas a corner part must be, as a part of the canvas size. */
 const CORNER = 0.03;
+/** The largest space between two neighbouring parts of the side panel, as a part of the canvas height. */
+const PANEL_GAP = 0.02;
+/** The width of the canvas in CSS pixels (style.css). */
+const CANVAS_WIDTH = 1920;
+/** The height of a card back in the other players' card count on the canvas: twice the 18 pixels of the phone. */
+const CANVAS_BACK_HEIGHT = 36;
 
 /**
- * On a wide landscape window the table is one 16:9 felt canvas, scaled to fit the window: every part is on the
- * felt, the call dock is in its bottom-left corner, and the table controls with the language are in its
- * bottom-right corner. On a phone the dock and the table controls sit below the felt.
+ * On a wide landscape window the table is one 16:9 felt canvas, scaled to fit the window, and every part is on the
+ * felt. A side panel at the right edge holds, from the top, the table controls with the language, the game
+ * description, the players and messages, and the call dock in the bottom-right corner. The other players, the
+ * stock, the melds and the own hand start at the left edge of the felt, and the card backs of the other players are
+ * twice the phone size with the same overlap. On a phone the dock and the table controls sit below the felt.
  */
 async function expectSideParts(
 	page: Page,
@@ -223,7 +240,9 @@ async function expectSideParts(
 	const rects = await measure(page, {
 		felt: ".felt",
 		tablePage: ".table-page",
+		...TABLE_PARTS,
 		...SIDE_PARTS,
+		...FELT_STARTS,
 	});
 	if (form === "below") {
 		const felt = shown(rects, "felt");
@@ -261,28 +280,84 @@ async function expectSideParts(
 			bottom(tablePage) + SUBPIXEL,
 		);
 	}
-	const dock = shown(rects, "dock");
-	expect(dock.x - tablePage.x, "call dock at the left edge").toBeLessThan(
-		tablePage.width * CORNER,
-	);
-	expect(
-		bottom(tablePage) - bottom(dock),
-		"call dock at the bottom",
-	).toBeLessThan(tablePage.height * CORNER);
 	const controls = shown(rects, "controls");
 	expect(
 		right(tablePage) - right(controls),
 		"table controls at the right edge",
 	).toBeLessThan(tablePage.width * CORNER);
+	expect(controls.y - tablePage.y, "table controls at the top").toBeLessThan(
+		tablePage.height * CORNER,
+	);
+	const dock = shown(rects, "dock");
 	expect(
-		bottom(tablePage) - bottom(controls),
-		"table controls at the bottom",
+		right(tablePage) - right(dock),
+		"call dock at the right edge",
+	).toBeLessThan(tablePage.width * CORNER);
+	expect(
+		bottom(tablePage) - bottom(dock),
+		"call dock at the bottom",
 	).toBeLessThan(tablePage.height * CORNER);
+	const panel = ["controls", "head", "drawer", "dock"];
+	for (const [index, name] of panel.slice(1).entries()) {
+		const above = panel[index] ?? "";
+		expect(shown(rects, name).y, `${name} below ${above}`).toBeGreaterThan(
+			bottom(shown(rects, above)) - SUBPIXEL,
+		);
+	}
+	expect(
+		shown(rects, "head").y - bottom(controls),
+		"the game description right below the table controls",
+	).toBeLessThan(tablePage.height * PANEL_GAP);
+	// The side panel starts right of every part of the table.
+	const tableRight = Math.max(
+		...Object.keys(TABLE_PARTS)
+			.filter((name) => name !== "dock")
+			.map((name) => right(shown(rects, name))),
+	);
+	for (const name of panel)
+		expect(
+			shown(rects, name).x,
+			`${name} right of the table`,
+		).toBeGreaterThanOrEqual(tableRight - SUBPIXEL);
+	expect(
+		bottom(tablePage) - bottom(shown(rects, "own")),
+		"the own place at the bottom",
+	).toBeLessThan(tablePage.height * CORNER);
+	for (const name of Object.keys(FELT_STARTS))
+		expect(
+			shown(rects, name).x - tablePage.x,
+			`${name} at the left edge`,
+		).toBeLessThan(tablePage.width * CORNER);
 	expect(
 		overlap(shown(rects, "language"), controls),
 		"the language with the table controls",
 	).toBeGreaterThan(0);
-	expectApart(rects, ["dock", "controls", "drawer"]);
+	expectApart(rects, panel);
+
+	// Two neighbouring card backs of the first other player give the size and the overlap.
+	const backs = await page
+		.getByTestId("opponents")
+		.locator(".count-backs")
+		.first()
+		.locator(".count-back")
+		.evaluateAll((nodes) =>
+			nodes.slice(0, 2).map((node) => {
+				const { x, width, height } = node.getBoundingClientRect();
+				return { x, width, height };
+			}),
+		);
+	const [first, second] = backs;
+	if (!first || !second)
+		throw new Error("the first other player shows fewer than two card backs");
+	const scale = tablePage.width / CANVAS_WIDTH;
+	expect(first.height / scale, "card back height on the canvas").toBeCloseTo(
+		CANVAS_BACK_HEIGHT,
+		0,
+	);
+	expect(
+		(second.x - first.x) / first.width,
+		"the visible part of a card back",
+	).toBeCloseTo(1 / 3, 1);
 }
 
 /** The viewer's own hand and its action buttons. */

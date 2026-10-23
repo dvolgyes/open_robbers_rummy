@@ -13,7 +13,7 @@ import { button, el } from "./dom";
 import { type IconName, icon } from "./icons";
 
 /**
- * The local call controls: a panel at the bottom-left of the desktop table, and one icon row on
+ * The local call controls: a panel at the bottom-right of the desktop table, and one icon row on
  * compact devices. The switches are the choice that Join starts the call with, so Join needs no second step. The
  * stylesheet shows the copy that fits the device class, so each control has one accessible name in both forms. The
  * controls only call the handlers; the call controller owns every rule.
@@ -28,7 +28,7 @@ export interface CallHandlers {
 }
 
 export interface CallControls {
-	/** Desktop: the panel at the bottom-left of the table. */
+	/** Desktop: the panel at the bottom-right of the table. */
 	readonly panel: HTMLElement;
 	/** Compact: a temporary message about a local problem, above the icon row. */
 	readonly alert: HTMLElement;
