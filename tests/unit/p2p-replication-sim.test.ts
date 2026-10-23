@@ -406,7 +406,7 @@ interface Scenario {
 	readonly seed: number;
 }
 
-describe("four pages play a board across a host crash", () => {
+describe("four pages play a game across a host crash", () => {
 	it("routes autoplay through the followed host and correlates its reply", async () => {
 		const sim = new Sim(41);
 		const player1 = await sim.create();

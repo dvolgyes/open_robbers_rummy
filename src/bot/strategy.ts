@@ -120,20 +120,3 @@ export function parseChoice(text: string, count: number): number {
 		throw new Error("OpenRouter chose an option that was not offered");
 	return value;
 }
-
-export async function chooseWithSchemaRetry(
-	request: (effort: ReasoningEffort) => Promise<unknown>,
-	count: number,
-	preferredEffort: ReasoningEffort = "low",
-): Promise<number> {
-	for (let attempt = 0; attempt < 4; attempt++) {
-		try {
-			const effort = attempt === 0 ? preferredEffort : "none";
-			return parseChoice(responseText(await request(effort)), count);
-		} catch (error) {
-			if (!(error instanceof MissingDecisionTextError) || attempt === 3)
-				throw error;
-		}
-	}
-	throw new Error("OpenRouter decision attempts were exhausted");
-}

@@ -450,12 +450,12 @@ describe("roomView", () => {
 			payload: {
 				v: 1,
 				roomId: TABLE_ID,
-				type: "call",
-				board: 1,
+				type: "action",
+				hand: 1,
 				at: 0,
-				call: "1S",
+				action: { type: "draw" },
 			},
-			event: { ...call.event, kind: "call" },
+			event: { ...call.event, kind: "action" },
 		};
 		const view = roomView(
 			input({ entries: [claim, tableEvent, chatEntry(3, "2", "good luck")] }),
@@ -490,10 +490,10 @@ describe("roomView", () => {
 		const play: JsonObject = {
 			v: 1,
 			roomId: TABLE_ID,
-			type: "play",
-			board: 1,
+			type: "action",
+			hand: 1,
 			at: 4,
-			card: "S7",
+			action: { type: "draw" },
 		};
 		const view = roomView(
 			input({

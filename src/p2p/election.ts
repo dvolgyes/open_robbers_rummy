@@ -50,7 +50,7 @@ export interface Seating {
 export interface SelfFacts {
 	readonly holder: string;
 	readonly seating: Seating | null;
-	/** An automated client that cannot deal a board sets this to false. */
+	/** An automated client that cannot deal a game sets this to false. */
 	readonly hostEligible?: boolean;
 }
 

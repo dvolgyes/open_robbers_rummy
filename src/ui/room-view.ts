@@ -537,7 +537,7 @@ export function showRoom(
 				// Clipboard failure stays silent, and does not signal success.
 			}
 		},
-		{ attrs: { "data-testid": "copy-board-url" } },
+		{ attrs: { "data-testid": "copy-table-url" } },
 	);
 	if (autoCopy)
 		void autoCopy.then(

@@ -172,7 +172,7 @@ export interface TableDeps {
 	readonly newId: () => string;
 	/** Connection-check nonces. */
 	readonly nonce: () => string;
-	/** False for automated clients that cannot take over board dealing. */
+	/** False for automated clients that cannot take over dealing. */
 	readonly hostEligible?: boolean;
 	/** This page load created the table: it hosts term 1 at once. */
 	readonly creator?: boolean;

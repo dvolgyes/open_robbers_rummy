@@ -474,7 +474,7 @@ describe("the Make me the host button (rules 6–7)", () => {
 });
 
 describe("the automatic volunteer (rule 8)", () => {
-	it("does not elect an automated client that cannot deal boards", () => {
+	it("does not elect an automated client that cannot deal a game", () => {
 		const bot = new Page({
 			...facts(HOLDER_4, seating("4")),
 			hostEligible: false,

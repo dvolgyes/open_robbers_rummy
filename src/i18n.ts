@@ -201,7 +201,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Your hand": "Deine Hand",
 			"Share URL": "URL teilen",
 			"Share action completed.": "Teilen abgeschlossen.",
-			"Could not share the board URL.":
+			"Could not share the table URL.":
 				"Die Tisch-URL konnte nicht geteilt werden.",
 			Host: "Host",
 			Release: "Freigeben",
@@ -545,7 +545,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Your hand": "A lapjaid",
 			"Share URL": "Hivatkozás megosztása",
 			"Share action completed.": "A megosztás befejeződött.",
-			"Could not share the board URL.":
+			"Could not share the table URL.":
 				"Nem sikerült megosztani az asztal hivatkozását.",
 			Host: "Host",
 			Release: "Feladás",
@@ -900,7 +900,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"Kontroller botmodellene, antall forsøk og ventetiden mellom forsøk.",
 			"Connection failed: the other players were found, but no direct connection works. Try another network.":
 				"Tilkoblingen mislyktes: de andre spillerne ble funnet, men ingen direkte tilkobling fungerer. Prøv et annet nettverk.",
-			"Could not share the board URL.": "Kunne ikke dele URL-en til bordet.",
+			"Could not share the table URL.": "Kunne ikke dele URL-en til bordet.",
 			"Enter an OpenRouter API key to run bot seats in this browser.":
 				"Skriv inn en OpenRouter API-nøkkel for å kjøre botplasser i denne nettleseren.",
 			"Insufficient OpenRouter balance. Bots are paused until you update the API key or balance.":

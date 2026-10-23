@@ -254,7 +254,7 @@ export function tableSection(
 				(error: unknown) => {
 					if (error instanceof DOMException && error.name === "AbortError")
 						return;
-					shareStatus.textContent = t("Could not share the board URL.");
+					shareStatus.textContent = t("Could not share the table URL.");
 				},
 			);
 		},

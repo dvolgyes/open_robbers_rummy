@@ -81,7 +81,7 @@ describe("chatModule.apply", () => {
 		],
 		[
 			"an unknown type",
-			{ ...chatPayload(ROOM_ID, "hi"), type: "bid" },
+			{ ...chatPayload(ROOM_ID, "hi"), type: "meld" },
 			"unknown command type",
 		],
 		["an empty text", chatPayload(ROOM_ID, ""), "message is empty"],
