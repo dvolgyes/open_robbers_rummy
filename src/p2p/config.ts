@@ -1,4 +1,5 @@
 import { parseStunUrls, rtcConfiguration } from "../call/ice";
+import { PROJECT_ID } from "../project";
 
 /**
  * Mesh settings from the build environment: the tracker list from `VITE_TRACKER_URLS` and the STUN
@@ -7,7 +8,7 @@ import { parseStunUrls, rtcConfiguration } from "../call/ice";
  */
 
 /** Unversioned, so pages of different versions meet and report the mismatch. */
-export const APP_ID = "open-robbers-rummy";
+export const APP_ID = PROJECT_ID;
 
 /** The three trackers that answered in every trial of the discovery spike. */
 export const DEFAULT_TRACKER_URLS: readonly string[] = [

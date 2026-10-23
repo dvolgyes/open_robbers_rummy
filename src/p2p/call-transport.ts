@@ -10,7 +10,7 @@ import type { Result } from "../result";
 import type { Binding, CallFrame } from "./wire";
 
 /**
- * Call signaling over the table mesh. A call message travels as an `rr-call` frame on the WebRTC data
+ * Call signaling over the table mesh. A call message travels as a `call` frame on the WebRTC data
  * channel to the peer that the roster binds to the addressed seat; no call message touches a tracker. The roster,
  * never the frame, names the sender's seat. `InboxSignaling` keeps its order, flood limit and envelope checks.
  *

@@ -1,3 +1,4 @@
+import { PROJECT_ID } from "../project";
 import {
 	isBotName,
 	type RoomConfig,
@@ -22,7 +23,7 @@ export function botSeats(config: RoomConfig): Seat[] {
 }
 
 export function botSeatHolder(tableId: string, seat: Seat): Promise<string> {
-	return deriveHolder(tableId, `open-robbers-rummy|host-bot|${seat}`);
+	return deriveHolder(tableId, `${PROJECT_ID}|host-bot|${seat}`);
 }
 
 export async function botSeatClaims(

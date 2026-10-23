@@ -1,4 +1,5 @@
 import { isRoomId } from "../ids";
+import { storageName } from "../project";
 import { isNonNegativeInteger, isObject, isSeat, type Seat } from "../protocol";
 import { type Authority, sameAuthority } from "./authority";
 import {
@@ -294,7 +295,7 @@ export class MemoryStorage implements TableStorage {
 // ---------------------------------------------------------------------------------------------------------------
 // IndexedDB
 
-const DB_NAME = "orr-p2p";
+const DB_NAME = storageName("p2p");
 const DB_VERSION = 1;
 const TABLES = "tables";
 const ENTRIES = "entries";

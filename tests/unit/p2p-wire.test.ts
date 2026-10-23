@@ -273,10 +273,10 @@ type Parse =
 	| typeof parseMesh;
 
 const CHANNELS: [string, Parse, Case[]][] = [
-	["rr-ctl", parseCtl, CTL],
-	["rr-log", parseLog, LOG],
-	["rr-call", parseCall, CALL],
-	["rr-mesh", parseMesh, MESH],
+	["ctl", parseCtl, CTL],
+	["log", parseLog, LOG],
+	["call", parseCall, CALL],
+	["mesh", parseMesh, MESH],
 ];
 
 /** A value of another JSON type than `value`. */
@@ -566,7 +566,7 @@ describe("message rules", () => {
 		],
 		["generation 0", { k: "cmd", id: ID, gen: 0, payload: {} }],
 		["an array payload", { k: "cmd", id: ID, gen: 1, payload: [] }],
-	])("rr-ctl rejects %s", (_label, message) => {
+	])("ctl rejects %s", (_label, message) => {
 		malformed(parseCtl, message as Sample);
 	});
 

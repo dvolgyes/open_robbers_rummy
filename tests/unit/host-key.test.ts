@@ -21,7 +21,10 @@ describe("host OpenRouter API key", () => {
 		writeHostApiKey(storage, "  fresh-key\n");
 		expect(readHostApiKey(storage)).toBe("fresh-key");
 
-		storage.setItem("open-robbers-rummy.openrouter-api-key", "\told-key  ");
+		storage.setItem(
+			"github.com/dvolgyes/open_robbers_rummy/openrouter-api-key",
+			"\told-key  ",
+		);
 		expect(readHostApiKey(storage)).toBe("old-key");
 	});
 

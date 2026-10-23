@@ -1,6 +1,7 @@
 import type { CallRoomSnapshot } from "../call/mesh";
 import type { CallTransport } from "../call/signaling";
 import type { GameModule } from "../game/module";
+import { storageName } from "../project";
 import {
 	type JsonObject,
 	type RoomConfig,
@@ -66,7 +67,7 @@ import type {
 // ---------------------------------------------------------------------------------------------------------------
 // Identity and creation
 
-const CLIENT_PREFIX = "lb.client.";
+const CLIENT_PREFIX = storageName("client/");
 const RELOAD_LOCK_WAIT_MS = 500;
 const RELOAD_LOCK_POLL_MS = 50;
 

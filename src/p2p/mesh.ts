@@ -125,10 +125,10 @@ export interface MeshDiagnostics {
 }
 
 const ACTIONS = {
-	ctl: "rr-ctl",
-	log: "rr-log",
-	call: "rr-call",
-	mesh: "rr-mesh",
+	ctl: "ctl",
+	log: "log",
+	call: "call",
+	mesh: "mesh",
 } as const;
 
 type JoinErrorClass = "wrong-key" | "unreachable" | "other";

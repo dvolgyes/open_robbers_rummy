@@ -353,7 +353,10 @@ describe("host-local bots", () => {
 	it("claims a free seat for a bot and frees it when the bot is disabled", async () => {
 		const rig = await new Rig().create();
 		expect(await rig.host.setBotSeat("2", true)).toBe(true);
-		const holder = await deriveHolder(TABLE, "open-robbers-rummy|host-bot|2");
+		const holder = await deriveHolder(
+			TABLE,
+			"github.com/dvolgyes/open_robbers_rummy|host-bot|2",
+		);
 		expect(rig.row("2")).toEqual({ seat: "2", holder, gen: 1 });
 		expect(await rig.host.setBotSeat("2", false)).toBe(true);
 		expect(rig.row("2")).toEqual({ seat: "2", holder: null, gen: 2 });

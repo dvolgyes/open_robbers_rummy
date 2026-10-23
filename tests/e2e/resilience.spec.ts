@@ -38,7 +38,9 @@ async function ageStoredTables(page: Page): Promise<number> {
 	return page.evaluate(
 		(aged) =>
 			new Promise<number>((resolve, reject) => {
-				const opened = indexedDB.open("orr-p2p");
+				const opened = indexedDB.open(
+					"github.com/dvolgyes/open_robbers_rummy/p2p",
+				);
 				opened.onerror = () => reject(opened.error);
 				opened.onsuccess = () => {
 					const db = opened.result;

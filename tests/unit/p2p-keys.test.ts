@@ -17,9 +17,9 @@ import { SEATS } from "../../src/protocol";
 // Reference values from Node's `crypto.createHash("sha256")` and `Buffer.toString("base64url")`, so the
 // expected text does not come from the code under test.
 const KEY = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE"; // 32 bytes of 0x01
-const TABLE_ID = "epL6jif2XRTHihMIdzmW4B";
+const TABLE_ID = "AxbZUN1_0EtJ8YBEAPw3Ia";
 const CLIENT_ID = "AgICAgICAgICAgICAgICAg"; // 16 bytes of 0x02
-const HOLDER = "D-p-JCajbG0nNwak";
+const HOLDER = "ti18Faryp95_t42P";
 
 describe("deriveTableId", () => {
 	it("is the first 22 characters of the SHA-256 of the labelled key", async () => {
@@ -36,7 +36,7 @@ describe("deriveTableId", () => {
 describe("derivePairRoomId", () => {
 	it("is the first 22 characters of the SHA-256 of the labelled key and pair", async () => {
 		expect(await derivePairRoomId(KEY, "seat|2|3")).toBe(
-			"4Ez_j8XBcjXdV4c1f0bZoY",
+			"euGqjhFQCLwGh1IWzhs-6E",
 		);
 	});
 

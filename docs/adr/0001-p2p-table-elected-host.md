@@ -2,6 +2,7 @@
 
 Status: accepted (2026-10-19).
 Room URL setup and post-expiry bootstrap are amended by [ADR 0002](0002-reusable-room-link-bootstrap.md).
+Amended 2026-10-23: the project ID `github.com/dvolgyes/open_robbers_rummy` (`src/project.ts`) namespaces the app ID, the derived identifiers and the storage names; the actions have short names.
 
 ## Context
 
@@ -35,7 +36,7 @@ Link and identity:
 - The link is `<page>#v=p2p-v2&k=<K>`, where K is 32 bytes from the platform CSPRNG in base64url.
   The fragment never reaches the web server, and the code never logs K.
   A link with another version gets the "other version" message.
-- The table identifier is the first 22 characters of base64url(SHA-256("open-robbers-rummy|table|" + K)) (`src/p2p/keys.ts`).
+- The table identifier is the first 22 characters of base64url(SHA-256(P + "|table|" + K)), where P is the project ID `github.com/dvolgyes/open_robbers_rummy` (`src/p2p/keys.ts`).
   SHA-256 derives identifiers only; there is no custom cryptography.
 - Each browser has a random client identifier per table in localStorage.
   Only the host receives it, and the host derives the seat holder from it, so a player cannot copy another player's holder from the roster.
@@ -49,9 +50,9 @@ Seats:
 Transport:
 
 - Trystero 0.26.0 (`@trystero-p2p/torrent`, pinned exactly) joins one room per table through the public WebTorrent trackers, with K as the room password.
-  The trackers see only an info hash that Trystero derives from the app name and the table identifier, the clients' IP addresses and encrypted session descriptions.
+  The trackers see only an info hash that Trystero derives from the app ID (the project ID) and the table identifier, the clients' IP addresses and encrypted session descriptions.
 - The pages form a full mesh of WebRTC data channels.
-  Four actions carry all traffic: `rr-ctl` (control, 8 KiB), `rr-log` (log replication, 256 KiB), `rr-call` (call signaling, 64 KiB) and `rr-mesh` (peer lists for the mesh repair, 2 KiB).
+  Four actions carry all traffic: `ctl` (control, 8 KiB), `log` (log replication, 256 KiB), `call` (call signaling, 64 KiB) and `mesh` (peer lists for the mesh repair, 2 KiB).
   Every received message passes a validator before any use.
 - Mesh repair (a deviation from one room per page): a tracker sends each announce to a few peers and repeats it only every 120 s, so in a room of several pages a link can stay missing for minutes.
   Two pages that miss each other join a Trystero room for only the two of them, which connects during the first announces.
@@ -69,7 +70,7 @@ Transport:
 
 State:
 
-- Every seated browser keeps a full replica of the table in IndexedDB (database `orr-p2p`): the config, the log of entries, the latest state and the seats.
+- Every seated browser keeps a full replica of the table in IndexedDB (database `github.com/dvolgyes/open_robbers_rummy/p2p`): the config, the log of entries, the latest state and the seats.
 - The host orders the commands.
   Each log entry has a sequence number and the authority (term, tag, incarnation) of the host that wrote it.
   A follower applies only the next entry whose previous authority matches its own last entry, and fills a gap with a sync request, never with a resend.
@@ -101,7 +102,7 @@ Presence:
 
 Call signaling:
 
-- Call messages go over the `rr-call` data channel action to the peer bound to the target seat, never through a tracker.
+- Call messages go over the `call` data channel action to the peer bound to the target seat, never through a tracker.
 - The receiver takes the sender seat and generation from the host's roster binding of the sending peer, never from the message.
   A message from an unbound peer or an old generation is dropped.
 - During a host change, the call keeps the last roster that it had, so the call between the remaining seats goes on.

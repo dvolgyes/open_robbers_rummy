@@ -9,11 +9,12 @@ import {
 	type TableStorage,
 } from "./p2p/storage";
 import { trysteroMesh } from "./p2p/trystero";
+import { storageName } from "./project";
 import { guardedStorage, SeatMemory, webSeatLocks } from "./session";
 import { startApp } from "./ui/app";
 import type { CallSupport } from "./ui/deps";
 
-const LOCALE_STORAGE_KEY = "open_robbers_rummy.locale";
+const LOCALE_STORAGE_KEY = storageName("locale");
 const browser = guardedStorage(() => window.localStorage);
 const detectedLocale = detectLocale(navigator.languages, navigator.language);
 const storedLocale = browser?.getItem(LOCALE_STORAGE_KEY);

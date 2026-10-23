@@ -381,7 +381,7 @@ window.ocHarness = {
 			},
 			tableId,
 		);
-		const action = room.makeAction("rr-ctl");
+		const action = room.makeAction("ctl");
 		const nonce = randomNonce();
 		const echoed = new Promise<boolean>((resolve) => {
 			action.onMessage = (data) => {

@@ -1,6 +1,7 @@
+import { storageName } from "../project";
 import type { MaybeStorage } from "../session";
 
-const STORAGE_KEY = "open-robbers-rummy.openrouter-api-key";
+const STORAGE_KEY = storageName("openrouter-api-key");
 
 export function normalizeHostApiKey(apiKey: string): string {
 	return apiKey.trim();

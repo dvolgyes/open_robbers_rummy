@@ -85,7 +85,7 @@ These choices are not in any source, and the project made them:
   Wire messages always carry six seat rows, so the message shapes stay fixed; the seats that are not in play are never available.
 - The room link query holds the names (`p1` to `p6`), the host seat, `rules`, `jokers`, `assist`, and `bot_seats`.
   A link with a wrong value fails closed as an invalid link.
-- The link version is `p2p-v2`, the key labels start with `open-robbers-rummy|`, and the browser database is `orr-p2p`.
+- The link version is `p2p-v2`, the key labels start with the project ID `github.com/dvolgyes/open_robbers_rummy|`, and the browser database is `github.com/dvolgyes/open_robbers_rummy/p2p`.
   A link with another version gets the "other version" message.
 
 ### Solver bots
@@ -118,7 +118,7 @@ These choices are not in any source, and the project made them:
 
 - The OpenRouter clients, the API-key storage, the decision model, and the turn chooser stay in `src/bot/` with their unit tests.
   Nothing in the game calls them, and the create screen does not show their settings.
-- The browser keeps a saved key in localStorage under `open-robbers-rummy.openrouter-api-key`.
+- The browser keeps a saved key in localStorage under `github.com/dvolgyes/open_robbers_rummy/openrouter-api-key`.
 
 ## Consequences
 

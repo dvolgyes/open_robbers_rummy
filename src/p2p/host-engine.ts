@@ -1,4 +1,5 @@
 import type { GameModule } from "../game/module";
+import { PROJECT_ID } from "../project";
 import {
 	envelopeEvent,
 	type JsonObject,
@@ -7,6 +8,7 @@ import {
 	seatsOf,
 } from "../protocol";
 import { type Authority, sameAuthority } from "./authority";
+import { botSeatHolder } from "./bot-seats";
 import { idleMs, isIdle } from "./expiry";
 import { deriveHolder } from "./keys";
 import {
@@ -83,6 +85,8 @@ type LocalCommandResult =
 	| { readonly ok: true }
 	| { readonly ok: false; readonly reason: string };
 
+/** The peer name of a bot that runs on the host page; no remote page has it. */
+const LOCAL_BOT_PEER = `${PROJECT_ID}/host-bot:`;
 const TOO_LARGE = "the result is too large to store";
 
 type CommitOutcome =
@@ -169,10 +173,7 @@ export class HostEngine {
 		if (!seats.every((seat) => inPlay.includes(seat))) return false;
 		for (const seat of seats) {
 			let row = seatRow(table, seat);
-			const holder = await deriveHolder(
-				this.#tableId,
-				`open-robbers-rummy|host-bot|${seat}`,
-			);
+			const holder = await botSeatHolder(this.#tableId, seat);
 			if (row.holder === null) {
 				const seq = table.rev + 1;
 				const id = this.#deps.newId();
@@ -227,10 +228,7 @@ export class HostEngine {
 		if (!table || this.#stopped || !seatsOf(table.config).includes(seat))
 			return false;
 		const row = seatRow(table, seat);
-		const holder = await deriveHolder(
-			this.#tableId,
-			`open-robbers-rummy|host-bot|${seat}`,
-		);
+		const holder = await botSeatHolder(this.#tableId, seat);
 		if (enabled) {
 			if (seat !== this.#deps.log.seat && row.holder === null) {
 				const id = this.#deps.newId();
@@ -415,9 +413,7 @@ export class HostEngine {
 			k: "roster",
 			auth: this.#deps.auth,
 			seats,
-			peers: peers.filter(
-				({ peer }) => !peer.startsWith("open-robbers-rummy-host-bot:"),
-			),
+			peers: peers.filter(({ peer }) => !peer.startsWith(LOCAL_BOT_PEER)),
 			bots: [...this.#localBots],
 			autoplay: true,
 		};
@@ -889,7 +885,7 @@ export class HostEngine {
 	}
 
 	#localPeer(seat: Seat): string {
-		return `open-robbers-rummy-host-bot:${seat}`;
+		return `${LOCAL_BOT_PEER}${seat}`;
 	}
 
 	#localResultKey(peer: string, id: string): string {

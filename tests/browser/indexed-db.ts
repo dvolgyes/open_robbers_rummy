@@ -5,7 +5,7 @@ import {
 } from "../../src/p2p/storage";
 
 /** The database of src/p2p/storage.ts. All browser test files use the same real database, one file at a time. */
-export const DB_NAME = "orr-p2p";
+export const DB_NAME = "github.com/dvolgyes/open_robbers_rummy/p2p";
 
 export function request<T>(target: IDBRequest<T>): Promise<T> {
 	return new Promise((resolve, reject) => {

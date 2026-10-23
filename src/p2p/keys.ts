@@ -1,4 +1,5 @@
 import { base64url, platformRandomBytes, type RandomBytes } from "../ids";
+import { PROJECT_ID } from "../project";
 import { isSeat, SEATS, type Seat } from "../protocol";
 
 /**
@@ -22,10 +23,7 @@ async function digest(text: string): Promise<string> {
 
 /** The Trystero room and storage name of the table; it satisfies `isRoomId`. */
 export async function deriveTableId(key: string): Promise<string> {
-	return (await digest(`open-robbers-rummy|table|${key}`)).slice(
-		0,
-		TABLE_ID_LENGTH,
-	);
+	return (await digest(`${PROJECT_ID}|table|${key}`)).slice(0, TABLE_ID_LENGTH);
 }
 
 /** The Trystero room in which two pages of the table meet (`rendezvous.ts`). Only pages with K can derive it. */
@@ -33,7 +31,7 @@ export async function derivePairRoomId(
 	key: string,
 	name: string,
 ): Promise<string> {
-	return (await digest(`open-robbers-rummy|pair|${key}|${name}`)).slice(
+	return (await digest(`${PROJECT_ID}|pair|${key}|${name}`)).slice(
 		0,
 		TABLE_ID_LENGTH,
 	);
@@ -44,7 +42,7 @@ export async function deriveHolder(
 	tableId: string,
 	clientId: string,
 ): Promise<string> {
-	return (await digest(`rr-holder|${tableId}|${clientId}`)).slice(
+	return (await digest(`${PROJECT_ID}|holder|${tableId}|${clientId}`)).slice(
 		0,
 		HOLDER_LENGTH,
 	);

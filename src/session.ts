@@ -1,11 +1,12 @@
+import { storageName } from "./project";
 import { isObject, isSeat, type Seat } from "./protocol";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Seat memory (owner decision 2026-10-18: reopening the same link gives the same seat back)
 
 export const SEAT_MEMORY_TTL_MS = 24 * 60 * 60 * 1000;
-const TAB_PREFIX = "lb.tab.";
-const BROWSER_PREFIX = "lb.seat.";
+const TAB_PREFIX = storageName("tab/");
+const BROWSER_PREFIX = storageName("seat/");
 
 /** Storage that may be missing, for example when the browser blocks site data. */
 export type MaybeStorage =
@@ -126,7 +127,7 @@ export interface SeatLocks {
 	hold(roomId: string, seat: Seat, options?: HoldOptions): () => void;
 }
 
-const LOCK_PREFIX = "lb.seat.";
+const LOCK_PREFIX = storageName("seat/");
 
 function lockName(roomId: string, seat: Seat): string {
 	return `${LOCK_PREFIX}${roomId}.${seat}`;
