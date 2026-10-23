@@ -154,6 +154,17 @@ npm test           # unit tests and browser tests
 npx playwright test  # end-to-end tests with several browsers
 ```
 
+A bot can also play from a terminal, as a separate player that joins through the table link:
+
+```sh
+npm run bot -- '<table-url>'                 # takes the seat whose player name is bot
+npm run bot -- '<table-url>' --user <name>   # takes the seat with this player name
+npm run bot -- '<table-url>' --random        # picks random legal actions instead of the solver
+```
+
+Without `--user`, the bot takes only a seat whose name is exactly `bot`, in any case, so names such as "Botond" or "Robot" stay human.
+Put the link in quotes, because it contains `&` and `#`.
+
 ## License
 
 Open Robber's Rummy is all rights reserved.
