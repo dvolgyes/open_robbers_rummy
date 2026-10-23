@@ -1,4 +1,3 @@
-import { getRelaySockets, joinRoom } from "@trystero-p2p/torrent";
 import type { CallMessage } from "../../../src/call/messages";
 import { type CallRecords, callRecordPayload } from "../../../src/call/record";
 import {
@@ -35,6 +34,7 @@ import {
 	type TableView,
 	tableIdentity,
 } from "../../../src/p2p/table";
+import { trackerRooms } from "../../../src/p2p/tracker";
 import { trysteroMesh } from "../../../src/p2p/trystero";
 import { frame } from "../../../src/p2p/wire";
 import {
@@ -170,6 +170,8 @@ const tab = guardedStorage(() => sessionStorage);
 const browser = guardedStorage(() => localStorage);
 const memory = new SeatMemory(tab, browser, clock.wall);
 const locks = webSeatLocks(navigator.locks);
+/** The page's tracker rooms, shared by the table mesh, the stranger mesh and the raw room. */
+const rooms = trackerRooms();
 
 let controller: TableController | null = null;
 /** The table controller's mesh, for `dropLinks`. */
@@ -209,7 +211,13 @@ async function open(
 			return () => clearInterval(timer);
 		},
 		openMesh: (handlers) => {
-			tableMesh = trysteroMesh(identity.tableId, key, config, clock)(handlers);
+			tableMesh = trysteroMesh(
+				rooms,
+				identity.tableId,
+				key,
+				config,
+				clock,
+			)(handlers);
 			return tableMesh;
 		},
 		newId: newCommandId,
@@ -323,7 +331,7 @@ window.ocHarness = {
 			connection.dispatchEvent(new Event("iceconnectionstatechange"));
 			closed++;
 		}
-		for (const socket of Object.values(getRelaySockets())) {
+		for (const socket of Object.values(rooms.sockets())) {
 			(socket as WebSocket).close();
 		}
 		return { closed, peersAfter: mesh.peers().length };
@@ -346,6 +354,7 @@ window.ocHarness = {
 		if (controller || stranger) throw new Error("this page already joined");
 		const tableId = await deriveTableId(key);
 		stranger = trysteroMesh(
+			rooms,
 			tableId,
 			newTableKey(),
 			meshConfig(),
@@ -369,7 +378,7 @@ window.ocHarness = {
 		if (controller || stranger) throw new Error("this page already joined");
 		const tableId = await deriveTableId(key);
 		const config = meshConfig();
-		const room = joinRoom(
+		const room = rooms.joinRoom(
 			{
 				appId: APP_ID,
 				password: key,

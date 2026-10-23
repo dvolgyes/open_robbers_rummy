@@ -8,6 +8,7 @@ import {
 	openIndexedDbStorage,
 	type TableStorage,
 } from "./p2p/storage";
+import { trackerRooms } from "./p2p/tracker";
 import { trysteroMesh } from "./p2p/trystero";
 import { storageName } from "./project";
 import { guardedStorage, SeatMemory, webSeatLocks } from "./session";
@@ -186,6 +187,7 @@ async function main(root: HTMLElement): Promise<void> {
 	memory.prune();
 	const { storage, problem } = await openStorage();
 	let persisted: Promise<boolean> | undefined;
+	const rooms = trackerRooms();
 	startApp(root, {
 		locale,
 		detectedLocale,
@@ -197,7 +199,8 @@ async function main(root: HTMLElement): Promise<void> {
 		memory,
 		browser,
 		clock,
-		openMesh: (tableId, key) => trysteroMesh(tableId, key, config, clock),
+		openMesh: (tableId, key) =>
+			trysteroMesh(rooms, tableId, key, config, clock),
 		call: callSupport(import.meta.env.VITE_STUN_URLS),
 		pageUrl: () => location.href,
 		persist: () => {

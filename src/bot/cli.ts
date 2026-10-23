@@ -16,6 +16,7 @@ import type { Mesh } from "../p2p/mesh";
 import type { Clock } from "../p2p/ports";
 import { MemoryStorage } from "../p2p/storage";
 import { TableController, tableIdentity } from "../p2p/table";
+import { trackerRooms } from "../p2p/tracker";
 import { trysteroMesh } from "../p2p/trystero";
 import type { Seat, TableConfig } from "../protocol";
 import { isBotName, seatName, seatsOf } from "../protocol";
@@ -134,6 +135,7 @@ async function run(options: Options): Promise<void> {
 	const identity = await tableIdentity(route.key, undefined);
 	let mesh: Mesh | undefined;
 	const openMesh = trysteroMesh(
+		trackerRooms(),
 		identity.tableId,
 		route.key,
 		meshResult.config,

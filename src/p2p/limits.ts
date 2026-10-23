@@ -36,12 +36,17 @@ export const PAIR_TIMEOUT_MS = 30_000;
 export const PAIR_RETRY_MS = 30_000;
 export const PAIR_RETRY_MAX_MS = 120_000;
 /**
- * A page without links leaves and joins the table room again after this long alone, for a new offer and
- * Trystero's first announces: 10 s, doubling, at most 60 s. Each tracker sends an offer to a few peers only, and
- * they can be frozen pages or pages that left the room.
+ * A page without links leaves and joins the table room again after this long alone, for new offers and
+ * Trystero's first announces: 10 s, doubling, at most 60 s.
  */
 export const REJOIN_MS = 10_000;
 export const REJOIN_MAX_MS = 60_000;
+/**
+ * Offers in each announce of the table room (src/p2p/tracker.ts). A tracker gives each offer of an announce to a
+ * different page of the room, always the same pages first, and these can be frozen pages that never answer; six
+ * offers reach a full table.
+ */
+export const TABLE_OFFERS = 6;
 
 // Replication.
 export const ACK_DEBOUNCE_MS = 1_000;

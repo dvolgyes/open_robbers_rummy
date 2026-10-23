@@ -11,5 +11,5 @@ export default defineConfig({
 	envPrefix: ["VITE_TRACKER_", "VITE_STUN_"],
 	server: { fs: { allow: [REPOSITORY] } },
 	// Bundled at startup, so the first test does not see a reload when Vite optimizes it later.
-	optimizeDeps: { include: ["@trystero-p2p/torrent"] },
+	optimizeDeps: { include: ["@trystero-p2p/core"] },
 });

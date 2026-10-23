@@ -3,6 +3,7 @@
 Status: accepted (2026-10-19).
 Table URL setup and post-expiry bootstrap are amended by [ADR 0002](0002-reusable-table-link-bootstrap.md).
 Amended 2026-10-23: the project ID `github.com/dvolgyes/open_robbers_rummy` (`src/project.ts`) namespaces the app ID, the derived identifiers and the storage names; the actions have short names.
+Amended 2026-10-23 (tracker offers): the page uses a local copy of Trystero's tracker strategy (`src/p2p/tracker.ts`), which sends six offers in each announce of the table room and tells the trackers when the page leaves a room.
 
 ## Context
 
@@ -49,7 +50,11 @@ Seats:
 
 Transport:
 
-- Trystero 0.26.0 (`@trystero-p2p/torrent`, pinned exactly) joins one room per table through the public WebTorrent trackers, with K as the room password.
+- Trystero 0.26.0 (`@trystero-p2p/core`, pinned exactly) joins one room per table through the public WebTorrent trackers, with K as the room password.
+  The tracker strategy is a local copy of `@trystero-p2p/torrent` 0.26.0 (`src/p2p/tracker.ts`, MIT), with two changes.
+  Each announce of the table room carries six offers (`TABLE_OFFERS`), where Trystero sends one.
+  A tracker gives each offer of an announce to a different page of the room, and it picks the same pages first every time; with one offer, a new page met only a frozen or superseded tab and no live page until the next announces 120 s later.
+  A page that leaves a room sends `event: "stopped"` to each tracker, so the trackers stop giving offers to it.
   The trackers see only an info hash that Trystero derives from the app ID (the project ID) and the table identifier, the clients' IP addresses and encrypted session descriptions.
 - The pages form a full mesh of WebRTC data channels.
   Four actions carry all traffic: `ctl` (control, 8 KiB), `log` (log replication, 256 KiB), `call` (call signaling, 64 KiB) and `mesh` (peer lists for the mesh repair, 2 KiB).
@@ -64,7 +69,7 @@ Transport:
   No connection detail is stored.
 - Rejoin (also a deviation): a page without any link has no neighbour list and, as a visitor, no seat pair.
   After 10 s alone with a tracker open, it leaves the table room and joins it again with the same peer identifier, which makes a new offer and repeats Trystero's first announces; the wait doubles up to 60 s.
-  The trackers send each offer to a few pages only, and they can be pages that cannot answer: a frozen tab, or a tab that left the room but keeps its tracker sockets.
+  A frozen tab stays in the tracker's room and takes offers that it never answers; the six offers of the table room reach the live pages too.
   A rejoin drops the handshakes in progress in the room that the page leaves.
 - The ICE servers are only the configured STUN servers (`VITE_STUN_URLS`); TURN URLs are refused.
 
@@ -124,11 +129,16 @@ Call signaling:
 - A browser that refuses to store data can take a seat and play with a memory replica, but it cannot create a table or become the host.
 - After expiry or loss of every local replica, the table link can seed a fresh session from the setup values; the old game state is not restored (ADR 0002).
 - A device clock change moves that device's local expiry.
-- Updates of Trystero are manual.
+- Updates of Trystero are manual, and each update must compare `src/p2p/tracker.ts` with the new `@trystero-p2p/torrent` strategy.
+- A page keeps six offers (WebRTC connections that wait for an answer) for the table room; an offer that gets no answer is replaced after 120 s.
 
 ## Alternatives Considered
 
 - **A hosted database for discovery and signaling.** Proven, but it adds a hosted dependency, its quotas, and stored call messages with IP addresses.
+- **Patch `@trystero-p2p/torrent` in `node_modules` after each install.**
+  The change is two lines, but npm has no patch support, so it needs a new tool and an install script, and a patch that no longer applies fails at install time and not in a test.
+- **One offer per announce, with more rejoins.**
+  A rejoin sends its one offer to the same first pages of the tracker's room again.
 - **Nostr relays for discovery.** Also serverless for us and acceptable to the owner; not needed, because the WebTorrent trackers passed the spike.
   It stays an option for redundancy.
 - **One private invite link per seat and a fixed host.** No election, but the owner asked for one shared link and an automatic host.

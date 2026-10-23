@@ -1,10 +1,12 @@
-import { getRelaySockets, joinRoom, selfId } from "@trystero-p2p/torrent";
+import { selfId } from "@trystero-p2p/core";
 import type { MeshConfig } from "./config";
 import { Mesh, type MeshHandlers, type TrackerSocket } from "./mesh";
 import type { Clock } from "./ports";
+import type { TrackerRooms } from "./tracker";
 
-/** The production mesh: the real Trystero bundle over the configured public trackers. */
+/** The production mesh: Trystero over the configured public trackers, with the page's tracker rooms. */
 export function trysteroMesh(
+	rooms: TrackerRooms,
 	tableId: string,
 	key: string,
 	config: MeshConfig,
@@ -18,10 +20,10 @@ export function trysteroMesh(
 				key,
 				config,
 				rtcPolyfill,
-				joinRoom,
+				joinRoom: rooms.joinRoom,
 				self: selfId,
 				trackerSockets: () =>
-					getRelaySockets() as Readonly<Record<string, TrackerSocket>>,
+					rooms.sockets() as Readonly<Record<string, TrackerSocket>>,
 				clock,
 			},
 			handlers,
