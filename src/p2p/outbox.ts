@@ -9,7 +9,7 @@ import type { StorageCode, TableStorage } from "./storage";
 import type { CommandResult, CommandStatus } from "./wire";
 
 /**
- * Own commands that are not in the log yet (plan §4.5). A command is stored before it is sent, so a reload or a
+ * Own commands that are not in the log yet. A command is stored before it is sent, so a reload or a
  * host change resends it with the same id, and the host's deduplication answers a command it already has. The
  * log commit that contains a command deletes its record in the same transaction; this queue then drops it.
  */

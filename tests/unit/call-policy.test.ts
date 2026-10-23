@@ -51,7 +51,7 @@ function flat(value: Switches): [boolean, boolean, boolean, boolean] {
 }
 
 describe("presets", () => {
-	// Columns: Send audio, Receive audio, Send video, Receive video (handover §2 table).
+	// Columns: Send audio, Receive audio, Send video, Receive video.
 	it.each([
 		["out", "Not in call", [false, false, false, false]],
 		["audio", "Audio only", [true, true, false, false]],
@@ -59,13 +59,13 @@ describe("presets", () => {
 		["watch", "See cameras; send voice", [true, true, false, true]],
 		["both", "Audio + video both ways", [true, true, true, true]],
 		["listen", "Listen only", [false, true, false, false]],
-	] as const)("%s maps to the handover switches", (id, label, expected) => {
+	] as const)("%s maps to its switches", (id, label, expected) => {
 		const preset = presetById(id);
 		expect(preset.label).toBe(label);
 		expect(flat(preset.switches)).toEqual(expected);
 	});
 
-	it("lists the six presets in the handover order", () => {
+	it("lists the six presets in the order of the call panel", () => {
 		expect(PRESETS.map((p) => p.id)).toEqual([
 			"out",
 			"audio",
@@ -195,7 +195,7 @@ describe("local preference changes", () => {
 	});
 });
 
-describe("sendable (handover §2: a denied device disables that outgoing capability)", () => {
+describe("sendable: a denied device disables that outgoing capability", () => {
 	it("announces a denied microphone as Send audio off and keeps the other switches", () => {
 		expect(sendable(ALL_ON, ["audio"])).toEqual(prefs(false, true, true, true));
 	});
@@ -227,31 +227,31 @@ describe("samePrefs", () => {
 	});
 });
 
-describe("allowed (handover §3)", () => {
-	it("North sends video and South receives video: the picture may reach South", () => {
-		const north = party(prefs(true, true, true, false));
-		const south = party(prefs(true, true, false, true));
-		expect(allowed(north, south, "video")).toBe(true);
+describe("allowed", () => {
+	it("Player 1 sends video and Player 3 receives video: the picture may reach Player 3", () => {
+		const player1 = party(prefs(true, true, true, false));
+		const player3 = party(prefs(true, true, false, true));
+		expect(allowed(player1, player3, "video")).toBe(true);
 	});
 
-	it("East turns receive video off: North's video is not sent to East", () => {
-		const north = party(prefs(true, true, true, false));
-		const east = party(prefs(true, true, false, false));
-		expect(allowed(north, east, "video")).toBe(false);
+	it("Player 2 turns receive video off: Player 1's video is not sent to Player 2", () => {
+		const player1 = party(prefs(true, true, true, false));
+		const player2 = party(prefs(true, true, false, false));
+		expect(allowed(player1, player2, "video")).toBe(false);
 	});
 
-	it("South turns send video off: no peer can get South's camera", () => {
-		const south = party(prefs(true, true, false, true));
+	it("Player 3 turns send video off: no peer can get Player 3's camera", () => {
+		const player3 = party(prefs(true, true, false, true));
 		for (const peer of [ALL_ON, prefs(false, false, false, true)]) {
-			expect(allowed(south, party(peer), "video")).toBe(false);
+			expect(allowed(player3, party(peer), "video")).toBe(false);
 		}
 	});
 
-	it("West turns receive audio off: no audio is allowed to West from any microphone", () => {
-		const west = party(prefs(true, false, false, false));
-		expect(allowed(party(ALL_ON), west, "audio")).toBe(false);
+	it("Player 4 turns receive audio off: no audio is allowed to Player 4 from any microphone", () => {
+		const player4 = party(prefs(true, false, false, false));
+		expect(allowed(party(ALL_ON), player4, "audio")).toBe(false);
 		// The reverse direction is decided separately.
-		expect(allowed(west, party(ALL_ON), "audio")).toBe(true);
+		expect(allowed(player4, party(ALL_ON), "audio")).toBe(true);
 	});
 
 	// Each row changes exactly one conjunct of an otherwise allowed pair (both desktop, every switch on).

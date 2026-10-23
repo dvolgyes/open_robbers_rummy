@@ -102,7 +102,7 @@ function switchStates(view: CallControlsView) {
 	);
 }
 
-describe("call controls (handover §6, §7)", () => {
+describe("call controls", () => {
 	it("offers only a disabled panel with the reason when this browser cannot make calls", () => {
 		const view = callControlsView({
 			available: false,
@@ -369,7 +369,7 @@ describe("call controls (handover §6, §7)", () => {
 	});
 });
 
-describe("remote call status (handover §7)", () => {
+describe("remote call status", () => {
 	const status = (seat: RemoteView, view: CallView = inCall()) =>
 		remoteCallStatus(seat, view);
 

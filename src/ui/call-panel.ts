@@ -13,7 +13,7 @@ import { button, el } from "./dom";
 import { type IconName, icon } from "./icons";
 
 /**
- * The local call controls (handover §2, §6, §7): a panel at the bottom-left of the desktop table, and one icon row on
+ * The local call controls: a panel at the bottom-left of the desktop table, and one icon row on
  * compact devices. The switches are the choice that Join starts the call with, so Join needs no second step. The
  * stylesheet shows the copy that fits the device class, so each control has one accessible name in both forms. The
  * controls only call the handlers; the call controller owns every rule.
@@ -253,7 +253,7 @@ export function callControls(
 		setIcon(node, toggle.icon, !view.pressed);
 	}
 
-	/** Desktop: one Retry per seat whose direct connection failed (handover §4, §6). */
+	/** Desktop: one Retry per seat whose direct connection failed. */
 	function renderRetries(): void {
 		const view = display?.available ? display.view : undefined;
 		const failed =

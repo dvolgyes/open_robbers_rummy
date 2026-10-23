@@ -500,12 +500,12 @@ export const SEAT_NAMES: Readonly<Record<SeatKey, string>> = {
 	"4": "Player 4",
 };
 
-/** The name on the tile of a seated player: the seat letter and the player name that createRoom gives. */
+/** The name on the tile of a seated player: the player name that createRoom gives. */
 export const TILE_NAMES: Readonly<Record<SeatKey, string>> = {
-	"1": "N - player1",
-	"2": "E - player3",
-	"3": "S - player2",
-	"4": "W - player4",
+	"1": "player1",
+	"2": "player2",
+	"3": "player3",
+	"4": "player4",
 };
 
 export const panel = (page: Page): Locator => page.getByTestId("call-panel");
@@ -536,7 +536,7 @@ const SWITCH_NAMES = [
 	"See cameras: receive video",
 ] as const;
 
-/** The switches of each mode of the handover §2 table, in SWITCH_NAMES order. */
+/** The switches of each call mode, in SWITCH_NAMES order. */
 const MODE_SWITCHES: Readonly<
 	Record<string, readonly [boolean, boolean, boolean, boolean]>
 > = {

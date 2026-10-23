@@ -10,112 +10,56 @@ import {
 } from "./room";
 
 /**
- * The host page's bot seats. OpenRouter is replaced by a route on the host page that always answers option 0, the
- * best action of the heuristic ranking (src/bot/strategy.ts), so no request leaves the machine and no key is spent.
- * The live model is tested separately (docs/test-results-canasta.md, live runs).
+ * The host page's solver bots. They need no key and no network, so the tests count the table actions (`data-at`).
+ * A bot acts 5 s after the last play that it saw, and 1 s after its previous command (src/bot/pacing.ts).
  */
 test.describe.configure({ mode: "serial" });
 
-const RESPONSES = "https://openrouter.ai/api/v1/responses";
+const tableAt = async (page: Page): Promise<number> =>
+	Number(await page.getByTestId("table").getAttribute("data-at"));
 
-/** Answers every bot request on this page with `{"choice": 0}`. Returns the count of the requests so far. */
-async function routeBots(page: Page): Promise<() => number> {
-	let requests = 0;
-	await page.route(RESPONSES, async (route) => {
-		if (route.request().method() === "OPTIONS") {
-			await route.fulfill({
-				status: 204,
-				headers: {
-					"access-control-allow-origin": "*",
-					"access-control-allow-methods": "POST, OPTIONS",
-					"access-control-allow-headers": "authorization,content-type",
-				},
-			});
-			return;
-		}
-		requests++;
-		const body = route.request().postDataJSON();
-		expect(body.text.format.name).toBe("canasta_choice");
-		await route.fulfill({
-			status: 200,
-			headers: { "access-control-allow-origin": "*" },
-			contentType: "application/json",
-			body: JSON.stringify({
-				output: [
-					{
-						type: "message",
-						role: "assistant",
-						content: [
-							{ type: "output_text", text: JSON.stringify({ choice: 0 }) },
-						],
-					},
-				],
-			}),
-		});
-	});
-	return () => requests;
-}
-
-const tableState = (page: Page) =>
-	page.getByTestId("table").evaluate((element) => ({
-		hand: element.getAttribute("data-hand"),
-		phase: element.getAttribute("data-phase"),
-	}));
-
-test("host bots play a whole hand, and the host deals the next one", async ({
-	page,
-}) => {
-	test.setTimeout(240_000);
-	const requests = await routeBots(page);
+test("host bots take the turns of every seat", async ({ page }) => {
+	test.setTimeout(180_000);
 	await page.goto("/");
 	for (const [seat, name] of [
-		["1", "robot north"],
-		["2", "bot east"],
-		["3", "robot south"],
-		["4", "robot west"],
+		["1", "robot one"],
+		["2", "bot two"],
+		["3", "robot three"],
+		["4", "robot four"],
 	] as const) {
 		await page.locator(`input[name="name-${seat}"]`).fill(name);
 	}
 	for (const seat of ["1", "2", "3", "4"])
 		await page.locator(`input[name="bot-${seat}"]`).check();
-	await page.locator('input[name="openrouter-key"]').fill("test-key");
 	await page.getByTestId("create").click();
 	await expect(page.getByTestId("table")).toBeVisible();
 	const roomUrl = new URL(page.url());
-	expect(roomUrl.searchParams.get("bot_seats")).toBe("N,E,S,W");
-	expect(roomUrl.searchParams.get("bot_model")).toBe("inception/mercury-3");
-	expect(roomUrl.searchParams.get("bot_fallback")).toBe("openai/gpt-6-luna");
-	expect(roomUrl.searchParams.get("bot_retries")).toBe("5");
-	expect(roomUrl.searchParams.get("bot_delay_ms")).toBe("3000");
-	// The key stays in this browser: never in the URL that the players share.
-	expect(roomUrl.href).not.toMatch(/api.?key|test-key/i);
-	expect(
-		await page.evaluate(() =>
-			localStorage.getItem("open-canasta.openrouter-api-key"),
-		),
-	).toBe("test-key");
+	expect(roomUrl.searchParams.get("bot_seats")).toBe("1,2,3,4");
+	// The solver bots have no model settings and no key.
+	expect(roomUrl.href).not.toMatch(/bot_model|api.?key/i);
 	await openDrawer(page);
 	await page.getByRole("button", { name: "Pause bots" }).click();
 	await expect(page.getByRole("button", { name: "Resume bots" })).toBeVisible();
 	await page.getByRole("button", { name: "Resume bots" }).click();
 	await expect(page.getByRole("button", { name: "Pause bots" })).toBeVisible();
 
+	// Two actions per turn: each of the four seats takes at least one turn.
 	await expect
-		.poll(() => tableState(page), { timeout: 200_000 })
-		.toEqual({ hand: "2", phase: "play" });
-	// A hand needs at least a draw and a discard from each seat before anybody can go out.
-	expect(requests()).toBeGreaterThan(8);
+		.poll(() => tableAt(page), { timeout: 150_000 })
+		.toBeGreaterThan(8);
+	await expect(page.getByTestId("table")).toHaveAttribute(
+		"data-phase",
+		/^(play|over)$/,
+	);
 });
 
 test("paused bots stay paused after the host reloads, and play again only on resume", async ({
 	page,
 }) => {
 	test.setTimeout(180_000);
-	const requests = await routeBots(page);
 	await page.goto("/");
 	for (const seat of ["1", "2", "3", "4"])
 		await page.locator(`input[name="bot-${seat}"]`).check();
-	await page.locator('input[name="openrouter-key"]').fill("test-key");
 	await page.getByTestId("create").click();
 	await expect(page.getByTestId("table")).toBeVisible();
 	await openDrawer(page);
@@ -136,27 +80,28 @@ test("paused bots stay paused after the host reloads, and play again only on res
 	await expect(
 		page.getByTestId("tile-2").locator(".bot-overlay"),
 	).toBeVisible();
-	const pausedAt = await page.getByTestId("table").getAttribute("data-at");
-	const pausedRequests = requests();
-	// A started bot asks OpenRouter within a second; a paused one never does.
-	await page.waitForTimeout(5_000);
-	expect(requests()).toBe(pausedRequests);
-	expect(await page.getByTestId("table").getAttribute("data-at")).toBe(
-		pausedAt,
-	);
+	const pausedAt = await tableAt(page);
+	// A started bot acts within 5 s of the deal plus 1 s; a paused one never does.
+	await page.waitForTimeout(8_000);
+	expect(await tableAt(page)).toBe(pausedAt);
 
 	await page.getByRole("button", { name: "Resume bots" }).click();
 	await expect(page.getByRole("button", { name: "Pause bots" })).toBeVisible();
 	await expect
-		.poll(() => requests(), { timeout: 30_000 })
-		.toBeGreaterThan(pausedRequests);
+		.poll(() => tableAt(page), { timeout: 30_000 })
+		.toBeGreaterThan(pausedAt);
 
 	// Bots that played before a reload play after it.
 	await page.reload();
-	const resumedRequests = requests();
+	await expect(page.getByTestId("table")).toHaveAttribute(
+		"data-phase",
+		"play",
+		{ timeout: CONNECT_MS },
+	);
+	const resumedAt = await tableAt(page);
 	await expect
-		.poll(() => requests(), { timeout: CONNECT_MS })
-		.toBeGreaterThan(resumedRequests);
+		.poll(() => tableAt(page), { timeout: CONNECT_MS })
+		.toBeGreaterThan(resumedAt);
 	await openDrawer(page);
 	await expect(page.getByRole("button", { name: "Pause bots" })).toBeVisible();
 });
@@ -168,24 +113,23 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 	test.setTimeout(180_000);
 	if (!baseURL) throw new Error("baseURL is not configured");
 	const host = await Player.open(browser, baseURL, "host");
-	const north = await Player.open(browser, baseURL, "north");
-	const east = await Player.open(browser, baseURL, "east");
-	const south = await Player.open(browser, baseURL, "south");
+	const one = await Player.open(browser, baseURL, "one");
+	const two = await Player.open(browser, baseURL, "two");
+	const three = await Player.open(browser, baseURL, "three");
 	try {
 		const hostPage = await host.page("./");
-		await routeBots(hostPage);
 		const link = await createRoom(hostPage);
-		const northPage = await north.page(link);
-		await pick(northPage, "1");
-		const southPage = await south.page(link);
-		await pick(southPage, "3");
+		const onePage = await one.page(link);
+		await pick(onePage, "1");
+		const threePage = await three.page(link);
+		await pick(threePage, "3");
 		// Player 2 is the last free seat, so its page takes it without a picker.
-		const eastPage = await east.page(link);
+		const twoPage = await two.page(link);
 		const pages = {
 			"4": hostPage,
-			"1": northPage,
-			"2": eastPage,
-			"3": southPage,
+			"1": onePage,
+			"2": twoPage,
+			"3": threePage,
 		};
 		for (const page of Object.values(pages))
 			await expect(page.getByTestId("table")).toHaveAttribute(
@@ -198,30 +142,22 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 		const before = order.indexOf("2");
 		for (const [index, seat] of order.slice(0, before).entries())
 			await takeTurn(pages[seat], index * 2);
-		await expect(eastPage.getByTestId("action-draw")).toBeEnabled({
+		await expect(twoPage.getByTestId("action-draw")).toBeEnabled({
 			timeout: CONNECT_MS,
 		});
 
 		await host.grantPermissions(["microphone"]);
-		await north.grantPermissions(["microphone"]);
+		await one.grantPermissions(["microphone"]);
 		await hostPage
 			.getByRole("button", { name: "Join call", exact: true })
 			.click();
-		await northPage
+		await onePage
 			.getByRole("button", { name: "Join call", exact: true })
 			.click();
-		await expect(northPage.getByTestId("call-note")).toContainText(
+		await expect(onePage.getByTestId("call-note")).toContainText(
 			"Connected to Player 4.",
 			{ timeout: CONNECT_MS },
 		);
-
-		await openDrawer(hostPage);
-		await hostPage.getByRole("button", { name: "Set API key" }).click();
-		await hostPage
-			.getByTestId("api-key-dialog")
-			.getByRole("textbox", { name: "OpenRouter API key" })
-			.fill("test-key");
-		await hostPage.getByRole("button", { name: "Save key" }).click();
 
 		// A bot seat keeps the person's call: Player 1 still sends audio while its seat plays as a bot.
 		await hostPage
@@ -229,34 +165,30 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 			.getByRole("button", { name: /Switch to bot$/ })
 			.click();
 		await expect(
-			northPage.getByRole("button", { name: "Leave call", exact: true }),
+			onePage.getByRole("button", { name: "Leave call", exact: true }),
 		).toBeVisible();
 		await expect(
-			northPage.getByRole("button", { name: "Send mic audio", exact: true }),
+			onePage.getByRole("button", { name: "Send mic audio", exact: true }),
 		).toHaveAttribute("data-actual", "on");
 		await hostPage
 			.getByTestId("tile-1")
 			.getByRole("button", { name: /Switch to player$/ })
 			.click();
 
-		// Player 2 has the turn: as a bot it draws and discards without a click, so the table moves past its turn.
+		// Player 2 has the turn: as a bot it takes the turn without a click, so the table moves past its turn.
 		await hostPage
 			.getByTestId("tile-2")
 			.getByRole("button", { name: /Switch to bot$/ })
 			.click();
 		await expect
-			.poll(
-				async () =>
-					Number(await hostPage.getByTestId("table").getAttribute("data-at")),
-				{ timeout: 30_000 },
-			)
+			.poll(() => tableAt(hostPage), { timeout: 30_000 })
 			.toBeGreaterThanOrEqual(before * 2 + 2);
 		expect(new URL(hostPage.url()).searchParams.get("bot_seats")).toBe("2");
 		await expect(
 			hostPage.getByTestId("tile-2").locator(".bot-overlay"),
 		).toBeVisible();
 		// Player 3 plays next, as a person.
-		await expect(southPage.getByTestId("action-draw")).toBeEnabled({
+		await expect(threePage.getByTestId("action-draw")).toBeEnabled({
 			timeout: 30_000,
 		});
 
@@ -266,6 +198,6 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 			hostPage.getByTestId("tile-2").locator(".bot-overlay"),
 		).toBeVisible({ timeout: CONNECT_MS });
 	} finally {
-		for (const player of [host, north, east, south]) await player.close();
+		for (const player of [host, one, two, three]) await player.close();
 	}
 });

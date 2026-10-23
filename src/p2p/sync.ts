@@ -22,12 +22,11 @@ import {
 } from "./wire";
 
 /**
- * The sync protocol (plan §4.5). The requester sends its position. The responder answers with the entries after
+ * The sync protocol. The requester sends its position. The responder answers with the entries after
  * it (extend) when its log contains that position; with a snapshot and its whole log (replace) when the logs
  * diverge and its position or active host authority is better; and with `behind` otherwise. A new host can supersede
  * an unreplicated tail from the previous host even when that old log has a larger revision.
- * Refinement of the plan's "pos.rev greater than the responder's rev → behind": the test is "the responder's
- * position is not better", which also covers a diverged log that is longer than the requester's.
+ * The answer is `behind` when the responder's position is not better, which also covers a diverged log that is longer than the requester's.
  */
 
 export interface SyncSource {

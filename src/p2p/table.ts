@@ -59,7 +59,7 @@ import type {
 } from "./wire";
 
 /**
- * The one object the UI uses for a table (plan §4.10). It holds the seat lock, opens the replica, joins the
+ * The one object the UI uses for a table. It holds the seat lock, opens the replica, joins the
  * mesh, and connects the election reducer, the replication and the connection checks. `view()` is plain data.
  */
 
@@ -337,7 +337,7 @@ export class TableController {
 		return this.#tableId;
 	}
 
-	/** This browser's holder at this table (plan §4.3); the host stores it with each seat it gives this browser. */
+	/** This browser's holder at this table; the host stores it with each seat it gives this browser. */
 	get holder(): string {
 		return this.#deps.identity.holder;
 	}
@@ -573,7 +573,7 @@ export class TableController {
 		return this.#replication.localBotCommand(seat, this.#deps.newId(), payload);
 	}
 
-	/** Asks the host to free an offline seat (D2); false when no host can be asked now. */
+	/** Asks the host to free an offline seat; false when no host can be asked now. */
 	release(seat: Seat): boolean {
 		if (this.#closed() || !this.#replication) return false;
 		this.#release = null;
@@ -743,7 +743,7 @@ export class TableController {
 		lock?.release();
 	}
 
-	/** Another tab stole the seat lock: stop at once, before this tab can write (§4.3). */
+	/** Another tab stole the seat lock: stop at once, before this tab can write. */
 	#lockLost(): void {
 		this.#lock = null;
 		this.#step({ type: "lock-lost", now: this.#now() });

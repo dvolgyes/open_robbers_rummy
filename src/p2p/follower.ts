@@ -37,7 +37,7 @@ import type {
 } from "./wire";
 
 /**
- * The follower side of replication (plan §4.5, §4.6). A follower says hello to the host it follows, takes or
+ * The follower side of replication. A follower says hello to the host it follows, takes or
  * keeps its seat, syncs, and then applies live entries in order. It accepts entries and a replacement log only
  * from the followed host's peer. During a claim, `pull` takes a strictly better log from any peer.
  */

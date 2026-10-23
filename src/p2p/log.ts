@@ -16,7 +16,7 @@ import type { Commit, StorageResult, TableStorage } from "./storage";
 import type { Entry, SeatHolder } from "./wire";
 
 /**
- * The local copy of one replica partition (plan §4.3, §4.5): the table record and its log in memory, kept equal
+ * The local copy of one replica partition: the table record and its log in memory, kept equal
  * to storage. Commits run one at a time; each is built from the latest copy at the head of the queue, so two
  * writers in one page never build on the same revision. Only the tab that holds the seat lock opens the log.
  */

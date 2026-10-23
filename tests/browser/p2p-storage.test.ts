@@ -227,19 +227,19 @@ describe.each(SUBJECTS)("%s storage", (_name, make) => {
 
 	it("keeps partitions of other tables and seats apart", async () => {
 		const { storage } = await make();
-		const north = created();
-		const east = created({ replica: "2", rev: 2 });
+		const player1 = created();
+		const player2 = created({ replica: "2", rev: 2 });
 		const other = created({ tableId: OTHER_TABLE, rev: 1 });
-		for (const change of [north, east, other]) {
+		for (const change of [player1, player2, other]) {
 			value(await storage.commit(change));
 		}
 		value(await storage.putOutbox(outboxRecord(1, { replica: "2" })));
-		value(await storage.commit(extended(north.table, 1)));
+		value(await storage.commit(extended(player1.table, 1)));
 		expect((await loaded(storage))?.table.rev).toBe(4);
 		expect((await loaded(storage))?.outbox).toEqual([]);
 		expect(await loaded(storage, TABLE, "2")).toEqual({
-			table: east.table,
-			entries: east.append,
+			table: player2.table,
+			entries: player2.append,
 			outbox: [outboxRecord(1, { replica: "2" })],
 		});
 		expect((await loaded(storage, OTHER_TABLE))?.table).toEqual(other.table);

@@ -20,7 +20,7 @@ The owner set these targets:
 The players do not cheat, and the link is the only key.
 Public WebTorrent trackers and public STUN servers are allowed; our own server, TURN and paid relays are not.
 
-The discovery spike (`spikes/p2p-discovery`) gave this evidence:
+A discovery spike gave this evidence:
 
 - Cold discovery through the public trackers: 22 of 22 trials in less than 0.4 s.
 - Rediscovery after a reload: 0.3–0.6 s.

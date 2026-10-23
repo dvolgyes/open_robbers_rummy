@@ -41,7 +41,7 @@ import {
 } from "./room";
 
 /**
- * Call lifecycle, adversarial and partial-failure rows (call/layout plan C7), on one P2P table through the public
+ * Call lifecycle, adversarial and partial-failure rows, on one P2P table through the public
  * trackers. Player 4, Player 1 and Player 2 are app players that may use the microphone (a generated tone). Player 3 is first a
  * modified client: a harness page (tests/e2e/harness) that holds the seat and sends raw call frames past call
  * signaling. A frame goes to every connected page, so the probe's count of arriving call frames is the positive
@@ -66,7 +66,7 @@ interface HarnessPage {
 const players = {} as Record<"4" | "1" | "2", Player>;
 const tab = {} as Record<SeatKey, Page>;
 let newcomer: Player;
-let south: HarnessPage;
+let player3: HarnessPage;
 let visitor: HarnessPage | undefined;
 let link = "";
 let tableKey = "";
@@ -154,7 +154,7 @@ function raw(
 
 /** Each seat's generation, as Player 3's harness page knows them. */
 async function generations(): Promise<Record<SeatKey, number>> {
-	const { holders } = await callView(south.page);
+	const { holders } = await callView(player3.page);
 	const generation = (seat: SeatKey): number => {
 		const value = holders[seat];
 		if (value === undefined) throw new Error(`${seat} has no holder`);
@@ -304,7 +304,7 @@ test.afterEach(async ({}, testInfo) => {
 test.afterAll(async () => {
 	for (const player of [...Object.values(players), newcomer])
 		await player?.close();
-	await south?.context.close();
+	await player3?.context.close();
 	await visitor?.context.close();
 });
 
@@ -320,17 +320,15 @@ test("1: Player 4, Player 1 and Player 2 join with audio; Player 3's seat is hel
 	const key = new URLSearchParams(new URL(link).hash.slice(1)).get("k");
 	if (!key) throw new Error("the table link has no key");
 	tableKey = key;
-	south = await openHarness(browser);
-	await takeSeat(south.page, "3");
+	player3 = await openHarness(browser);
+	await takeSeat(player3.page, "3");
 	// The tiles come with the first hand, which the hosting page deals once all four seats are present.
 	for (const seat of IN_CALL)
 		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play");
 	for (const seat of IN_CALL) await joinWith(tab[seat], "Audio only");
 	await expectConnected(IN_CALL);
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "3")).toHaveText(
-			"S - player2 · Not in call",
-		);
+		await expect(caption(tab[seat], "3")).toHaveText("player3 · Not in call");
 });
 
 test("2: frames from a page without a seat, or for another generation, of an unknown type, or without a target reach the browsers and change nothing", async ({
@@ -371,28 +369,28 @@ test("2: frames from a page without a seat, or for another generation, of an unk
 		},
 		{
 			what: "a later sender generation",
-			from: south.page,
+			from: player3.page,
 			fromGen: gen["3"] + 1,
 			toLater: 0,
 			message: join,
 		},
 		{
 			what: "a later receiver generation",
-			from: south.page,
+			from: player3.page,
 			fromGen: gen["3"],
 			toLater: 1,
 			message: join,
 		},
 		{
 			what: "an unknown type",
-			from: south.page,
+			from: player3.page,
 			fromGen: gen["3"],
 			toLater: 0,
 			message: { type: "hello", session: session() },
 		},
 		{
 			what: "an offer without a target session",
-			from: south.page,
+			from: player3.page,
 			fromGen: gen["3"],
 			toLater: 0,
 			message: {
@@ -486,9 +484,9 @@ test("3: malformed or misaddressed frames from Player 3's own seat reach the bro
 	];
 	for (const [, message] of toAll)
 		for (const seat of IN_CALL)
-			await raw(south.page, seat, gen[seat], gen["3"], message);
+			await raw(player3.page, seat, gen[seat], gen["3"], message);
 	for (const [, to, message] of toOne)
-		await raw(south.page, to, gen[to], gen["3"], message);
+		await raw(player3.page, to, gen[to], gen["3"], message);
 
 	await expectArrived(before, toAll.length * IN_CALL.length + toOne.length);
 	await tab["4"].waitForTimeout(1_500);
@@ -503,11 +501,13 @@ test("4: a valid join from Player 3 opens links; after Player 3 goes and its sea
 	};
 	// The positive control: Player 3's own join through call signaling reaches each in-call seat. Player 1 and Player 2
 	// make the first offer to Player 3 (the earlier seat offers); Player 4 waits for Player 3's offer.
-	await south.page.evaluate(() => (window.ocHarness as Harness).callOpen());
-	await south.page.evaluate(() => (window.ocHarness as Harness).callSend(null));
+	await player3.page.evaluate(() => (window.ocHarness as Harness).callOpen());
+	await player3.page.evaluate(() =>
+		(window.ocHarness as Harness).callSend(null),
+	);
 	for (const seat of IN_CALL)
 		await expect(caption(tab[seat], "3")).not.toHaveText(
-			"S - player2 · Not in call",
+			"player3 · Not in call",
 		);
 	for (const seat of ["1", "2"] as const)
 		await expect
@@ -515,35 +515,32 @@ test("4: a valid join from Player 3 opens links; after Player 3 goes and its sea
 			.toBe(peers[seat] + 1);
 	await expect
 		.poll(async () => {
-			const received: readonly CallReceived[] = await south.page.evaluate(() =>
-				(window.ocHarness as Harness).callReceived(),
+			const received: readonly CallReceived[] = await player3.page.evaluate(
+				() => (window.ocHarness as Harness).callReceived(),
 			);
 			return [...new Set(received.map((message) => message.from))].sort();
 		})
-		.toEqual(["2", "1", "4"]);
+		.toEqual(["1", "2", "4"]);
 
 	// The old holder's stored status is in the call, with audio.
-	const stored: SubmitResult = await south.page.evaluate(() =>
+	const stored: SubmitResult = await player3.page.evaluate(() =>
 		(window.ocHarness as Harness).sendMedia(1, false),
 	);
 	expect(stored).toEqual({ ok: true });
 	await expect
 		.poll(async () => {
-			const records: CallRecords = await south.page.evaluate(() =>
+			const records: CallRecords = await player3.page.evaluate(() =>
 				(window.ocHarness as Harness).media(),
 			);
 			return records["3"]?.prefs.inCall;
 		})
 		.toBe(true);
 
-	await south.context.close();
+	await player3.context.close();
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "3")).toHaveText(
-			"S - player2 · Not in call",
-			{
-				timeout: GONE_MS,
-			},
-		);
+		await expect(caption(tab[seat], "3")).toHaveText("player3 · Not in call", {
+			timeout: GONE_MS,
+		});
 	for (const seat of ["1", "2"] as const)
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(2);
 	await expect(rosterSeat(tab["4"], "3")).toHaveAttribute(
@@ -572,9 +569,7 @@ test("4: a valid join from Player 3 opens links; after Player 3 goes and its sea
 	});
 	expect(await requestsFor(tab["3"], "audio")).toBe(0);
 	for (const seat of IN_CALL)
-		await expect(caption(tab[seat], "3")).toHaveText(
-			"S - player2 · Not in call",
-		);
+		await expect(caption(tab[seat], "3")).toHaveText("player3 · Not in call");
 
 	await joinWith(tab["3"], "Audio only");
 	await expectConnected(SEATS);
@@ -584,9 +579,7 @@ test("5: when one player leaves, the other three pairs keep their sound", async 
 	await leaveButton(tab["3"]).click();
 	for (const seat of IN_CALL) {
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(2);
-		await expect(caption(tab[seat], "3")).toHaveText(
-			"S - player2 · Not in call",
-		);
+		await expect(caption(tab[seat], "3")).toHaveText("player3 · Not in call");
 	}
 	for (const seat of IN_CALL) {
 		const growth = await peerAudioGrowth(tab[seat]);
@@ -610,12 +603,9 @@ test("6: leaving the room during the call ends the tracks and the links; back in
 		})
 		.toEqual({ openPeers: 0, liveTracks: 0 });
 	for (const seat of ["4", "1"] as const) {
-		await expect(caption(tab[seat], "2")).toHaveText(
-			"E - player3 · Not in call",
-			{
-				timeout: GONE_MS,
-			},
-		);
+		await expect(caption(tab[seat], "2")).toHaveText("player2 · Not in call", {
+			timeout: GONE_MS,
+		});
 		await expect.poll(async () => (await counts(tab[seat])).openPeers).toBe(1);
 	}
 
@@ -635,9 +625,7 @@ test("7: a browser limited to relays gets Retry for each of its pairs, the other
 	await leaveButton(tab["1"]).click();
 	await expect(joinButton(tab["1"])).toBeVisible();
 	for (const seat of ["4", "2"] as const)
-		await expect(caption(tab[seat], "1")).toHaveText(
-			"N - player1 · Not in call",
-		);
+		await expect(caption(tab[seat], "1")).toHaveText("player1 · Not in call");
 	await setCallRelayOnly(tab["1"], true);
 	await joinWith(tab["3"], "Audio only");
 	const others = ["4", "2", "3"] as const;
@@ -656,7 +644,7 @@ test("7: a browser limited to relays gets Retry for each of its pairs, the other
 			`${TILE_NAMES[seat]} · Direct connection unavailable`,
 		);
 		await expect(caption(tab[seat], "1")).toHaveText(
-			"N - player1 · Direct connection unavailable",
+			"player1 · Direct connection unavailable",
 			{ timeout: UNAVAILABLE_WITHIN_MS },
 		);
 	}

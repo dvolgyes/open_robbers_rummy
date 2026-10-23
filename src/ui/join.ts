@@ -295,7 +295,7 @@ export function showTable(
 		}
 	}
 
-	// The election restarts its absence clock when the page comes back (plan §4.4 rule 5).
+	// The election restarts its absence clock when the page comes back.
 	const onVisible = (): void => {
 		if (document.visibilityState === "visible") controller?.wake();
 	};

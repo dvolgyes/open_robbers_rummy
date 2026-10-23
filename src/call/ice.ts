@@ -1,5 +1,5 @@
 /**
- * ICE server configuration (handover §6): a configurable STUN list and nothing else. TURN URLs are refused so a
+ * ICE server configuration: a configurable STUN list and nothing else. TURN URLs are refused so a
  * paid relay is never enabled by a configuration value; adding TURN later changes only this module.
  */
 

@@ -153,14 +153,6 @@ td label {
 	display: none;
 }
 
-.copy-field {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.4rem;
-	align-items: center;
-	margin: 0.5rem 0;
-}
-
 .roster,
 .transcript,
 .pending {

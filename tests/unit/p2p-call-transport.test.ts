@@ -10,17 +10,17 @@ import type { Binding, CallFrame } from "../../src/p2p/wire";
 import type { Seat } from "../../src/protocol";
 import { TABLE } from "./p2p-fixtures";
 
-const PEER_N = "peerNorth0123456789a";
-const PEER_E = "peerEast00123456789a";
-const PEER_S = "peerSouth0123456789a";
-const PEER_W = "peerWest00123456789a";
+const PEER_1 = "player1x0123456789ab";
+const PEER_2 = "player2x0123456789ab";
+const PEER_3 = "player3x0123456789ab";
+const PEER_4 = "player4x0123456789ab";
 const VISITOR = "visitor0123456789abc";
 
 const BINDINGS: readonly Binding[] = [
-	{ peer: PEER_N, seat: "1", gen: 3 },
-	{ peer: PEER_E, seat: "2", gen: 1 },
-	{ peer: PEER_S, seat: "3", gen: 2 },
-	{ peer: PEER_W, seat: "4", gen: 5 },
+	{ peer: PEER_1, seat: "1", gen: 3 },
+	{ peer: PEER_2, seat: "2", gen: 1 },
+	{ peer: PEER_3, seat: "3", gen: 2 },
+	{ peer: PEER_4, seat: "4", gen: 5 },
 ];
 
 const JOIN: CallMessage = {
@@ -43,29 +43,29 @@ describe("call targets", () => {
 	it("sends a broadcast to every connected peer bound to another seat", () => {
 		const targets = callTargets(
 			BINDINGS,
-			[PEER_N, PEER_E, PEER_S, VISITOR],
+			[PEER_1, PEER_2, PEER_3, VISITOR],
 			"1",
 			null,
 		);
 		expect(targets).toEqual([
-			{ peer: PEER_E, seat: "2", gen: 1 },
-			{ peer: PEER_S, seat: "3", gen: 2 },
+			{ peer: PEER_2, seat: "2", gen: 1 },
+			{ peer: PEER_3, seat: "3", gen: 2 },
 		]);
 	});
 
 	it("sends an addressed message only to the peer of that seat", () => {
-		const all = [PEER_N, PEER_E, PEER_S, PEER_W];
+		const all = [PEER_1, PEER_2, PEER_3, PEER_4];
 		expect(callTargets(BINDINGS, all, "1", "4")).toEqual([
-			{ peer: PEER_W, seat: "4", gen: 5 },
+			{ peer: PEER_4, seat: "4", gen: 5 },
 		]);
-		expect(callTargets(BINDINGS, [PEER_N, PEER_E], "1", "4")).toEqual([]);
+		expect(callTargets(BINDINGS, [PEER_1, PEER_2], "1", "4")).toEqual([]);
 		expect(callTargets(BINDINGS, all, "1", "1")).toEqual([]);
 	});
 });
 
 describe("inbound call frames", () => {
 	it("takes the sender seat from the roster and builds an envelope for the addressed inbox", () => {
-		const inbound = inboundCall(TABLE, BINDINGS, PEER_E, frame("1", 3, 1));
+		const inbound = inboundCall(TABLE, BINDINGS, PEER_2, frame("1", 3, 1));
 		const inbox = { roomId: TABLE, seat: "1" as const, generation: 3 };
 		expect(inbound?.topic).toBe(inboxTopic(inbox));
 		expect(parseEnvelope(inbound?.envelope, inbox)).toEqual({
@@ -80,21 +80,21 @@ describe("inbound call frames", () => {
 			inboundCall(TABLE, BINDINGS, VISITOR, frame("1", 3, 1)),
 		).toBeUndefined();
 		expect(
-			inboundCall(TABLE, BINDINGS, PEER_E, frame("1", 3, 2)),
+			inboundCall(TABLE, BINDINGS, PEER_2, frame("1", 3, 2)),
 		).toBeUndefined();
 	});
 
 	it("addresses a frame with an old receiver generation to that old inbox, not to the current one", () => {
-		const inbound = inboundCall(TABLE, BINDINGS, PEER_E, frame("1", 2, 1));
+		const inbound = inboundCall(TABLE, BINDINGS, PEER_2, frame("1", 2, 1));
 		const current = { roomId: TABLE, seat: "1" as const, generation: 3 };
 		expect(inbound?.topic).not.toBe(inboxTopic(current));
 		expect(parseEnvelope(inbound?.envelope, current)).toBeUndefined();
 	});
 
 	it("never lets a frame name its own seat as the sender", () => {
-		const fromNorth = inboundCall(TABLE, BINDINGS, PEER_N, frame("1", 3, 3));
+		const fromPlayer1 = inboundCall(TABLE, BINDINGS, PEER_1, frame("1", 3, 3));
 		const inbox = { roomId: TABLE, seat: "1" as const, generation: 3 };
-		expect(parseEnvelope(fromNorth?.envelope, inbox)).toBeUndefined();
+		expect(parseEnvelope(fromPlayer1?.envelope, inbox)).toBeUndefined();
 	});
 });
 

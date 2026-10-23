@@ -25,7 +25,7 @@ import {
 } from "./room";
 
 /**
- * The call after a crash, a host change and a lost permission (plan §12 R2), on one P2P table through the public
+ * The call after a crash, a host change and a lost permission, on one P2P table through the public
  * trackers. Each person has their own browser, which may use the microphone (a generated tone). The seats join
  * with different switches, so the captions show whether a restored status is the stored one: Player 1 sends no
  * audio, and Player 2 hears nobody. A crash closes the tab without unload handlers; a reopen is a new tab of the same
@@ -176,12 +176,9 @@ test("2: a player whose tab crashes comes back in the call with its switches, an
 	await crash("1");
 	const others = ["4", "2", "3"] as const;
 	for (const seat of others)
-		await expect(caption(tab[seat], "1")).toHaveText(
-			"N - player1 · Not in call",
-			{
-				timeout: GONE_MS,
-			},
-		);
+		await expect(caption(tab[seat], "1")).toHaveText("player1 · Not in call", {
+			timeout: GONE_MS,
+		});
 	await expectConnected(others);
 
 	await reopen("1");
@@ -197,12 +194,9 @@ test("3: the host's tab crashes; the call goes on, another player becomes the ho
 	await crash("4");
 	const others = ["1", "2", "3"] as const;
 	for (const seat of others)
-		await expect(caption(tab[seat], "4")).toHaveText(
-			"W - player4 · Not in call",
-			{
-				timeout: GONE_MS,
-			},
-		);
+		await expect(caption(tab[seat], "4")).toHaveText("player4 · Not in call", {
+			timeout: GONE_MS,
+		});
 	await expectBanner(tab["2"], "waiting-for-host");
 	// The host change does not touch the call between the other seats.
 	await expectConnected(others);
@@ -240,12 +234,9 @@ test("4: a browser that must ask for the microphone again offers Rejoin the call
 	});
 	expect(await requestsFor(tab["3"], "audio")).toBe(0);
 	for (const seat of ["4", "1", "2"] as const)
-		await expect(caption(tab[seat], "3")).toHaveText(
-			"S - player2 · Not in call",
-			{
-				timeout: GONE_MS,
-			},
-		);
+		await expect(caption(tab[seat], "3")).toHaveText("player3 · Not in call", {
+			timeout: GONE_MS,
+		});
 
 	await tab["3"].context().grantPermissions(["microphone"]);
 	await rejoinButton(tab["3"]).click();

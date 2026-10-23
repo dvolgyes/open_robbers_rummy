@@ -2,7 +2,7 @@ import { base64url, platformRandomBytes, type RandomBytes } from "../ids";
 import { isSeat, SEATS, type Seat } from "../protocol";
 
 /**
- * Identifiers derived with SHA-256 (plan §4.1, §4.3). They are names, not secrets or signatures: the table key
+ * Identifiers derived with SHA-256. They are names, not secrets or signatures: the table key
  * K stays the only secret, and the Trystero password (K) is the only access control at the transport.
  */
 

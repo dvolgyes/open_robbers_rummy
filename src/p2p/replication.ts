@@ -18,7 +18,7 @@ import type {
 } from "./wire";
 
 /**
- * One page's replication (plan §4.5): it routes messages to the host engine, the follower, the outbox and the
+ * One page's replication: it routes messages to the host engine, the follower, the outbox and the
  * sync responder, and carries out the election's replication effects. Messages to this page's own peer id loop
  * back in a microtask, so the host's own commands take the same path as everyone else's.
  */

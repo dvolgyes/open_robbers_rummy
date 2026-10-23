@@ -22,7 +22,7 @@ import {
 import type { Beat } from "./wire";
 
 /**
- * Host election (plan §4.4) as a pure reducer: `stepElection` takes the state and one event and returns the next
+ * Host election as a pure reducer: `stepElection` takes the state and one event and returns the next
  * state and the effects for the controller. Times are `performance.now()` values of this page, and the controller
  * steps the election at least every TICK_MS.
  *

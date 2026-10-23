@@ -188,7 +188,7 @@ describe("banner", () => {
 		button: Extract<ElectionView, { phase: "waiting-for-host" }>["button"],
 	) => banner("open", { phase: "waiting-for-host", absentMs: 12_400, button });
 
-	it("shows one banner in the order of plan §4.9", () => {
+	it("shows one banner, in the order of precedence", () => {
 		const unreachable: ElectionView = { phase: "host-unreachable" };
 		expect(banner("expired", { phase: "superseded" })?.kind).toBe("expired");
 		expect(banner("open", { phase: "superseded" })?.kind).toBe("superseded");
@@ -377,7 +377,7 @@ describe("networkLines", () => {
 		]);
 	});
 
-	it("reports the storage in the words of plan §4.3", () => {
+	it("reports the storage in plain words", () => {
 		const storage = (persistent: boolean, persisted: boolean | undefined) =>
 			networkLines({
 				network: null,

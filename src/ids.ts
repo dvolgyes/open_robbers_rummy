@@ -1,5 +1,4 @@
 const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
-const ROOM_ID_BYTES = 16;
 
 export type RandomBytes = (length: number) => Uint8Array;
 
@@ -14,17 +13,6 @@ export function base64url(bytes: Uint8Array): string {
 		.replace(/\+/g, "-")
 		.replace(/\//g, "_")
 		.replace(/=+$/, "");
-}
-
-/** 128 bits from the platform CSPRNG; the room ID is the only key to a room. */
-export function newRoomId(
-	randomBytes: RandomBytes = platformRandomBytes,
-): string {
-	const bytes = randomBytes(ROOM_ID_BYTES);
-	if (bytes.length !== ROOM_ID_BYTES) {
-		throw new Error(`expected ${ROOM_ID_BYTES} random bytes`);
-	}
-	return base64url(bytes);
 }
 
 export function isRoomId(value: unknown): value is string {

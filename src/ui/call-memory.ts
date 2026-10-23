@@ -11,7 +11,7 @@ import {
 import type { JsonObject, Seat } from "../protocol";
 
 /**
- * Keeps this person's call status in the table and restores it on the next room screen (plan §12 R2).
+ * Keeps this person's call status in the table and restores it on the next room screen.
  *
  * It stores a record only after an explicit call action of the user (Join, Leave, a switch), never because the
  * page closed, the seat was lost or the device class changed: a reload or a crash then restores the call. One

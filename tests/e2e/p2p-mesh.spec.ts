@@ -15,7 +15,7 @@ import { withholdOffers } from "./network";
 import { buildTrackerUrls } from "./player";
 
 /**
- * The P2P table on the real network (plan P6, P7 and §12 R1, R2): production modules in Chrome, Trystero over
+ * The P2P table on the real network: production modules in Chrome, Trystero over
  * the public trackers, WebRTC data channels, IndexedDB and Web Locks. No part of the network is simulated.
  * Each player is one browser context, so each has its own storage and holder. The link key never appears in
  * an assertion message.
@@ -169,11 +169,11 @@ async function takeSeat(page: Page, key: string, seat: Seat) {
 async function fullTable(
 	browser: Browser,
 ): Promise<{ key: string; players: Record<Seat, Player> }> {
-	const north = await newPlayer(browser);
-	const key = await create(north, "1");
-	await expectSeated(north.page, "1", "1");
+	const player1 = await newPlayer(browser);
+	const key = await create(player1, "1");
+	await expectSeated(player1.page, "1", "1");
 	const players: Record<Seat, Player> = {
-		"1": north,
+		"1": player1,
 		"2": await newPlayer(browser),
 		"3": await newPlayer(browser),
 		"4": await newPlayer(browser),
@@ -184,7 +184,7 @@ async function fullTable(
 	return { key, players };
 }
 
-/** Versioned log (R3): sequence numbers 1..n without a gap, and no entry id twice. */
+/** Versioned log: sequence numbers 1..n without a gap, and no entry id twice. */
 function expectWellFormed(lines: readonly TranscriptLine[]) {
 	expect(lines.map((line) => line.seq)).toEqual(
 		lines.map((_, index) => index + 1),
@@ -472,25 +472,27 @@ test("four players form one table, take seats, and replicate commands", async ({
 	}
 	expect((await view(players["1"].page))?.hosting).toBe(true);
 
-	expect(await send(players["2"].page, "hello from east")).toEqual({
+	expect(await send(players["2"].page, "hello from player2")).toEqual({
 		ok: true,
 	});
 	// Entry 1 is the creator's claim; three seat claims and the command follow.
 	const first = await expectSameLog(players["1"].page, pages, 5);
 	expect(first.filter((line) => line.kind === "cmd")).toHaveLength(1);
 
-	// R1: a follower reloads and gets its seat and the log back.
+	// A follower reloads and gets its seat and the log back.
 	await players["2"].page.reload();
 	await players["2"].page.waitForFunction(() => window.ocHarness !== undefined);
 	await openTable(players["2"].page, key, "2");
 	await expectSeated(players["2"].page, "2", "1");
 
-	// R1: a follower crashes and reopens the link in a new tab.
+	// A follower crashes and reopens the link in a new tab.
 	await crash(players["3"]);
 	await reopenAfterCrash(players["3"], key, "3");
 	await expectSeated(players["3"].page, "3", "1");
 
-	expect(await send(players["3"].page, "south is back")).toEqual({ ok: true });
+	expect(await send(players["3"].page, "player3 is back")).toEqual({
+		ok: true,
+	});
 	const second = await expectSameLog(
 		players["1"].page,
 		pagesOf(players, SEATS),
@@ -534,7 +536,7 @@ test("the table survives the host and three players leaving", async ({
 		5,
 	);
 
-	// Three players leave; Player 1 stays alone. Without a witness, Player 1 cannot elect itself (D1).
+	// Three players leave; Player 1 stays alone. Without a witness, Player 1 cannot elect itself.
 	for (const seat of ["2", "3", "4"] as const) await crash(players[seat]);
 	expect(await waitForButton(players["1"].page)).toEqual({
 		enabled: false,
@@ -623,9 +625,9 @@ test("a visitor whose first links fail still connects within the connection budg
 	browser,
 }) => {
 	test.setTimeout(120_000);
-	const north = await newPlayer(browser);
-	const key = await create(north, "1");
-	await expectSeated(north.page, "1", "1");
+	const player1 = await newPlayer(browser);
+	const key = await create(player1, "1");
+	await expectSeated(player1.page, "1", "1");
 
 	// Each link that the visitor starts in its first 15 s fails its ICE checks. Trystero reports a failed
 	// link about 23 s after the exchange, and the table room tries again only at a later tracker announce.
@@ -649,7 +651,7 @@ test("a visitor whose first links fail still connects within the connection budg
 	expect(elapsed).toBeGreaterThan(failMs);
 
 	// The two-page rooms close once the table room has the link.
-	for (const page of [north.page, visitor.page]) {
+	for (const page of [player1.page, visitor.page]) {
 		await expect
 			.poll(async () => (await view(page))?.network?.pairRooms, {
 				timeout: CONNECT_MS,
@@ -666,11 +668,11 @@ test("a latecomer whose first offers reach no page that answers rejoins and conn
 	browser,
 }) => {
 	test.setTimeout(120_000);
-	const north = await newPlayer(browser);
-	const key = await create(north, "1");
-	await expectSeated(north.page, "1", "1");
-	const east = await newPlayer(browser);
-	await takeSeat(east.page, key, "2");
+	const player1 = await newPlayer(browser);
+	const key = await create(player1, "1");
+	await expectSeated(player1.page, "1", "1");
+	const player2 = await newPlayer(browser);
+	await takeSeat(player2.page, key, "2");
 
 	// The trackers send each offer to a few pages, and those can be pages that cannot answer: a frozen tab, or
 	// a tab that left the room but keeps its tracker sockets (the full2 seat-timeout failure). For its first
@@ -699,7 +701,7 @@ test("a latecomer whose first offers reach no page that answers rejoins and conn
 	);
 });
 
-test("game actions wait for every player (R4)", async ({ browser }) => {
+test("game actions wait for every player ", async ({ browser }) => {
 	test.setTimeout(300_000);
 	const { key, players } = await fullTable(browser);
 	const pages = pagesOf(players, SEATS);
@@ -750,7 +752,7 @@ test("game actions wait for every player (R4)", async ({ browser }) => {
 	expect(new Set(log.map((line) => line.term))).toEqual(new Set([1]));
 });
 
-test("call signaling goes over the data channels, and only from bound seats (P7)", async ({
+test("call signaling goes over the data channels, and only from bound seats", async ({
 	browser,
 }) => {
 	test.setTimeout(240_000);
@@ -855,7 +857,7 @@ test("call signaling goes over the data channels, and only from bound seats (P7)
 	expect(await arrivals(players["1"].page, stray)).toEqual([]);
 });
 
-test("call signaling and the call status come back after a network change and a reload (P7, R2)", async ({
+test("call signaling and the call status come back after a network change and a reload", async ({
 	browser,
 }) => {
 	test.setTimeout(240_000);
@@ -884,7 +886,7 @@ test("call signaling and the call status come back after a network change and a 
 		(window.ocHarness as Harness).callOnlineHistory(),
 	);
 	expect(
-		history.slice(history.indexOf("ESW")).some((seats) => !seats.includes("2")),
+		history.slice(history.indexOf("234")).some((seats) => !seats.includes("2")),
 		`Player 1's online sets: ${history}`,
 	).toBe(true);
 	expect(
@@ -892,20 +894,20 @@ test("call signaling and the call status come back after a network change and a 
 			(window.ocHarness as Harness).callEnded(),
 		),
 	).toBeNull();
-	const toEast = await callSend(players["1"].page, "2");
-	await expectArrivals(players["2"].page, toEast, [["1", gens["1"]]]);
-	const fromEast = await callSend(players["2"].page, null);
+	const toPlayer2 = await callSend(players["1"].page, "2");
+	await expectArrivals(players["2"].page, toPlayer2, [["1", gens["1"]]]);
+	const fromPlayer2 = await callSend(players["2"].page, null);
 	for (const seat of others("2")) {
-		await expectArrivals(players[seat].page, fromEast, [["2", gens["2"]]]);
+		await expectArrivals(players[seat].page, fromPlayer2, [["2", gens["2"]]]);
 	}
 
-	// R2: Player 2's call status is a versioned record in every replica; an equal version never replaces it. The host
+	// Player 2's call status is a versioned record in every replica; an equal version never replaces it. The host
 	// stores it with the holder of Player 2's seat, which only Player 2's own browser knows first-hand.
-	const eastHolder = await players["2"].page.evaluate(() =>
+	const player2Holder = await players["2"].page.evaluate(() =>
 		(window.ocHarness as Harness).holder(),
 	);
 	expect(await sendMedia(players["2"].page, 1, true)).toEqual({ ok: true });
-	await expectMedia(pages, { "2": callStatus(1, true, eastHolder) });
+	await expectMedia(pages, { "2": callStatus(1, true, player2Holder) });
 	expect(await sendMedia(players["2"].page, 1, false)).toEqual({ ok: true });
 	await expect
 		.poll(
@@ -918,7 +920,7 @@ test("call signaling and the call status come back after a network change and a 
 		)
 		.toEqual([["rejected", "a newer call status is stored"]]);
 	expect(await sendMedia(players["2"].page, 2, false)).toEqual({ ok: true });
-	await expectMedia(pages, { "2": callStatus(2, false, eastHolder) });
+	await expectMedia(pages, { "2": callStatus(2, false, player2Holder) });
 
 	// After a reload, Player 2 reads its call status from its own replica. Its own URL binds the seat again at the
 	// generation that it holds, and its new inbox receives.
@@ -927,7 +929,7 @@ test("call signaling and the call status come back after a network change and a 
 	await openTable(players["2"].page, key, "2");
 	await expectSeated(players["2"].page, "2", "1");
 	await expectMedia([players["2"].page], {
-		"2": callStatus(2, false, eastHolder),
+		"2": callStatus(2, false, player2Holder),
 	});
 	const reopened = await callOpen(players["2"].page);
 	expect(reopened.generation).toBe(gens["2"]);
@@ -943,9 +945,9 @@ test("call signaling and the call status come back after a network change and a 
 });
 
 test("a page with another key never becomes a peer", async ({ browser }) => {
-	const north = await newPlayer(browser);
-	const key = await create(north, "1");
-	await expectSeated(north.page, "1", "1");
+	const player1 = await newPlayer(browser);
+	const key = await create(player1, "1");
+	await expectSeated(player1.page, "1", "1");
 	const stranger = await newPlayer(browser);
 	await stranger.page.evaluate(
 		(link) => (window.ocHarness as Harness).wrongKeyJoin(link),
@@ -954,7 +956,7 @@ test("a page with another key never becomes a peer", async ({ browser }) => {
 	await expect
 		.poll(
 			async () => {
-				const table = await view(north.page);
+				const table = await view(player1.page);
 				const other = await stranger.page.evaluate(() =>
 					(window.ocHarness as Harness).strangerView(),
 				);
@@ -963,7 +965,7 @@ test("a page with another key never becomes a peer", async ({ browser }) => {
 			{ timeout: CONNECT_MS },
 		)
 		.toBeGreaterThanOrEqual(1);
-	expect((await view(north.page))?.peers).toEqual([]);
+	expect((await view(player1.page))?.peers).toEqual([]);
 	expect(
 		(
 			await stranger.page.evaluate(() =>
@@ -976,9 +978,9 @@ test("a page with another key never becomes a peer", async ({ browser }) => {
 test("the receive cap drops an oversize control message and the link keeps working", async ({
 	browser,
 }) => {
-	const north = await newPlayer(browser);
-	const key = await create(north, "1");
-	await expectSeated(north.page, "1", "1");
+	const player1 = await newPlayer(browser);
+	const key = await create(player1, "1");
+	await expectSeated(player1.page, "1", "1");
 	const sender = await newPlayer(browser);
 	expect(
 		await sender.page.evaluate(
@@ -987,20 +989,20 @@ test("the receive cap drops an oversize control message and the link keeps worki
 		),
 	).toBe(true);
 	expect(
-		(await view(north.page))?.network?.dropped.oversize,
+		(await view(player1.page))?.network?.dropped.oversize,
 	).toBeGreaterThanOrEqual(1);
 });
 
 test("a second tab cannot take a seat from an active same-browser tab", async ({
 	browser,
 }) => {
-	const north = await newPlayer(browser);
-	const key = await create(north, "1");
-	await expectSeated(north.page, "1", "1");
-	const east = await newPlayer(browser);
-	await takeSeat(east.page, key, "2");
+	const player1 = await newPlayer(browser);
+	const key = await create(player1, "1");
+	await expectSeated(player1.page, "1", "1");
+	const player2 = await newPlayer(browser);
+	await takeSeat(player2.page, key, "2");
 
-	const second = await openPage(east.context);
+	const second = await openPage(player2.context);
 	await openTable(second, key);
 	await expect
 		.poll(async () => (await view(second))?.heldElsewhere, {
@@ -1010,19 +1012,19 @@ test("a second tab cannot take a seat from an active same-browser tab", async ({
 	expect(
 		await second.evaluate(() => (window.ocHarness as Harness).choose("2")),
 	).toEqual({ ok: false, reason: "held-elsewhere" });
-	await expectSeated(east.page, "2", "1");
-	expect(await send(east.page, "still active")).toEqual({ ok: true });
-	await expectSameLog(north.page, [east.page], 3);
+	await expectSeated(player2.page, "2", "1");
+	expect(await send(player2.page, "still active")).toEqual({ ok: true });
+	await expectSameLog(player1.page, [player2.page], 3);
 });
 
 test("a claim for a taken seat fails and the page stays a visitor", async ({
 	browser,
 }) => {
-	const north = await newPlayer(browser);
-	const key = await create(north, "1");
-	await expectSeated(north.page, "1", "1");
-	const east = await newPlayer(browser);
-	await takeSeat(east.page, key, "2");
+	const player1 = await newPlayer(browser);
+	const key = await create(player1, "1");
+	await expectSeated(player1.page, "1", "1");
+	const player2 = await newPlayer(browser);
+	await takeSeat(player2.page, key, "2");
 
 	const late = await newPlayer(browser);
 	await openTable(late.page, key);

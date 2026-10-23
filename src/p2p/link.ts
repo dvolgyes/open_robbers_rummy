@@ -1,7 +1,7 @@
 import { base64url, platformRandomBytes, type RandomBytes } from "../ids";
 
 /**
- * The table link fragment (plan §4.1): `#v=p2p-v2&k=<K>`. K is 32 CSPRNG bytes in base64url and is the only key to
+ * The table link fragment: `#v=p2p-v2&k=<K>`. K is 32 CSPRNG bytes in base64url and is the only key to
  * the table. The fragment never reaches the web server; names and host metadata can be carried in the query.
  */
 

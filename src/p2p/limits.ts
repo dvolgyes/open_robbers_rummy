@@ -1,10 +1,10 @@
-/** Every timer and cap of the peer-to-peer table (plan §5). In-page timers use `performance.now()`. */
+/** Every timer and cap of the peer-to-peer table. In-page timers use `performance.now()`. */
 
-// Election (plan §4.4).
+// Election.
 /** Every page sends a beat this often; a host, or a seat's peer, is offline after HOST_LOST_MS without one. */
 export const BEAT_MS = 10_000;
 export const HOST_LOST_MS = 20_000;
-/** A seat whose holder has been unseen this long is free for any other browser (plan §4.6). A fixed limit, not a setting. */
+/** A seat whose holder has been unseen this long is free for any other browser. A fixed limit, not a setting. */
 export const SEAT_HOLD_MS = 180_000;
 /** A seat whose holder has been offline this long is free. Covers a short WebRTC drop: Trystero reports a leave only after its 5 s disconnect timer, and a page that returns is found again by re-announcement. */
 export const SEAT_GRACE_MS = 15_000;
@@ -18,7 +18,7 @@ export const LATE_TICK_MS = 5_000;
 /** The controller steps the election at least this often. */
 export const TICK_MS = 500;
 
-// Connection checks and failure states (plan §4.9).
+// Connection checks and failure states.
 export const PING_COUNT = 3;
 export const PING_TIMEOUT_MS = 5_000;
 export const NOBODY_MS = 10_000;
@@ -43,7 +43,7 @@ export const PAIR_RETRY_MAX_MS = 120_000;
 export const REJOIN_MS = 10_000;
 export const REJOIN_MAX_MS = 60_000;
 
-// Replication (plan §4.5).
+// Replication.
 export const ACK_DEBOUNCE_MS = 1_000;
 export const GAP_WAIT_MS = 1_500;
 export const SYNC_TIMEOUT_MS = 5_000;
@@ -55,19 +55,19 @@ export const RESULT_TIMEOUT_MS = 10_000;
 export const WAITING_RETRY_MS = 2_000;
 export const EARLY_ENTRIES = 64;
 
-// Expiry (plan §4.7).
+// Expiry.
 export const TABLE_IDLE_MS = 24 * 60 * 60 * 1_000;
 export const CLEANUP_MS = 60_000;
 export const TOMBSTONE_MS = 30 * 24 * 60 * 60 * 1_000;
 
-// Trystero receive caps, checked before a message is buffered (plan §4.2).
+// Trystero receive caps, checked before a message is buffered.
 export const MAX_RECEIVE_BYTES = 1024 * 1024;
 export const CTL_BYTES = 8 * 1024;
 export const LOG_BYTES = 256 * 1024;
 export const CALL_BYTES = 64 * 1024;
 export const MESH_BYTES = 2 * 1024;
 
-// Field caps (plan §5). MAX_PAGE_BYTES bounds a whole sync page, including the state on its last page, so a page
+// Field caps. MAX_PAGE_BYTES bounds a whole sync page, including the state on its last page, so a page
 // fits in LOG_BYTES; an entry message (payload, event and state) fits as well.
 export const MAX_PAYLOAD_BYTES = 4_096;
 export const MAX_EVENT_BYTES = 16 * 1024;
@@ -82,5 +82,5 @@ export const MAX_TERM = 2 ** 31 - 1;
 /** Nesting depth of a payload, event or state; a rummy table state uses about 6. */
 export const MAX_JSON_DEPTH = 32;
 
-// Rate limits (plan §5).
+// Rate limits.
 export const CTL_PER_SECOND = 50;

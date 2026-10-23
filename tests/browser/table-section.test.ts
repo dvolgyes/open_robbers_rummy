@@ -164,13 +164,13 @@ describe("the other players", () => {
 			(node) => node.getAttribute("data-testid"),
 		);
 		expect(seats).toEqual(["seat-4", "seat-1", "seat-2"]);
-		const west = query(opponents, '[data-testid="seat-4"]');
-		const strip = query(west, '[data-testid="card-count"]');
+		const player4 = query(opponents, '[data-testid="seat-4"]');
+		const strip = query(player4, '[data-testid="card-count"]');
 		expect(strip.dataset.count).toBe("3");
 		expect(strip.querySelectorAll(".count-back")).toHaveLength(3);
 		expect(query(strip, ".count-number").textContent).toBe("3");
 		// The strip sits below the video tile, and the backs overlap.
-		const tile = query(west, ".tile").getBoundingClientRect();
+		const tile = query(player4, ".tile").getBoundingClientRect();
 		expect(strip.getBoundingClientRect().top).toBeGreaterThanOrEqual(
 			tile.bottom,
 		);

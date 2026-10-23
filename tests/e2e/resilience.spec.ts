@@ -18,7 +18,7 @@ import {
 } from "./room";
 
 /**
- * Failures around the table (plan §9): the trackers go down, the browser does not store data, the link is old,
+ * Failures around the table: the trackers go down, the browser does not store data, the link is old,
  * of another version or damaged, and the table expires. Each test has its own browsers. The trackers and the
  * peers are the real ones.
  */
@@ -27,7 +27,7 @@ const all: Player[] = [];
 const current: Player[] = [];
 let openBrowser: (name: string, rig?: RigOptions) => Promise<Player>;
 
-/** Every table older than this is expired (24 h without activity, plan §4.7). */
+/** Every table older than this is expired (24 h without activity). */
 const AGED_MS = 25 * 60 * 60 * 1_000;
 
 /**
@@ -147,8 +147,8 @@ test("a tracker outage keeps the table: messages, the deal and the play go on; a
 
 test("a browser that does not store data cannot create a table, but it can take a seat and play; it cannot become the host", async () => {
 	test.setTimeout(120_000);
-	const west = await openBrowser("west");
-	const creator = await west.page("./");
+	const player4 = await openBrowser("player4");
+	const creator = await player4.page("./");
 	const link = await createRoom(creator);
 	const blocked = await openBrowser("blocked", { blockSiteData: true });
 
@@ -198,8 +198,8 @@ test("a link of another version shows the version message", async () => {
 });
 
 test("a damaged key opens an empty table: nobody is there", async () => {
-	const west = await openBrowser("west");
-	const creator = await west.page("./");
+	const player4 = await openBrowser("player4");
+	const creator = await player4.page("./");
 	const link = await createRoom(creator);
 	// The same length and alphabet, the first key character changed: another table. The last character holds
 	// only 4 key bits, so a change there can make the link not valid instead. The search starts at the fragment,
@@ -219,8 +219,8 @@ test("a damaged key opens an empty table: nobody is there", async () => {
 });
 
 test("a table without activity for 24 h expires and stays expired; the full room link starts it again", async () => {
-	const west = await openBrowser("west");
-	const page = await west.page("./");
+	const player4 = await openBrowser("player4");
+	const page = await player4.page("./");
 	const link = await createRoom(page);
 	// Without the setup query the link has only the key, so nothing can start the table again (ADR 0002).
 	const keyOnly = new URL(link);

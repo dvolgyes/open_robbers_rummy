@@ -37,7 +37,7 @@ import {
 } from "./wire";
 
 /**
- * The page's Trystero table room (plan §4.2). Trackers only introduce the peers; every message then goes over
+ * The page's Trystero table room. Trackers only introduce the peers; every message then goes over
  * the WebRTC data channels. Each action caps its size before Trystero buffers a message, and each message passes
  * the wire validators before a handler sees it. Messages from peers above MAX_PEERS, or from peers that are not
  * connected, never reach a handler.

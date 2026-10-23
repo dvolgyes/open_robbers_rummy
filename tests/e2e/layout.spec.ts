@@ -3,28 +3,15 @@ import { Player } from "./player";
 import { CONNECT_MS, createRoom, pick, type SeatKey, turnOrder } from "./room";
 
 /**
- * Player-relative layout (call/layout plan C3). Four desktop browsers check the rotation, the tiles and the free
- * space between the table parts; a phone-sized browser checks the compact layout at a second table. A deal needs
- * all four seats (plan §12 R4), so three of the desktop browsers also sit at the second table.
+ * Player-relative layout. Four desktop browsers check the row of the other players, the tiles and the free space
+ * between the table parts; a phone-sized browser checks the compact layout at a second table. A deal needs every
+ * seat, so three of the desktop browsers also sit at the second table. Tables of six and of two fill the other
+ * seats with the host page's bots.
  */
 test.describe.configure({ mode: "serial" });
 
 const SEATS = ["1", "2", "3", "4"] as const satisfies readonly SeatKey[];
-const SEAT_NAMES: Readonly<Record<SeatKey, string>> = {
-	"1": "Player 1",
-	"2": "Player 2",
-	"3": "Player 3",
-	"4": "Player 4",
-};
-/** Play goes clockwise, so the next seat sits on the viewer's left. */
-const AROUND: Readonly<
-	Record<SeatKey, { left: SeatKey; partner: SeatKey; right: SeatKey }>
-> = {
-	"1": { left: "2", partner: "3", right: "4" },
-	"2": { left: "3", partner: "4", right: "1" },
-	"3": { left: "4", partner: "1", right: "2" },
-	"4": { left: "1", partner: "2", right: "3" },
-};
+const SIX = ["1", "2", "3", "4", "5", "6"] as const;
 /** Half a pixel absorbs subpixel rounding of the layout. */
 const SUBPIXEL = 0.5;
 /** The call controls; each name spells out the way and the medium. */
@@ -50,7 +37,7 @@ let phone: Player | undefined;
 let phoneTab: Page | undefined;
 
 const table = (page: Page): Locator => page.getByTestId("table");
-const tile = (page: Page, seat: SeatKey): Locator =>
+const tile = (page: Page, seat: string): Locator =>
 	page.getByTestId(`tile-${seat}`);
 
 interface Rect {
@@ -115,73 +102,65 @@ function expectApart(
 			).toBe(0);
 }
 
-/** The parts of the table that must keep apart: the four places, the centre and the call dock. */
+/** The parts of the table that must keep apart: the row of the other players, the centre, the own place and the call dock. */
 const TABLE_PARTS: Readonly<Record<string, string>> = {
-	top: ".seat-top",
-	left: ".seat-left",
-	right: ".seat-right",
-	bottom: ".seat-bottom",
+	others: '[data-testid="opponents"]',
 	centre: '[data-testid="centre"]',
+	own: ".seat-bottom",
 	dock: ".dock",
 };
 
 /**
- * Own place lowest, partner highest, left opponent leftmost, right opponent rightmost; a tile in each other
- * place and none for the viewer; no two parts of the table overlap. In the one-row form the partner shares the
- * top row with the opponents, between them.
+ * The other players sit in one row above the centre, in turn order from the seat after the viewer, each with a
+ * tile; the viewer has no tile and holds the hand in the own place below the centre. No two parts of the table
+ * overlap.
  */
 async function expectRotation(
 	page: Page,
-	viewer: SeatKey,
-	form: "row" | "around",
+	viewer: string,
+	seats: readonly string[],
 ): Promise<void> {
-	const around = AROUND[viewer];
-	for (const [place, seat] of [
-		["top", around.partner],
-		["left", around.left],
-		["right", around.right],
-	] as const) {
+	const at = seats.indexOf(viewer);
+	const order = [...seats.slice(at + 1), ...seats.slice(0, at)];
+	const row = page.getByTestId("opponents").locator(".seat.opponent");
+	await expect(row).toHaveCount(order.length);
+	for (const [index, seat] of order.entries()) {
 		await expect(
-			page.locator(`.seat-${place}`).getByTestId(`tile-${seat}`),
-			`${SEAT_NAMES[seat]} sits ${place}`,
-		).toHaveCount(1);
+			row.nth(index),
+			`Player ${seat} is number ${index + 1} in the row`,
+		).toHaveAttribute("data-testid", `seat-${seat}`);
+		await expect(row.nth(index).getByTestId(`tile-${seat}`)).toHaveCount(1);
 		await expect(tile(page, seat).locator(".avatar")).toHaveText(seat);
 	}
 	await expect(tile(page, viewer)).toHaveCount(0);
 	await expect(page.locator(".seat-bottom .own-hand")).toHaveCount(1);
 
-	const rects = await measure(page, TABLE_PARTS);
-	const at = (name: string): { x: number; y: number } =>
-		middle(shown(rects, name));
-	for (const other of ["top", "left", "right"])
-		expect(at("bottom").y, `own place below ${other}`).toBeGreaterThan(
-			at(other).y,
+	const tiles = await row.evaluateAll((nodes) =>
+		nodes.map((node) => {
+			const { x, y } = (
+				node.querySelector(".tile") ?? node
+			).getBoundingClientRect();
+			return { x, y };
+		}),
+	);
+	for (const [index, box] of tiles.entries()) {
+		expect(Math.abs(box.y - (tiles[0]?.y ?? 0)), "one row").toBeLessThanOrEqual(
+			1,
 		);
-	expect(at("left").x, "left opponent left of the right one").toBeLessThan(
-		at("right").x,
+		if (index > 0)
+			expect(box.x, "turn order from left to right").toBeGreaterThan(
+				tiles[index - 1]?.x ?? 0,
+			);
+	}
+	const rects = await measure(page, TABLE_PARTS);
+	const middleY = (name: string): number => middle(shown(rects, name)).y;
+	expect(middleY("others"), "the other players above the centre").toBeLessThan(
+		middleY("centre"),
+	);
+	expect(middleY("centre"), "the centre above the own place").toBeLessThan(
+		middleY("own"),
 	);
 	expectApart(rects, Object.keys(TABLE_PARTS));
-	if (form === "around") {
-		for (const other of ["left", "right", "bottom"])
-			expect(at("top").y, `partner above ${other}`).toBeLessThan(at(other).y);
-		return;
-	}
-	const tiles = await measure(page, {
-		top: ".seat-top .tile",
-		left: ".seat-left .tile",
-		right: ".seat-right .tile",
-	});
-	for (const side of ["left", "right"])
-		expect(
-			Math.abs(shown(tiles, side).y - shown(tiles, "top").y),
-			`${side} tile in the partner's row`,
-		).toBeLessThanOrEqual(1);
-	expect(at("top").x, "partner right of the left opponent").toBeGreaterThan(
-		at("left").x,
-	);
-	expect(at("top").x, "partner left of the right opponent").toBeLessThan(
-		at("right").x,
-	);
 }
 
 /** The page does not scroll sideways, and the named parts show inside the window without page scroll. */
@@ -215,9 +194,8 @@ async function expectFit(
 	}).toPass({ timeout: 5_000 });
 }
 
-/** The parts that are not seats: the scores, the call dock, the room controls, the drawer and the language. */
+/** The parts that are not seats: the call dock, the room controls, the drawer and the language. */
 const SIDE_PARTS: Readonly<Record<string, string>> = {
-	scores: '[data-testid="score-strip"]',
 	dock: ".dock",
 	controls: '[data-testid="room-controls"]',
 	drawer: '[data-testid="room-drawer"]',
@@ -294,7 +272,7 @@ async function expectSideParts(
 		overlap(shown(rects, "language"), controls),
 		"the language with the room controls",
 	).toBeGreaterThan(0);
-	expectApart(rects, ["scores", "dock", "controls", "drawer"]);
+	expectApart(rects, ["dock", "controls", "drawer"]);
 }
 
 /** The viewer's own hand and its action buttons. */
@@ -324,7 +302,7 @@ test.afterAll(async () => {
 	await phone?.close();
 });
 
-test("1: desktop, first hand: each of the four viewers sits at the bottom, with tiles in the other places", async () => {
+test("1: desktop, first hand: each of the four viewers sits at the bottom, with the other players in one row above", async () => {
 	tab["4"] = await players["4"].page("./");
 	const link = await createRoom(tab["4"]);
 	for (const seat of ["1", "3", "2"] as const) {
@@ -336,7 +314,7 @@ test("1: desktop, first hand: each of the four viewers sits at the bottom, with 
 		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play", {
 			timeout: CONNECT_MS,
 		});
-		await expectRotation(tab[seat], seat, "row");
+		await expectRotation(tab[seat], seat, SEATS);
 	}
 
 	// The window of the first player shows the hand and the action buttons without page scroll, also on a low
@@ -367,7 +345,7 @@ test("2: a phone shows the table without sideways scroll, with the own hand and 
 		await phoneTab.setViewportSize(size);
 		await test.step(`${size.width}×${size.height}`, async () => {
 			const page = phoneTab as Page;
-			await expectRotation(page, "1", "around");
+			await expectRotation(page, "1", SEATS);
 			await expectSideParts(page, "below");
 			await page.locator(".own-hand").scrollIntoViewIfNeeded();
 			const view = await page.evaluate(() => ({
@@ -413,5 +391,60 @@ test("3: the call controls have names that spell out the way and the medium, and
 		await expect(toggle).toBeDisabled();
 		await expect(toggle).toHaveAttribute("aria-pressed", "false");
 		await expect(toggle.locator(".icon-slash")).toHaveCount(1);
+	}
+});
+
+/**
+ * Creates a table of `count` seats on the host page, where the host sits at `me` and its bots take `bots`. The deal
+ * needs no other browser. Returns once the first hand is dealt.
+ */
+async function createBotTable(
+	page: Page,
+	count: number,
+	me: string,
+	bots: readonly string[],
+): Promise<void> {
+	await page.locator('select[name="players"]').selectOption(String(count));
+	await page.locator(`input[name="me"][value="${me}"]`).check();
+	for (const seat of bots)
+		await page.locator(`input[name="bot-${seat}"]`).check();
+	await page.getByTestId("create").click();
+	await expect(table(page)).toHaveAttribute("data-phase", "play", {
+		timeout: CONNECT_MS,
+	});
+}
+
+test("4: a table of six shows the five other players in one row, also at phone width", async () => {
+	const page = await players["4"].page("./");
+	try {
+		await createBotTable(page, 6, "4", ["1", "2", "3", "5", "6"]);
+		await expectRotation(page, "4", SIX);
+		await expectFit(page, OWN_PARTS);
+		await expectSideParts(page, "canvas");
+		await page.setViewportSize({ width: 320, height: 568 });
+		await expectRotation(page, "4", SIX);
+		await expectSideParts(page, "below");
+		const view = await page.evaluate(() => ({
+			innerWidth: window.innerWidth,
+			scrollWidth: document.documentElement.scrollWidth,
+		}));
+		expect(view.scrollWidth, "sideways page scroll").toBeLessThanOrEqual(
+			view.innerWidth,
+		);
+	} finally {
+		// Closing the host page stops its bots.
+		await page.close();
+	}
+});
+
+test("5: a table of two shows the one other player above the centre", async () => {
+	const page = await players["4"].page("./");
+	try {
+		await createBotTable(page, 2, "2", ["1"]);
+		await expectRotation(page, "2", SIX.slice(0, 2));
+		await expectFit(page, OWN_PARTS);
+		await expectSideParts(page, "canvas");
+	} finally {
+		await page.close();
 	}
 });

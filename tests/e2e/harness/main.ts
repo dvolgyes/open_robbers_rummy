@@ -132,7 +132,7 @@ export interface Harness {
 	 */
 	callRaw(to: Seat, toGen: number, fromGen: number, msg: unknown): void;
 	callView(): CallView;
-	/** Every distinct online set since `callOpen`, in order, as seat strings such as "ESW". */
+	/** Every distinct online set since `callOpen`, in order, as seat strings such as "234". */
 	callOnlineHistory(): readonly string[];
 	/** Sends this seat's call status record with `version`. */
 	sendMedia(version: number, video: boolean): Promise<SubmitResult>;
@@ -149,7 +149,7 @@ declare global {
 }
 
 const CONFIG: RoomConfig = {
-	names: { "1": "north", "2": "east", "3": "south", "4": "west" },
+	names: { "1": "player1", "2": "player2", "3": "player3", "4": "player4" },
 	table: DEFAULT_TABLE_SETUP,
 };
 

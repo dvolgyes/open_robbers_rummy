@@ -8,7 +8,7 @@ import {
 } from "./limits";
 
 /**
- * Two-page Trystero rooms that repair the table's mesh (deviation from plan §4.2, "one joinRoom per page").
+ * Two-page Trystero rooms that repair the table's mesh. A page can be in more rooms than its table room.
  * A tracker sends each announce, with one shared offer, to a few peers and repeats it only every 120 s, so in a
  * room of four pages some links stay missing for minutes. Two pages that miss each other join a room that only
  * they can name, and it connects during Trystero's first announces. Trystero shares one connection per peer

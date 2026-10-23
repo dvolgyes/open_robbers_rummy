@@ -128,7 +128,7 @@ export function storageText(code: StorageCode, t: Translate = english): string {
 	}
 }
 
-/** The notice on a page that keeps the table only in memory (plan §4.3). */
+/** The notice on a page that keeps the table only in memory. */
 export function storageNotice(problem: string, t: Translate = english): string {
 	return t(
 		"This browser does not store data ({problem}). You can play, but you cannot become the host, and a reload loses this copy of the table.",
@@ -235,7 +235,7 @@ export interface BannerInput {
 }
 
 /**
- * One banner at a time (plan §4.9): expired > superseded > incompatible > full > connection failed > host
+ * One banner at a time: expired > superseded > incompatible > full > connection failed > host
  * unreachable > becoming host > waiting for host > nobody here > connecting.
  */
 export function bannerFor(input: BannerInput): Banner | undefined {
@@ -488,7 +488,7 @@ export interface RosterRow {
 	readonly host: boolean;
 	readonly you: boolean;
 	readonly state: "online" | "offline" | "free";
-	/** Another player holds this seat and is offline, so the viewer may release it (D2). */
+	/** Another player holds this seat and is offline, so the viewer may release it. */
 	readonly releasable: boolean;
 }
 
@@ -552,7 +552,7 @@ export function heldSeats(rows: readonly SeatHolder[]): ReadonlySet<Seat> {
 }
 
 /**
- * The host's seat, and the seats whose peer the roster binds at the seat's current generation (plan §12 R4).
+ * The host's seat, and the seats whose peer the roster binds at the seat's current generation.
  * The host decides; this copy only explains why an action waits.
  */
 export function presentSeats(

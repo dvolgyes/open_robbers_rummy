@@ -1,7 +1,7 @@
 import type { Medium } from "./policy";
 
 /**
- * The local microphone and, on desktop, the camera (call/layout plan §4.5). A capture starts only while the local
+ * The local microphone and, on desktop, the camera. A capture starts only while the local
  * user is in the call with the matching Send switch on; the caller checks the device class. Every request has a
  * token: a result that arrives after the switch changed is stopped at once and never attached.
  */

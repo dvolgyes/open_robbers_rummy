@@ -18,15 +18,15 @@ import {
 	CONFIG,
 	commandId,
 	entries,
-	HOLDER_E,
-	HOLDER_N,
+	HOLDER_1,
+	HOLDER_2,
 	outboxRecord,
 	TABLE,
 	tableRecord,
 } from "../unit/p2p-fixtures";
 import { deleteDatabase, openNewerVersion, openStorage } from "./indexed-db";
 
-const AUTH_3: Authority = { term: 3, tag: `${HOLDER_E}.2`, inc: 4 };
+const AUTH_3: Authority = { term: 3, tag: `${HOLDER_2}.2`, inc: 4 };
 
 beforeEach(deleteDatabase);
 
@@ -61,7 +61,7 @@ describe("LocalLog", () => {
 			creationCommit({
 				tableId: TABLE,
 				seat: "1",
-				holder: HOLDER_N,
+				holder: HOLDER_1,
 				config: CONFIG,
 				state: { phase: "lobby" },
 				auth: AUTH_1,
@@ -75,7 +75,7 @@ describe("LocalLog", () => {
 		expect(log.table?.inc).toBe(1);
 		expect(log.table?.seats.find((row) => row.seat === "1")).toEqual({
 			seat: "1",
-			holder: HOLDER_N,
+			holder: HOLDER_1,
 			gen: 1,
 		});
 		expect(log.entry(1)?.kind).toBe("seat");

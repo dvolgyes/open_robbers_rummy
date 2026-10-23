@@ -33,7 +33,7 @@ import {
 	CONFIG,
 	commandId,
 	entries,
-	HOLDER_E,
+	HOLDER_2,
 	TABLE,
 	tableRecord,
 } from "./p2p-fixtures";
@@ -41,7 +41,7 @@ import {
 const HOST = peerId("host");
 const HOST2 = peerId("newhost");
 const OTHER = peerId("other");
-const CLIENT_E = "clientE-0123456789abcd";
+const CLIENT_2 = "client2-0123456789abcd";
 
 const FIRST: Followed = { peer: HOST, auth: AUTH_1 };
 const SECOND: Followed = { peer: HOST2, auth: AUTH_2 };
@@ -95,7 +95,7 @@ class Rig {
 		this.follower = new Follower(
 			{
 				tableId: TABLE,
-				client: CLIENT_E,
+				client: CLIENT_2,
 				send: this.sent,
 				clock: this.clock,
 				onEvent: (event) => this.events.push(event),
@@ -117,7 +117,7 @@ class Rig {
 			host: end?.auth ?? AUTH_1,
 			seats: SEATS.map((seat) => ({
 				seat,
-				holder: seat === "2" ? HOLDER_E : null,
+				holder: seat === "2" ? HOLDER_2 : null,
 				gen: seat === "2" ? 1 : 0,
 			})),
 		});
@@ -229,7 +229,7 @@ describe("joining", () => {
 				{
 					k: "hello",
 					b: LINK_VERSION,
-					client: CLIENT_E,
+					client: CLIENT_2,
 				},
 			],
 			[HOST, { k: "claim-seat", req: 1, seat: "2" }],
@@ -264,7 +264,7 @@ describe("joining", () => {
 			{
 				k: "hello",
 				b: LINK_VERSION,
-				client: CLIENT_E,
+				client: CLIENT_2,
 				seat: "2",
 				gen: 1,
 				pos: { rev: 3, lastAuth: AUTH_1 },

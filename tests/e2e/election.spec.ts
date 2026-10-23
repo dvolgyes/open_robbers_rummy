@@ -24,9 +24,9 @@ import {
 } from "./room";
 
 /**
- * Host election on the peer-to-peer table (plan §4.4, §9). The owner's numbers: the "Make me the host" button
+ * Host election on the peer-to-peer table. The owner's numbers: the "Make me the host" button
  * after 10 s without a host, and an automatic volunteer after 30 s. A new term needs a witness: another browser
- * at the table (plan §2 D1). Each test has its own table and its own browsers.
+ * at the table. Each test has its own table and its own browsers.
  */
 
 /**
@@ -49,16 +49,16 @@ interface SeatedTable {
 	readonly link: string;
 	readonly tab: Partial<Record<SeatKey, Page>>;
 	/** The creator's browser. */
-	readonly west: Player;
+	readonly player4: Player;
 }
 
 /** Player 4 creates a table and hosts it; each other seat takes its place from the link in its own browser. */
 async function seatTable(
 	seats: readonly Exclude<SeatKey, "4">[],
 ): Promise<SeatedTable> {
-	const west = await openBrowser("west");
+	const player4 = await openBrowser("player4");
 	const tab: Partial<Record<SeatKey, Page>> = {};
-	const creator = await west.page("./");
+	const creator = await player4.page("./");
 	tab["4"] = creator;
 	const link = await createRoom(creator);
 	for (const seat of seats) {
@@ -72,7 +72,7 @@ async function seatTable(
 		});
 		tab[seat] = page;
 	}
-	return { link, tab, west };
+	return { link, tab, player4 };
 }
 
 function tabOf(tab: Partial<Record<SeatKey, Page>>, seat: SeatKey): Page {
@@ -153,24 +153,24 @@ test.afterEach(async ({}, testInfo) => {
 });
 
 /** Player 4 leaves a table where only Player 1 sits. Player 1's page waits for a host and shows the disabled button. */
-async function northAlone(): Promise<{
+async function player1Alone(): Promise<{
 	readonly link: string;
-	readonly north: Page;
-	readonly westBrowser: Player;
+	readonly player1: Page;
+	readonly player4Browser: Player;
 	readonly since: number;
 	/** When the disabled button showed: BUTTON_MS into Player 1's absence clock. */
 	readonly shownAt: number;
 }> {
-	const { link, tab, west: westBrowser } = await seatTable(["1"]);
-	const north = tabOf(tab, "1");
+	const { link, tab, player4: player4Browser } = await seatTable(["1"]);
+	const player1 = tabOf(tab, "1");
 	await tabOf(tab, "4").close({ runBeforeUnload: false });
 	const since = Date.now();
 
 	// The banner reads "unreachable" until Player 4's last beat is HOST_LOST_MS old.
-	await expectBanner(north, "waiting-for-host", {
+	await expectBanner(player1, "waiting-for-host", {
 		timeout: HOST_LOST_MS + 10_000,
 	});
-	const become = north.getByTestId("become-host");
+	const become = player1.getByTestId("become-host");
 	await expect(become).toBeVisible({ timeout: BUTTON_LATEST_MS });
 	const shownAt = Date.now();
 	const shownAfter = shownAt - since;
@@ -180,37 +180,37 @@ async function northAlone(): Promise<{
 	});
 	expect(shownAfter).toBeGreaterThanOrEqual(BUTTON_MS);
 	await expect(become).toBeDisabled();
-	await expect(north.getByTestId("banner")).toContainText(
+	await expect(player1.getByTestId("banner")).toContainText(
 		"Another player must be online to confirm",
 	);
-	return { link, north, westBrowser, since, shownAt };
+	return { link, player1, player4Browser, since, shownAt };
 }
 
 /** The old host reopens and follows Player 1; Player 4's message reaches every page. */
-async function westFollowsNorth(
+async function player4FollowsPlayer1(
 	link: string,
-	westBrowser: Player,
-	north: Page,
+	player4Browser: Player,
+	player1: Page,
 	visitor: Page,
 ): Promise<void> {
 	await expect(visitor.getByTestId("pick-2")).toBeVisible({
 		timeout: CONNECT_MS,
 	});
 	await pick(visitor, "2");
-	const west = await westBrowser.page(ownLink(link, "4"));
-	await expectSeat(west, "4", {
+	const player4 = await player4Browser.page(ownLink(link, "4"));
+	await expectSeat(player4, "4", {
 		timeout: CONNECT_MS,
 	});
-	expect(await commonHost([north, visitor, west])).toBe("1");
-	await sendDraft(west);
-	for (const page of [north, visitor, west])
+	expect(await commonHost([player1, visitor, player4])).toBe("1");
+	await sendDraft(player4);
+	for (const page of [player1, visitor, player4])
 		await expect(texts(page)).toHaveText([MESSAGE["4"]]);
 }
 
 test("the button shows after 10 s without a host; it waits for a witness, and a click gives one host", async () => {
 	test.setTimeout(180_000);
-	const { link, north, westBrowser, shownAt } = await northAlone();
-	const become = north.getByTestId("become-host");
+	const { link, player1, player4Browser, shownAt } = await player1Alone();
+	const become = player1.getByTestId("become-host");
 
 	// A visitor in another browser is a witness. It must connect before the automatic volunteer at 30 s.
 	const visitor = await (await openBrowser("visitor")).page(link);
@@ -226,48 +226,48 @@ test("the button shows after 10 s without a host; it waits for a witness, and a 
 		"the witness came before the automatic volunteer",
 	).toBeLessThan(VOLUNTEER_MS);
 	await become.click();
-	await expect(hostRows(north)).toHaveAttribute("data-seat", "1", {
+	await expect(hostRows(player1)).toHaveAttribute("data-seat", "1", {
 		timeout: CONNECT_MS,
 	});
-	await expect(north.getByTestId("banner")).toBeHidden();
-	await westFollowsNorth(link, westBrowser, north, visitor);
+	await expect(player1.getByTestId("banner")).toBeHidden();
+	await player4FollowsPlayer1(link, player4Browser, player1, visitor);
 });
 
 test("alone, a seated player never becomes the host; after 30 s it volunteers as soon as a witness comes", async () => {
 	test.setTimeout(180_000);
-	const { link, north, westBrowser, since } = await northAlone();
-	const become = north.getByTestId("become-host");
-	// Alone, Player 1 never volunteers: no new term without a witness (plan §2 D1).
+	const { link, player1, player4Browser, since } = await player1Alone();
+	const become = player1.getByTestId("become-host");
+	// Alone, Player 1 never volunteers: no new term without a witness.
 	await holdsUntil(
 		since + HOST_LOST_MS + VOLUNTEER_MS + 10_000,
 		"Player 1 stays without a host and its button stays disabled",
 		async () =>
-			(await hostRows(north).count()) === 0 &&
+			(await hostRows(player1).count()) === 0 &&
 			(await become.isVisible()) &&
 			(await become.isDisabled()),
 	);
 
 	// The 30 s are over, so the witness's arrival is enough: Player 1 volunteers without a click (rule 8).
 	const visitor = await (await openBrowser("visitor")).page(link);
-	await expect(hostRows(north)).toHaveAttribute("data-seat", "1", {
+	await expect(hostRows(player1)).toHaveAttribute("data-seat", "1", {
 		timeout: CONNECT_MS,
 	});
-	await expect(north.getByTestId("banner")).toBeHidden();
-	await westFollowsNorth(link, westBrowser, north, visitor);
+	await expect(player1.getByTestId("banner")).toBeHidden();
+	await player4FollowsPlayer1(link, player4Browser, player1, visitor);
 });
 
 test("with four seats, a player volunteers about 30 s after the host leaves; the old host follows when it returns", async () => {
 	test.setTimeout(180_000);
-	const { link, tab, west: westBrowser } = await seatTable(["1", "2"]);
+	const { link, tab, player4: player4Browser } = await seatTable(["1", "2"]);
 	// "All players connected" needs the other three seats.
 	await openDrawer(tabOf(tab, "4"));
 	await expect(tabOf(tab, "4").getByTestId("all-connected")).toBeHidden();
-	const south = await (await openBrowser("3")).page(link);
-	await expect(south.getByTestId("pick-3")).toBeVisible({
+	const player3 = await (await openBrowser("3")).page(link);
+	await expect(player3.getByTestId("pick-3")).toBeVisible({
 		timeout: CONNECT_MS,
 	});
-	await pick(south, "3");
-	tab["3"] = south;
+	await pick(player3, "3");
+	tab["3"] = player3;
 	for (const seat of SEATS) {
 		await openDrawer(tabOf(tab, seat));
 		await expect(tabOf(tab, seat).getByTestId("all-connected")).toBeVisible({
@@ -297,51 +297,51 @@ test("with four seats, a player volunteers about 30 s after the host leaves; the
 	for (const page of guests)
 		await expect(page.getByTestId("banner")).toBeHidden();
 
-	const west = await westBrowser.page(ownLink(link, "4"));
-	await expectSeat(west, "4", {
+	const player4 = await player4Browser.page(ownLink(link, "4"));
+	await expectSeat(player4, "4", {
 		timeout: CONNECT_MS,
 	});
-	expect(await commonHost([...guests, west])).toBe(host);
-	await sendDraft(west);
-	for (const page of [...guests, west])
+	expect(await commonHost([...guests, player4])).toBe(host);
+	await sendDraft(player4);
+	for (const page of [...guests, player4])
 		await expect(texts(page)).toHaveText([MESSAGE["4"]]);
 });
 
 test("two players who click at the same moment get exactly one host", async () => {
 	const { tab } = await seatTable(["1", "2"]);
-	const north = tabOf(tab, "1");
-	const east = tabOf(tab, "2");
+	const player1 = tabOf(tab, "1");
+	const player2 = tabOf(tab, "2");
 	await tabOf(tab, "4").close({ runBeforeUnload: false });
-	for (const page of [north, east])
+	for (const page of [player1, player2])
 		await expect(page.getByTestId("become-host")).toBeEnabled({
 			timeout: BUTTON_LATEST_MS,
 		});
 
 	const at = Date.now() + 1_000;
 	expect(
-		await Promise.all([clickHostAt(north, at), clickHostAt(east, at)]),
+		await Promise.all([clickHostAt(player1, at), clickHostAt(player2, at)]),
 		"both clicks reached an enabled button",
 	).toEqual([true, true]);
-	const host = await commonHost([north, east]);
+	const host = await commonHost([player1, player2]);
 	test.info().annotations.push({ type: "host", description: host });
 	await holdsUntil(
 		Date.now() + 8_000,
 		"both pages keep one and the same host",
 		async () =>
-			(await hostRows(north).getAttribute("data-seat")) === host &&
-			(await hostRows(east).getAttribute("data-seat")) === host,
+			(await hostRows(player1).getAttribute("data-seat")) === host &&
+			(await hostRows(player2).getAttribute("data-seat")) === host,
 	);
 
-	await sendDraft(north);
-	await expect(texts(east)).toHaveText([MESSAGE["1"]]);
-	await sendDraft(east);
-	for (const page of [north, east])
+	await sendDraft(player1);
+	await expect(texts(player2)).toHaveText([MESSAGE["1"]]);
+	await sendDraft(player2);
+	for (const page of [player1, player2])
 		await expect(texts(page)).toHaveText([MESSAGE["1"], MESSAGE["2"]]);
 });
 
 test("a host that reloads resumes its term, and no page shows the button", async () => {
 	const { tab } = await seatTable(["1", "2"]);
-	const west = tabOf(tab, "4");
+	const player4 = tabOf(tab, "4");
 	const guests = [tabOf(tab, "1"), tabOf(tab, "2")];
 	const noButton = async (pages: readonly Page[]): Promise<boolean> => {
 		for (const page of pages)
@@ -353,59 +353,61 @@ test("a host that reloads resumes its term, and no page shows the button", async
 		"no guest shows the host button",
 		() => noButton(guests),
 	);
-	await west.reload();
-	await expectSeat(west, "4", {
+	await player4.reload();
+	await expectSeat(player4, "4", {
 		timeout: CONNECT_MS,
 	});
 	await holdsUntil(
 		Date.now() + 5_000,
 		"the reloaded host shows no button",
-		() => noButton([west]),
+		() => noButton([player4]),
 	);
 	await watching;
-	expect(await commonHost([west, ...guests])).toBe("4");
+	expect(await commonHost([player4, ...guests])).toBe("4");
 
 	await sendDraft(tabOf(tab, "1"));
-	for (const page of [west, ...guests])
+	for (const page of [player4, ...guests])
 		await expect(texts(page)).toHaveText([MESSAGE["1"]]);
 });
 
 test("a thawed old host steps down, and its later message still goes through", async () => {
 	const { tab } = await seatTable(["1", "2"]);
-	const west = tabOf(tab, "4");
-	const north = tabOf(tab, "1");
-	const east = tabOf(tab, "2");
-	const thaw = await freeze(west);
-	const become = north.getByTestId("become-host");
+	const player4 = tabOf(tab, "4");
+	const player1 = tabOf(tab, "1");
+	const player2 = tabOf(tab, "2");
+	const thaw = await freeze(player4);
+	const become = player1.getByTestId("become-host");
 	await expect(become).toBeEnabled({ timeout: BUTTON_LATEST_MS });
 	await become.click();
-	expect(await commonHost([north, east])).toBe("1");
+	expect(await commonHost([player1, player2])).toBe("1");
 
 	await thaw();
-	expect(await commonHost([west, north, east])).toBe("1");
-	await expect(west.getByTestId("banner")).toBeHidden({ timeout: CONNECT_MS });
-	await expectSeat(west, "4");
-	await sendDraft(west);
-	for (const page of [west, north, east])
+	expect(await commonHost([player4, player1, player2])).toBe("1");
+	await expect(player4.getByTestId("banner")).toBeHidden({
+		timeout: CONNECT_MS,
+	});
+	await expectSeat(player4, "4");
+	await sendDraft(player4);
+	for (const page of [player4, player1, player2])
 		await expect(texts(page)).toHaveText([MESSAGE["4"]]);
-	await expect(west.getByTestId("pending").locator("li")).toHaveCount(0);
+	await expect(player4.getByTestId("pending").locator("li")).toHaveCount(0);
 });
 
 test("a second tab cannot take the host's active seat", async () => {
-	const { link, tab, west: westBrowser } = await seatTable(["1"]);
+	const { link, tab, player4: player4Browser } = await seatTable(["1"]);
 	const old = tabOf(tab, "4");
-	const north = tabOf(tab, "1");
-	const west = await westBrowser.page(link);
+	const player1 = tabOf(tab, "1");
+	const player4 = await player4Browser.page(link);
 	await expect(
-		west.getByRole("heading", { name: "Choose your seat" }),
+		player4.getByRole("heading", { name: "Choose your seat" }),
 	).toBeVisible({ timeout: CONNECT_MS });
-	await expect(west.getByTestId("pick-4")).toHaveCount(0);
+	await expect(player4.getByTestId("pick-4")).toHaveCount(0);
 	await expectSeat(old, "4");
 	await expect(old.getByTestId("send")).toBeEnabled();
 
-	expect(await commonHost([old, north])).toBe("4");
+	expect(await commonHost([old, player1])).toBe("4");
 	await sendDraft(old);
-	await expect(texts(north)).toHaveText([MESSAGE["4"]]);
+	await expect(texts(player1)).toHaveText([MESSAGE["4"]]);
 });
 
 test("no uncaught errors", () => {

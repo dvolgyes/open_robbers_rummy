@@ -36,15 +36,15 @@ const LATEST_MS = HOST_LOST_MS + SEAT_GRACE_MS + 30_000;
 const QUIET_MS = HOST_LOST_MS + 10_000;
 /**
  * A host is replaced after 20 s without its beats (HOST_LOST_MS), then "Make me the host" shows after 10 s more
- * (BUTTON_MS, plan §4.4 rule 7), so the button can take about 30 s after the last beat.
+ * (BUTTON_MS), so the button can take about 30 s after the last beat.
  */
 const BUTTON_LATEST_MS = HOST_LOST_MS + BUTTON_MS + 20_000;
 
 const players: Player[] = [];
 let host: Player;
-let north: Player;
-let east: Player;
-let south: Player;
+let player1: Player;
+let player2: Player;
+let player3: Player;
 let newcomer: Player;
 let latecomer: Player;
 let link = "";
@@ -73,10 +73,10 @@ test.beforeAll(async ({ browser, baseURL }) => {
 		players.push(player);
 		return player;
 	};
-	host = await open("west");
-	north = await open("north");
-	east = await open("east");
-	south = await open("south");
+	host = await open("player4");
+	player1 = await open("player1");
+	player2 = await open("player2");
+	player3 = await open("player3");
 	newcomer = await open("newcomer");
 	latecomer = await open("latecomer");
 });
@@ -95,8 +95,8 @@ test("a frozen player's seat shows offline, frees after the timeout, and the tha
 	tab["4"] = await host.page("./");
 	link = await createRoom(tab["4"]);
 	for (const [player, seat] of [
-		[north, "1"],
-		[east, "2"],
+		[player1, "1"],
+		[player2, "2"],
 	] as const) {
 		const page = await player.page(link);
 		await expect(page.getByTestId(`pick-${seat}`)).toBeVisible({
@@ -106,7 +106,7 @@ test("a frozen player's seat shows offline, frees after the timeout, and the tha
 		tab[seat] = page;
 	}
 	// Player 3 is the last free seat, so its page takes it without a picker. Its seat stays held during the test.
-	tab["3"] = await south.page(link);
+	tab["3"] = await player3.page(link);
 	await expectSeat(tab["3"], "3", {
 		timeout: CONNECT_MS,
 	});
@@ -157,7 +157,7 @@ test("a frozen host is replaced; its seat frees after the timeout; the thawed ol
 	await expectBanner(tab["1"], "waiting-for-host", {
 		timeout: HOST_LOST_MS + 10_000,
 	});
-	// Player 2 is the witness of the new Player 1 (plan §2 D1).
+	// Player 2 is the witness of the new Player 1.
 	const become = tab["1"].getByTestId("become-host");
 	await expect(become).toBeEnabled({ timeout: BUTTON_LATEST_MS });
 	await become.click();
@@ -167,7 +167,7 @@ test("a frozen host is replaced; its seat frees after the timeout; the thawed ol
 		await expect(tab[seat].getByTestId("banner")).toBeHidden();
 	}
 
-	// The new host starts the old host's seat clock at its claim (plan §4.4 rule 9), and the old host is offline
+	// The new host starts the old host's seat clock at its claim, and the old host is offline
 	// from then on, so its seat frees after the seat grace.
 	const page = await latecomer.page(link);
 	const elapsed = await seatOffered(page, "4", hostSince);

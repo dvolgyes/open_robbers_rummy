@@ -4,7 +4,7 @@ import type { Form } from "./device-class";
 import type { MediaSwitches, Prefs } from "./policy";
 
 /**
- * Call signaling messages (call/layout plan §4.4). The call transport wraps each message in an envelope with the
+ * Call signaling messages. The call transport wraps each message in an envelope with the
  * sender's seat and generation from the roster binding, so the sender identity comes only from the envelope.
  * Every parser rebuilds its value from the known fields, so unknown fields never pass through.
  */

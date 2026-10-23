@@ -10,7 +10,7 @@ import {
 import { MEDIA, type Medium, mediaPlan, type Party } from "./policy";
 
 /**
- * One RTCPeerConnection to one remote seat (call/layout plan §4.4 steps 4–5, §4.5). Perfect negotiation with fixed
+ * One RTCPeerConnection to one remote seat. Perfect negotiation with fixed
  * roles: the impolite side owns the m-lines, so it adds the transceivers and makes every offer for a change of
  * preferences. The polite side only sets directions and tracks on the transceivers it received, and offers only
  * for an ICE restart; a colliding offer rolls it back. All description and candidate steps run in one serial queue.
@@ -41,7 +41,7 @@ export interface PeerLinkOptions extends LinkOptions {
 	readonly tracks: LocalTracks;
 }
 
-/** Audio goes first when the network is poor (call/layout plan §4.5). Chrome's default is "low" for both. */
+/** Audio goes first when the network is poor. Chrome's default is "low" for both. */
 const PRIORITY: Readonly<Record<Medium, RTCPriorityType>> = {
 	audio: "high",
 	video: "low",
@@ -366,7 +366,7 @@ export class PeerLink implements CallLink {
 	}
 
 	/**
-	 * Audio first on a poor network (call/layout plan §4.5): on a connection with video, audio senders get a high
+	 * Audio first on a poor network: on a connection with video, audio senders get a high
 	 * priority, and video senders a low one and keep their frame rate. Runs after each negotiation; a sender without
 	 * encodings sends nothing yet and is tuned after a later one. Chrome keeps the values over renegotiation and
 	 * replaceTrack (probe, Chrome 155).

@@ -31,7 +31,7 @@ import {
 } from "./wire";
 
 /**
- * Stored records of a replica (plan §4.3). A browser keeps one replica per table and seat that it holds; the
+ * Stored records of a replica. A browser keeps one replica per table and seat that it holds; the
  * pair (tableId, replica seat) names the partition. Every record read from storage passes a parser here, and
  * a record that fails counts as absent.
  */

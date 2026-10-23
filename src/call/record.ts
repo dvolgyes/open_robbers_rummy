@@ -17,7 +17,7 @@ import {
 } from "./policy";
 
 /**
- * A seat's call status in the replicated table (plan §12 R2): in the call or not, the switches, and the form. Every
+ * A seat's call status in the replicated table: in the call or not, the switches, and the form. Every
  * seated browser keeps it with the game state, so a reload, a crash or a host change does not lose it. A change
  * needs a higher version than the stored record; an equal or lower one is refused, so a late resend never wins.
  *

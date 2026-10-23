@@ -33,7 +33,7 @@ import { SEATS, type Seat } from "../../src/protocol";
 import { TABLE } from "./p2p-fixtures";
 
 /**
- * Seeded simulation of the host election (plan §8, P4). 4–6 browsers share one table: four hold the seats, the
+ * Seeded simulation of the host election. 4–6 browsers share one table: four hold the seats, the
  * others are visitors. A noisy phase brings link loss, partitions, freezes, clicks, reloads and tab duplicates; a
  * quiet phase then keeps the links fixed, and in half of the seeds every host closes as it starts. The simulation
  * plays the controllers: it delivers beats with delays, runs
@@ -568,7 +568,7 @@ class World {
 		});
 	}
 
-	/** A follower takes the log of the host it follows (extend or replace, plan §4.5). */
+	/** A follower takes the log of the host it follows (extend or replace). */
 	#adopt(page: Page, pos: Position): void {
 		const { replica } = page.browser;
 		if (replica === null) return;
@@ -666,7 +666,7 @@ class World {
 		}
 	}
 
-	/** (b) and (h); the follower keeps the best followed authority as its replica's host (plan P5). */
+	/** (b) and (h); the follower keeps the best followed authority as its replica's host. */
 	#follow(page: Page, auth: Authority, peer: string): void {
 		const key = authKey(auth);
 		if (this.#hostedBy.get(key) !== peer) {

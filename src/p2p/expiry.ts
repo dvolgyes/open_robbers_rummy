@@ -2,7 +2,7 @@ import { TABLE_IDLE_MS, TOMBSTONE_MS } from "./limits";
 import type { StorageResult, TableStorage } from "./storage";
 
 /**
- * Table expiry (plan §4.7). `lastActivityAt` is `Date.now()` of this device; only durations cross devices.
+ * Table expiry. `lastActivityAt` is `Date.now()` of this device; only durations cross devices.
  */
 
 /** How long the table has been idle; zero when this device's clock moved back. */

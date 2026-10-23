@@ -31,7 +31,7 @@ import {
 import type { OpenCallSignaling } from "./signaling";
 
 /**
- * The call of one seat holder (call/layout plan §4.1, §4.5): the local preferences, the microphone and camera, the
+ * The call of one seat holder: the local preferences, the microphone and camera, the
  * mesh and one peer link per remote seat. The room view gives it room snapshots and user actions; it gives back a view
  * for rendering. It never touches the game: a call action cannot send a game command.
  */

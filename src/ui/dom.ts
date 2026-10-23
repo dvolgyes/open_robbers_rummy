@@ -40,36 +40,6 @@ export function button(
 	return node;
 }
 
-/** Copies a link without displaying its URL. */
-export function copyButton(
-	label: string,
-	url: string,
-	testId: string,
-	autoCopy?: Promise<string>,
-): HTMLElement {
-	const status = el("span", {
-		className: "copy-status",
-		attrs: { role: "status" },
-	});
-	if (autoCopy !== undefined) {
-		void autoCopy.then((message) => {
-			status.textContent = message;
-		});
-	}
-	const copy = button(
-		label,
-		() => {
-			void copyToClipboard(url).then((message) => {
-				status.textContent = message;
-			});
-		},
-		{
-			attrs: { "data-testid": testId },
-		},
-	);
-	return el("div", { className: "copy-field" }, copy, status);
-}
-
 export async function copyToClipboard(text: string): Promise<string> {
 	if (!navigator.clipboard) {
 		return "Clipboard access is unavailable.";

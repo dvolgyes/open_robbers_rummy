@@ -201,36 +201,37 @@ function snapshot(self: Seat | null): CallRoomSnapshot {
 }
 
 let wire: Wire;
-let north: Player;
-let east: Player;
+let player1: Player;
+let player2: Player;
 
 /** Joins both seats and lets ICE connect. */
 async function connected(
-	northPreset: PresetId = "audio",
-	eastPreset: PresetId = "audio",
+	player1Preset: PresetId = "audio",
+	player2Preset: PresetId = "audio",
 ): Promise<void> {
-	north.join(northPreset);
-	east.join(eastPreset);
+	player1.join(player1Preset);
+	player2.join(player2Preset);
 	await settle();
-	for (const player of [north, east]) player.open?.setConnection("connected");
+	for (const player of [player1, player2])
+		player.open?.setConnection("connected");
 }
 
 beforeEach(() => {
 	vi.useFakeTimers();
 	wire = new Wire();
-	north = new Player("1", wire);
-	east = new Player("2", wire);
-	north.call.update(snapshot("1"));
-	east.call.update(snapshot("2"));
+	player1 = new Player("1", wire);
+	player2 = new Player("2", wire);
+	player1.call.update(snapshot("1"));
+	player2.call.update(snapshot("2"));
 });
 
 afterEach(() => {
 	vi.useRealTimers();
 });
 
-describe("CallController (call/layout plan §4.5)", () => {
+describe("CallController", () => {
 	it("starts outside the call, with the other seats unknown, and offers every desktop preset", () => {
-		const view = north.call.view;
+		const view = player1.call.view;
 		expect(view.status).toBe("outside");
 		expect(view.canJoin).toBe(true);
 		expect(view.requested.inCall).toBe(false);
@@ -253,277 +254,278 @@ describe("CallController (call/layout plan §4.5)", () => {
 			["4", "unknown"],
 		]);
 
-		north.call.setForm("compact");
-		expect(north.call.view.media).toEqual(["audio"]);
-		expect(north.call.view.presets.map((preset) => preset.id)).toEqual([
+		player1.call.setForm("compact");
+		expect(player1.call.view.media).toEqual(["audio"]);
+		expect(player1.call.view.presets.map((preset) => preset.id)).toEqual([
 			"audio",
 			"listen",
 		]);
 	});
 
 	it("does not send video until a preview track is explicitly prepared", () => {
-		north.call.join({
+		player1.call.join({
 			send: { audio: false, video: true },
 			receive: { audio: false, video: true },
 		});
-		expect(north.call.view.status).toBe("joining");
-		expect(north.asked("video")).toEqual([]);
-		expect(north.call.view.requested.send.video).toBe(false);
-		expect(north.call.view.camera).toBe("off");
-		const camera = north.prepareCamera();
-		north.call.setSwitch("send", "video", true);
-		expect(north.asked("video")).toEqual([]);
-		expect(north.call.view.camera).toBe("on");
-		expect(north.call.view.requested.send.video).toBe(true);
-		north.call.setSwitch("send", "video", false);
+		expect(player1.call.view.status).toBe("joining");
+		expect(player1.asked("video")).toEqual([]);
+		expect(player1.call.view.requested.send.video).toBe(false);
+		expect(player1.call.view.camera).toBe("off");
+		const camera = player1.prepareCamera();
+		player1.call.setSwitch("send", "video", true);
+		expect(player1.asked("video")).toEqual([]);
+		expect(player1.call.view.camera).toBe("on");
+		expect(player1.call.view.requested.send.video).toBe(true);
+		player1.call.setSwitch("send", "video", false);
 		expect(camera.stops).toBe(1);
 	});
 
 	it("never asks a compact device for the camera: not for restored video switches, not for a video switch", async () => {
-		north.call.dispose();
-		north = new Player("1", wire, "compact");
-		north.call.update(snapshot("1"));
+		player1.call.dispose();
+		player1 = new Player("1", wire, "compact");
+		player1.call.update(snapshot("1"));
 		// The switches of a desktop session, as a restored preference would give them.
-		north.join("both");
-		expect(north.call.view.requested).toEqual({
+		player1.join("both");
+		expect(player1.call.view.requested).toEqual({
 			inCall: true,
 			...presetById("audio").switches,
 		});
-		north.call.setSwitch("send", "video", true);
-		north.call.setSwitch("receive", "video", true);
-		east.join("both");
+		player1.call.setSwitch("send", "video", true);
+		player1.call.setSwitch("receive", "video", true);
+		player2.join("both");
 		await settle();
-		expect(north.asked("video")).toEqual([]);
-		expect(north.call.view.requested.send.video).toBe(false);
+		expect(player1.asked("video")).toEqual([]);
+		expect(player1.call.view.requested.send.video).toBe(false);
 		// Audio only on both sides of the pair: neither side has a video section.
-		expect(north.sections).toEqual(["audio"]);
-		expect(east.sections).toEqual(["audio"]);
-		expect(east.remote("1")?.peerSendsVideo).toBe(false);
+		expect(player1.sections).toEqual(["audio"]);
+		expect(player2.sections).toEqual(["audio"]);
+		expect(player2.remote("1")?.peerSendsVideo).toBe(false);
 	});
 
 	it("accepts the confirmed camera when Send camera was turned on before Join", async () => {
-		north.call.setSwitch("send", "video", true);
-		north.call.setSwitch("receive", "video", true);
-		expect(north.call.view.requested.inCall).toBe(false);
-		const camera = north.prepareCamera();
-		north.call.join(presetById("both").switches);
-		east.join("both");
+		player1.call.setSwitch("send", "video", true);
+		player1.call.setSwitch("receive", "video", true);
+		expect(player1.call.view.requested.inCall).toBe(false);
+		const camera = player1.prepareCamera();
+		player1.call.join(presetById("both").switches);
+		player2.join("both");
 		await settle();
-		for (const player of [north, east]) player.open?.setConnection("connected");
-		north.grant("audio");
+		for (const player of [player1, player2])
+			player.open?.setConnection("connected");
+		player1.grant("audio");
 		await settle(10);
-		expect(north.call.view.requested.send.video).toBe(true);
-		expect(north.call.view.camera).toBe("on");
-		expect(north.sendingVideo).toBe(asTrack(camera));
+		expect(player1.call.view.requested.send.video).toBe(true);
+		expect(player1.call.view.camera).toBe("on");
+		expect(player1.sendingVideo).toBe(asTrack(camera));
 	});
 
 	it("sends the camera to a desktop that receives video, and stops it at once on Send camera off", async () => {
 		await connected("both", "both");
-		const mic = north.grant("audio");
-		const camera = north.preparedCamera;
+		const mic = player1.grant("audio");
+		const camera = player1.preparedCamera;
 		expect(camera).toBeDefined();
 		await settle(10);
-		expect(north.call.view.camera).toBe("on");
-		expect(north.sendingVideo).toBe(asTrack(camera as FakeTrack));
-		expect(east.remote("1")?.video).toBeDefined();
-		expect(east.remote("1")?.peerSendsVideo).toBe(true);
+		expect(player1.call.view.camera).toBe("on");
+		expect(player1.sendingVideo).toBe(asTrack(camera as FakeTrack));
+		expect(player2.remote("1")?.video).toBeDefined();
+		expect(player2.remote("1")?.peerSendsVideo).toBe(true);
 
-		north.call.setSwitch("send", "video", false);
+		player1.call.setSwitch("send", "video", false);
 		expect(camera?.stops).toBe(1);
 		expect(mic.stops).toBe(0);
-		expect(north.call.view.camera).toBe("off");
+		expect(player1.call.view.camera).toBe("off");
 		await settle(1);
-		expect(north.sendingVideo).toBeNull();
+		expect(player1.sendingVideo).toBeNull();
 		// The peer clears the picture when the new prefs arrive; its audio stays.
 		await settle();
-		expect(east.remote("1")?.peerSendsVideo).toBe(false);
-		expect(east.remote("1")?.video).toBeUndefined();
-		expect(east.remote("1")?.audio).toBeDefined();
+		expect(player2.remote("1")?.peerSendsVideo).toBe(false);
+		expect(player2.remote("1")?.video).toBeUndefined();
+		expect(player2.remote("1")?.audio).toBeDefined();
 	});
 
 	it("clears the picture at once when See cameras goes off", async () => {
 		await connected("both", "both");
 		await settle(10);
-		expect(east.remote("1")?.video).toBeDefined();
-		east.call.setSwitch("receive", "video", false);
-		expect(east.remote("1")?.video).toBeUndefined();
-		expect(east.remote("1")?.audio).toBeDefined();
-		expect(east.call.view.status).toBe("subscribed");
+		expect(player2.remote("1")?.video).toBeDefined();
+		player2.call.setSwitch("receive", "video", false);
+		expect(player2.remote("1")?.video).toBeUndefined();
+		expect(player2.remote("1")?.audio).toBeDefined();
+		expect(player2.call.view.status).toBe("subscribed");
 	});
 
 	it("stops the camera at once when a desktop call becomes compact, keeps audio, and does not restore video after", async () => {
 		await connected("both", "both");
-		const mic = north.grant("audio");
-		const camera = north.preparedCamera;
+		const mic = player1.grant("audio");
+		const camera = player1.preparedCamera;
 		await settle(10);
-		north.call.setForm("compact");
+		player1.call.setForm("compact");
 		expect(camera?.stops).toBe(1);
 		expect(mic.stops).toBe(0);
-		expect(north.call.view.requested).toEqual({
+		expect(player1.call.view.requested).toEqual({
 			inCall: true,
 			...presetById("audio").switches,
 		});
-		expect(north.remote("2")?.video).toBeUndefined();
+		expect(player1.remote("2")?.video).toBeUndefined();
 		await settle();
-		expect(north.sendingVideo).toBeNull();
-		expect(east.remote("1")?.video).toBeUndefined();
-		expect(east.remote("1")?.audio).toBeDefined();
+		expect(player1.sendingVideo).toBeNull();
+		expect(player2.remote("1")?.video).toBeUndefined();
+		expect(player2.remote("1")?.audio).toBeDefined();
 		const video = (pc: FakePeerConnection | undefined) =>
 			pc?.getTransceivers().find((t) => t.receiver.track.kind === "video");
-		expect(video(north.open)?.currentDirection).toBe("inactive");
-		expect(video(east.open)?.currentDirection).toBe("inactive");
+		expect(video(player1.open)?.currentDirection).toBe("inactive");
+		expect(video(player2.open)?.currentDirection).toBe("inactive");
 
-		north.call.setForm("desktop");
+		player1.call.setForm("desktop");
 		await settle();
-		expect(north.call.view.requested.send.video).toBe(false);
-		expect(north.call.view.requested.receive.video).toBe(false);
-		expect(north.asked("video")).toHaveLength(0);
+		expect(player1.call.view.requested.send.video).toBe(false);
+		expect(player1.call.view.requested.receive.video).toBe(false);
+		expect(player1.asked("video")).toHaveLength(0);
 	});
 
 	it("keeps audio when the user cancels the camera preview", async () => {
 		await connected("audio", "both");
-		const mic = north.grant("audio");
-		north.call.setSwitch("send", "video", true);
+		const mic = player1.grant("audio");
+		player1.call.setSwitch("send", "video", true);
 		await settle(10);
-		expect([north.call.view.mic, north.call.view.camera]).toEqual([
+		expect([player1.call.view.mic, player1.call.view.camera]).toEqual([
 			"on",
 			"off",
 		]);
-		expect(north.call.view.requested.send.video).toBe(false);
-		expect(north.asked("video")).toEqual([]);
-		expect(north.sending).toBe(asTrack(mic));
-		expect(north.sendingVideo ?? null).toBeNull();
-		expect(east.remote("1")?.audio).toBeDefined();
+		expect(player1.call.view.requested.send.video).toBe(false);
+		expect(player1.asked("video")).toEqual([]);
+		expect(player1.sending).toBe(asTrack(mic));
+		expect(player1.sendingVideo ?? null).toBeNull();
+		expect(player2.remote("1")?.audio).toBeDefined();
 	});
 
 	it("asks for the microphone only after Join, and never for Listen only", async () => {
-		north.join("audio");
-		east.join("listen");
-		expect(north.requests.map((r) => r.constraints)).toEqual([
+		player1.join("audio");
+		player2.join("listen");
+		expect(player1.requests.map((r) => r.constraints)).toEqual([
 			{ audio: true, video: false },
 		]);
-		expect(east.requests).toEqual([]);
-		expect(north.call.view.mic).toBe("pending");
-		expect(east.call.view.mic).toBe("off");
-		expect(north.remote("2")?.status).toBe("waiting");
+		expect(player2.requests).toEqual([]);
+		expect(player1.call.view.mic).toBe("pending");
+		expect(player2.call.view.mic).toBe("off");
+		expect(player1.remote("2")?.status).toBe("waiting");
 		await settle();
-		expect(north.remote("3")?.status).toBe("out");
-		expect(north.remote("2")?.status).toBe("connecting");
-		expect(east.remote("1")?.peerSendsAudio).toBe(true);
+		expect(player1.remote("3")?.status).toBe("out");
+		expect(player1.remote("2")?.status).toBe("connecting");
+		expect(player2.remote("1")?.peerSendsAudio).toBe(true);
 	});
 
 	it("sends a microphone captured after the link exists, and gives a new link the live microphone", async () => {
 		await connected();
-		expect(north.sending).toBeNull();
-		const mic = north.grant();
+		expect(player1.sending).toBeNull();
+		const mic = player1.grant();
 		await settle(10);
-		expect(north.call.view.mic).toBe("on");
-		expect(north.sending).toBe(asTrack(mic));
+		expect(player1.call.view.mic).toBe("on");
+		expect(player1.sending).toBe(asTrack(mic));
 
-		const south = new Player("3", wire);
+		const player3 = new Player("3", wire);
 		const three = (self: Seat): CallRoomSnapshot => ({
 			...snapshot(self),
 			holders: { "1": 1, "2": 1, "3": 1 },
 			online: new Set<Seat>(["1", "2", "3"]),
 		});
-		north.call.update(three("1"));
-		east.call.update(three("2"));
-		south.call.update(three("3"));
-		south.join("listen");
+		player1.call.update(three("1"));
+		player2.call.update(three("2"));
+		player3.call.update(three("3"));
+		player3.join("listen");
 		await settle();
-		const toSouth = north.connections.at(-1);
-		expect(north.connections).toHaveLength(2);
-		expect(toSouth?.getTransceivers()[0]?.sender.track).toBe(asTrack(mic));
+		const toPlayer3 = player1.connections.at(-1);
+		expect(player1.connections).toHaveLength(2);
+		expect(toPlayer3?.getTransceivers()[0]?.sender.track).toBe(asTrack(mic));
 	});
 
 	it("stops the microphone at once when Send mic goes off, then tells the peers", async () => {
 		await connected();
-		const mic = north.grant();
+		const mic = player1.grant();
 		await settle(10);
-		north.call.setSwitch("send", "audio", false);
+		player1.call.setSwitch("send", "audio", false);
 		expect(mic.stops).toBe(1);
-		expect(north.call.view.mic).toBe("off");
-		expect(north.call.view.status).toBe("subscribed");
+		expect(player1.call.view.mic).toBe("off");
+		expect(player1.call.view.status).toBe("subscribed");
 		await settle();
 		const prefs = wire.last("1", "prefs");
 		expect(prefs?.type === "prefs" && prefs.prefs.send.audio).toBe(false);
-		expect(north.sending).toBeNull();
-		expect(east.remote("1")?.peerSendsAudio).toBe(false);
+		expect(player1.sending).toBeNull();
+		expect(player2.remote("1")?.peerSendsAudio).toBe(false);
 	});
 
 	it("detaches remote audio at once when Hear others goes off", async () => {
 		await connected();
-		expect(east.remote("1")?.status).toBe("connected");
-		expect(east.remote("1")?.audio).toBeDefined();
-		east.call.setSwitch("receive", "audio", false);
-		expect(east.remote("1")?.audio).toBeUndefined();
-		expect(east.call.view.status).toBe("subscribed");
+		expect(player2.remote("1")?.status).toBe("connected");
+		expect(player2.remote("1")?.audio).toBeDefined();
+		player2.call.setSwitch("receive", "audio", false);
+		expect(player2.remote("1")?.audio).toBeUndefined();
+		expect(player2.call.view.status).toBe("subscribed");
 	});
 
 	it("leaves the call when the last switch goes off, and when the seat is lost", async () => {
 		await connected("listen", "audio");
-		north.call.setSwitch("receive", "audio", false);
-		expect(north.call.view.status).toBe("outside");
-		expect(north.call.view.requested.inCall).toBe(false);
-		expect(north.connections.every((pc) => pc.closed)).toBe(true);
+		player1.call.setSwitch("receive", "audio", false);
+		expect(player1.call.view.status).toBe("outside");
+		expect(player1.call.view.requested.inCall).toBe(false);
+		expect(player1.connections.every((pc) => pc.closed)).toBe(true);
 		await settle();
 		expect(wire.types("1").at(-1)).toBe("leave");
-		expect(east.remote("1")?.status).toBe("out");
+		expect(player2.remote("1")?.status).toBe("out");
 
-		const mic = east.grant();
+		const mic = player2.grant();
 		await settle(10);
-		east.call.update(snapshot(null));
-		expect(east.call.view.status).toBe("outside");
-		expect(east.call.view.canJoin).toBe(false);
+		player2.call.update(snapshot(null));
+		expect(player2.call.view.status).toBe("outside");
+		expect(player2.call.view.canJoin).toBe(false);
 		expect(mic.stops).toBe(1);
-		east.join("audio");
-		expect(east.call.view.status).toBe("outside");
+		player2.join("audio");
+		expect(player2.call.view.status).toBe("outside");
 	});
 
 	it("ends the call when signaling ends, and stops the microphone", async () => {
 		await connected();
-		const mic = north.grant();
+		const mic = player1.grant();
 		await settle(10);
 		wire.end("1");
-		expect(north.call.view.status).toBe("outside");
-		expect(north.call.view.requested.inCall).toBe(false);
+		expect(player1.call.view.status).toBe("outside");
+		expect(player1.call.view.requested.inCall).toBe(false);
 		expect(mic.stops).toBe(1);
-		expect(north.connections.every((pc) => pc.closed)).toBe(true);
+		expect(player1.connections.every((pc) => pc.closed)).toBe(true);
 	});
 
 	it("stays in the call with a refused microphone", async () => {
-		north.join("audio");
-		north.requests[0]?.reject(new DOMException("no", "NotAllowedError"));
+		player1.join("audio");
+		player1.requests[0]?.reject(new DOMException("no", "NotAllowedError"));
 		await settle();
-		expect(north.call.view.mic).toBe("denied");
-		expect(north.call.view.status).toBe("subscribed");
-		expect(north.call.view.requested.send.audio).toBe(true);
+		expect(player1.call.view.mic).toBe("denied");
+		expect(player1.call.view.status).toBe("subscribed");
+		expect(player1.call.view.requested.send.audio).toBe(true);
 	});
 
 	it("announces a device class change in the call, and only re-renders outside it", async () => {
-		north.changes.mockClear();
-		north.call.setForm("compact");
-		expect(north.changes).toHaveBeenCalledTimes(1);
+		player1.changes.mockClear();
+		player1.call.setForm("compact");
+		expect(player1.changes).toHaveBeenCalledTimes(1);
 		expect(wire.sent).toEqual([]);
-		expect(north.call.view.form).toBe("compact");
+		expect(player1.call.view.form).toBe("compact");
 
 		await connected();
-		north.call.setForm("desktop");
+		player1.call.setForm("desktop");
 		await settle();
 		const prefs = wire.last("1", "prefs");
 		expect(prefs?.type === "prefs" && prefs.form).toBe("desktop");
-		expect(north.call.view.status).toBe("subscribed");
+		expect(player1.call.view.status).toBe("subscribed");
 	});
 
 	it("dispose leaves, closes the links and stops notifying", async () => {
 		await connected();
-		const mic = north.grant();
+		const mic = player1.grant();
 		await settle(10);
-		north.changes.mockClear();
-		north.call.dispose();
+		player1.changes.mockClear();
+		player1.call.dispose();
 		expect(mic.stops).toBe(1);
-		expect(north.connections.every((pc) => pc.closed)).toBe(true);
-		expect(north.changes).not.toHaveBeenCalled();
+		expect(player1.connections.every((pc) => pc.closed)).toBe(true);
+		expect(player1.changes).not.toHaveBeenCalled();
 		await settle();
 		expect(wire.types("1").at(-1)).toBe("leave");
 	});

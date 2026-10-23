@@ -5,8 +5,8 @@ import { expect, type Locator, type Page } from "@playwright/test";
 export const YOU = {
 	"4": "You are Player 4 — player4",
 	"1": "You are Player 1 — player1",
-	"2": "You are Player 2 — player3",
-	"3": "You are Player 3 — player2",
+	"2": "You are Player 2 — player2",
+	"3": "You are Player 3 — player3",
 } as const;
 
 /** The prefilled test message of each seat. */
@@ -47,15 +47,16 @@ const TABLE_LINK =
 	/^http:\/\/localhost:\d+\/?\?.*#v=p2p-v2&k=[A-Za-z0-9_-]{43}$/;
 
 /**
- * Creates a table with the default names. The creator sits Player 4 and enters the game directly.
+ * Creates a table of four with the default names and rules. The creator chooses Player 4 and enters the game directly.
  * Returns the unselected room URL that all players share.
  */
 export async function createRoom(page: Page): Promise<string> {
+	await page.locator('input[name="me"][value="4"]').check();
 	// Chrome's mobile emulation reports the form below the screenshot viewport; activate its native submit control.
 	await page
 		.getByTestId("create")
 		.evaluate((button) => (button as HTMLButtonElement).click());
-	await expect(page).toHaveTitle(/player4 \(W\)$/);
+	await expect(page).toHaveTitle(/player4 \(Player 4\)$/);
 	await expect(page).toHaveURL(/\?.*#v=p2p-v2&k=[A-Za-z0-9_-]{43}$/);
 	const linkUrl = new URL(page.url());
 	linkUrl.searchParams.delete("selected_player");
@@ -75,7 +76,7 @@ export function ownLink(link: string, seat: SeatKey): string {
 export async function pick(page: Page, seat: SeatKey): Promise<void> {
 	await page.getByTestId(`pick-${seat}`).click();
 	const name = YOU[seat].split(" — ")[1];
-	await expect(page).toHaveTitle(new RegExp(`${name} \\(${seat}\\)$`));
+	await expect(page).toHaveTitle(new RegExp(`${name} \\(Player ${seat}\\)$`));
 }
 
 /**
@@ -88,7 +89,10 @@ export async function expectSeat(
 	options: { timeout?: number } = {},
 ): Promise<void> {
 	const name = YOU[seat].split(" — ")[1];
-	await expect(page).toHaveTitle(new RegExp(`${name} \\(${seat}\\)$`), options);
+	await expect(page).toHaveTitle(
+		new RegExp(`${name} \\(Player ${seat}\\)$`),
+		options,
+	);
 	await expect(
 		rosterSeat(page, seat).locator(".tag", { hasText: /^You$/ }),
 	).toBeAttached(options);
@@ -133,16 +137,16 @@ export async function turnOrder(
 }
 
 /**
- * One canasta turn through the buttons a player uses, from table position `at`: draw from the stock, then discard
- * the first card of the hand. Any card is a legal discard after a draw, so the turn needs no knowledge of the deal.
+ * One turn through the buttons a player uses, from table position `at`: draw from the stock, then end the turn.
+ * In the default `gamerules` preset a player who has laid nothing may draw and then end, so the turn needs no
+ * knowledge of the deal.
  */
 export async function takeTurn(page: Page, at: number): Promise<void> {
 	const table = page.getByTestId("table");
 	await expect(table).toHaveAttribute("data-at", String(at));
 	await page.getByTestId("action-draw").click();
 	await expect(table).toHaveAttribute("data-at", String(at + 1));
-	await page.locator(".own-hand button.card").first().click();
-	await page.getByTestId("action-discard").click();
+	await page.getByTestId("action-end").click();
 	await expect(table).toHaveAttribute("data-at", String(at + 2));
 }
 

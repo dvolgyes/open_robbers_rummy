@@ -3,7 +3,7 @@ import { isTag } from "./keys";
 import { MAX_LOG_ENTRIES, MAX_TERM } from "./limits";
 
 /**
- * Host authority and log position (plan §3, §4.4 rule 1 and 8). One authority writes each log entry once, at
+ * Host authority and log position. One authority writes each log entry once, at
  * the end of its own log, so two logs with the same (seq, auth) entry are equal up to that entry.
  */
 

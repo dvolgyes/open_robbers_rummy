@@ -36,7 +36,7 @@ import {
 import { CONFIG, commandId, TABLE } from "./p2p-fixtures";
 
 /**
- * Plan §8, P5: four pages play a hand over the fake mesh with the real election, replication and rummy rules.
+ * Four pages play a hand over the fake mesh with the real election, replication and rummy rules.
  * The host crashes during the play; another page becomes the host after the absence timeout and the hand goes
  * on; the old host reopens on its stored replica, takes its seat back, and the hand finishes. Every message
  * passes the wire validators, so a malformed one fails the run.
@@ -44,10 +44,10 @@ import { CONFIG, commandId, TABLE } from "./p2p-fixtures";
 
 /** One browser per seat; the sim plays four seats, so seats 5 and 6 are never opened. */
 const CLIENTS: Readonly<Record<Seat, string>> = {
-	"1": "clientN-0123456789abcd",
-	"2": "clientE-0123456789abcd",
-	"3": "clientS-0123456789abcd",
-	"4": "clientW-0123456789abcd",
+	"1": "client1-0123456789abcd",
+	"2": "client2-0123456789abcd",
+	"3": "client3-0123456789abcd",
+	"4": "client4-0123456789abcd",
 	"5": "client5-0123456789abcd",
 	"6": "client6-0123456789abcd",
 };
@@ -134,7 +134,7 @@ class Sim {
 			}),
 		);
 		if (!written.ok) throw new Error(written.detail);
-		return this.#open(browser, "north", { log, outbox: [] }, true);
+		return this.#open(browser, "player1", { log, outbox: [] }, true);
 	}
 
 	/** A visitor opens the link and chooses `seat`: it holds the seat lock and opens its partition. */
@@ -409,17 +409,17 @@ interface Scenario {
 describe("four pages play a board across a host crash", () => {
 	it("routes autoplay through the followed host and correlates its reply", async () => {
 		const sim = new Sim(41);
-		const north = await sim.create();
-		const east = await sim.visit("2", "eastauto");
+		const player1 = await sim.create();
+		const player2 = await sim.visit("2", "player2auto");
 		sim.mesh.connectAll();
-		await sim.mesh.until(() => east.replication.follower.ready, 10_000);
+		await sim.mesh.until(() => player2.replication.follower.ready, 10_000);
 		const handled: { seat: Seat; enabled: boolean }[] = [];
-		north.replication.setAutoplayHandler(async (seat, enabled) => {
+		player1.replication.setAutoplayHandler(async (seat, enabled) => {
 			handled.push({ seat, enabled });
 			return "enabled";
 		});
 		let result: string | null = null;
-		void east.replication.requestAutoplay(true).then((status) => {
+		void player2.replication.requestAutoplay(true).then((status) => {
 			result = status;
 		});
 		await sim.mesh.until(() => result !== null, 10_000);
@@ -438,15 +438,15 @@ describe("four pages play a board across a host crash", () => {
 		"the host crashes $crashDelay ms after an entry from $from (seed $seed)",
 		async ({ from, crashDelay, seed }) => {
 			const sim = new Sim(seed);
-			const north = await sim.create();
-			await sim.visit("2", "east");
-			await sim.visit("3", "south");
-			await sim.visit("4", "west");
+			const player1 = await sim.create();
+			await sim.visit("2", "player2");
+			await sim.visit("3", "player3");
+			await sim.visit("4", "player4");
 			sim.mesh.connectAll();
 
 			let lost = null as Entry | null;
 			sim.mesh.tap = (sender, _to, message) => {
-				if (lost || sender !== north.peer || message.k !== "entry") return;
+				if (lost || sender !== player1.peer || message.k !== "entry") return;
 				if (
 					cardsIn(message.state) < 20 ||
 					(message.e.seat === "1") !== (from === "1")
@@ -455,7 +455,7 @@ describe("four pages play a board across a host crash", () => {
 				lost = message.e;
 				sim.mesh.after(crashDelay, () => sim.crash("1"));
 			};
-			await sim.mesh.until(() => lost !== null && !north.alive, 120_000);
+			await sim.mesh.until(() => lost !== null && !player1.alive, 120_000);
 			const crashed = lost;
 			if (!crashed) throw new Error("the host did not crash");
 			expect(sim.pages.map((page) => page.browser.seat)).toEqual([
@@ -473,7 +473,7 @@ describe("four pages play a board across a host crash", () => {
 					),
 				60_000,
 			);
-			const reopened = await sim.reopen("1", "north2");
+			const reopened = await sim.reopen("1", "player1b");
 			await sim.mesh.until(() => {
 				const pages = sim.pages;
 				if (pages.length !== 4 || !pages.every(finished)) return false;
@@ -534,7 +534,7 @@ describe("four pages play a board across a host crash", () => {
 					expect(resent).toBeUndefined();
 					expect(undone).toEqual([["1", [crashed.id]]]);
 				} else {
-					// R4: every game action needs all four seats, so the new host keeps the action waiting until Player 1 is
+					// Every game action needs all four seats, so the new host keeps the action waiting until Player 1 is
 					// back. Rebinding the same holder and generation adds no seat entry; the delayed action takes the next
 					// log position.
 					const back = reference.entries.find(

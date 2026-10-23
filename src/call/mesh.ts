@@ -16,21 +16,21 @@ import type {
 } from "./signaling";
 
 /**
- * Peer discovery and link lifecycle for one seat holder (call/layout plan §4.1, §4.4). The mesh knows which seats
+ * Peer discovery and link lifecycle for one seat holder. The mesh knows which seats
  * are in the call, with which session and preferences, and keeps at most one link per remote seat. It knows
  * nothing about WebRTC: the link factory (`peer.ts`) negotiates media; the mesh only routes its signals.
  */
 
 /** Replies to `join` and `resync` from one seat within this delay go out as one `prefs` message. */
 export const REPLY_COALESCE_MS = 300;
-/** A seat that is silent this long after an announcement gets one addressed `resync` (the C2 P9 maximum). */
+/** A seat that is silent this long after an announcement gets one addressed `resync`. */
 export const SILENCE_MS = 3000;
 /** A message from a holder that the snapshot does not show yet waits this long for the next snapshot. */
 export const STALE_SNAPSHOT_MS = 3000;
 /** A peer that is offline at its current generation this long is out of the call. */
 export const VANISHED_MS = 10_000;
 
-/** What the room tells the call, on every change (plan §4.1). */
+/** What the room tells the call, on every change. */
 export interface CallRoomSnapshot {
 	readonly roomId: string;
 	/** Null when this tab is superseded, the room expired, or the room stopped. */
@@ -410,7 +410,7 @@ export class CallMesh {
 		}, SILENCE_MS);
 	}
 
-	/** Membership invariant (plan §4.1): only a current holder at the sending generation is heard. */
+	/** Membership invariant: only a current holder at the sending generation is heard. */
 	#onEnvelope(envelope: CallEnvelope): void {
 		const holder = this.#snapshot?.holders[envelope.from];
 		if (holder === envelope.fromGen) {

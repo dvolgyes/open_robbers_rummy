@@ -25,7 +25,7 @@ import type { Result } from "../../src/result";
 import { AUDIO, BOTH, FakeLink, party, session } from "./call-fakes";
 import { ROOM_ID } from "./fixtures";
 
-/** Delays in the range of the C2 P9 measure: an inbox join of about 60 ms, RPC to delivery about 70 ms. */
+/** Delays in the measured range: an inbox join of about 60 ms, RPC to delivery about 70 ms. */
 const SUBSCRIBE_MS = 60;
 const REMOVE_MS = 30;
 const RPC_MS = 20;
@@ -317,42 +317,42 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-describe("CallMesh convergence (call/layout plan §4.4 step 3)", () => {
+describe("CallMesh convergence", () => {
 	it("connects A before B with one offer from the impolite side", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
 		await settle();
-		expect(north.mesh.status).toBe("subscribed");
-		expect(north.links).toEqual([]);
-		east.mesh.join(AUDIO);
+		expect(player1.mesh.status).toBe("subscribed");
+		expect(player1.links).toEqual([]);
+		player2.mesh.join(AUDIO);
 		await settle();
-		expectConnected(north, east);
-		expect(north.live("2")[0]?.options.polite).toBe(false);
+		expectConnected(player1, player2);
+		expect(player1.live("2")[0]?.options.polite).toBe(false);
 		expect(table.broker.count("offer")).toBe(1);
-		expect(north.mesh.peer("2")).toEqual(AUDIO);
-		expect(east.mesh.peer("1")).toEqual(AUDIO);
+		expect(player1.mesh.peer("2")).toEqual(AUDIO);
+		expect(player2.mesh.peer("1")).toEqual(AUDIO);
 	});
 
 	it("connects B before A with one offer from the impolite side", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player2.mesh.join(AUDIO);
 		await settle();
-		north.mesh.join(AUDIO);
+		player1.mesh.join(AUDIO);
 		await settle();
-		expectConnected(north, east);
+		expectConnected(player1, player2);
 		expect(table.broker.count("offer", { from: "1" })).toBe(1);
 		expect(table.broker.count("offer")).toBe(1);
 	});
 
 	it("connects two seats that join in the same tick", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
-		expectConnected(north, east);
+		expectConnected(player1, player2);
 		expect(table.broker.count("offer")).toBe(1);
 	});
 
@@ -372,45 +372,45 @@ describe("CallMesh convergence (call/layout plan §4.4 step 3)", () => {
 	});
 
 	it("re-announces after a reconnect and receives a preference change missed during the outage", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
 		table.broker.outage("2");
 		await settle(100);
-		expect(east.mesh.status).toBe("lost");
-		north.mesh.setLocal(BOTH);
+		expect(player2.mesh.status).toBe("lost");
+		player1.mesh.setLocal(BOTH);
 		await settle(500);
 		expect(table.broker.count("prefs", { from: "1", addressed: false })).toBe(
 			1,
 		);
-		expect(east.mesh.peer("1")).toEqual(AUDIO);
+		expect(player2.mesh.peer("1")).toEqual(AUDIO);
 		table.broker.restore("2");
 		await settle();
-		expect(east.mesh.status).toBe("subscribed");
+		expect(player2.mesh.status).toBe("subscribed");
 		expect(table.broker.count("resync", { from: "2", addressed: false })).toBe(
 			1,
 		);
-		expect(east.mesh.peer("1")).toEqual(BOTH);
-		expect(east.live("1")[0]?.remote).toEqual(BOTH);
-		expectConnected(north, east);
+		expect(player2.mesh.peer("1")).toEqual(BOTH);
+		expect(player2.live("1")[0]?.remote).toEqual(BOTH);
+		expectConnected(player1, player2);
 		expect(table.broker.count("offer")).toBe(1);
 	});
 
 	it("recovers a lost join with one addressed resync after 3 s", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
 		await settle();
 		table.broker.drop = (traffic) =>
 			traffic.from === "2" && traffic.message.type === "join";
-		east.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle(SILENCE_MS - 100);
-		expect(north.mesh.peer("2")).toBeUndefined();
+		expect(player1.mesh.peer("2")).toBeUndefined();
 		expect(table.broker.count("resync", { from: "2" })).toBe(0);
 		await settle();
-		expectConnected(north, east);
+		expectConnected(player1, player2);
 		expect(table.broker.count("resync", { from: "2", addressed: true })).toBe(
 			1,
 		);
@@ -419,53 +419,53 @@ describe("CallMesh convergence (call/layout plan §4.4 step 3)", () => {
 	});
 
 	it("queues a join from a holder that the snapshot does not show yet, then accepts it", async () => {
-		const north = table.take("1");
-		north.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		player1.mesh.join(AUDIO);
 		await settle();
-		const east = table.take("2", true);
-		east.mesh.join(AUDIO);
+		const player2 = table.take("2", true);
+		player2.mesh.join(AUDIO);
 		await settle(1_000);
-		expect(north.mesh.peer("2")).toBeUndefined();
-		expect(north.links).toEqual([]);
-		table.publish(north);
+		expect(player1.mesh.peer("2")).toBeUndefined();
+		expect(player1.links).toEqual([]);
+		table.publish(player1);
 		await settle();
-		expectConnected(north, east);
+		expectConnected(player1, player2);
 	});
 
 	it("replaces a lost offer exactly once after the peer's reconnect resync", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
+		const player1 = table.take("1");
+		const player2 = table.take("2");
 		let offers = 0;
 		table.broker.drop = (traffic) =>
 			traffic.message.type === "offer" && offers++ === 0;
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
-		expect(north.live("2").map((link) => link.connected)).toEqual([false]);
-		expect(east.live("1").map((link) => link.connected)).toEqual([false]);
+		expect(player1.live("2").map((link) => link.connected)).toEqual([false]);
+		expect(player2.live("1").map((link) => link.connected)).toEqual([false]);
 		table.broker.outage("2");
 		await settle(100);
 		table.broker.restore("2");
 		await settle();
-		expectConnected(north, east);
-		expect(north.live("2")[0]?.offers).toEqual([1, 2]);
-		expect(east.live("1")[0]?.offers).toEqual([]);
+		expectConnected(player1, player2);
+		expect(player1.live("2")[0]?.offers).toEqual([1, 2]);
+		expect(player2.live("1")[0]?.offers).toEqual([]);
 		expect(table.broker.count("offer")).toBe(2);
 	});
 });
 
 describe("CallMesh announcements", () => {
 	it("sends join only after the own inbox is subscribed, with the latest preferences", async () => {
-		const north = table.take("1");
+		const player1 = table.take("1");
 		table.take("2");
-		north.mesh.join(AUDIO);
-		expect(north.mesh.status).toBe("joining");
-		north.mesh.setLocal(BOTH);
+		player1.mesh.join(AUDIO);
+		expect(player1.mesh.status).toBe("joining");
+		player1.mesh.setLocal(BOTH);
 		await settle(SUBSCRIBE_MS - 1);
 		expect(table.broker.log).toEqual(["subscribe 1"]);
 		expect(table.broker.sent).toEqual([]);
 		await settle(1_000);
-		expect(north.mesh.status).toBe("subscribed");
+		expect(player1.mesh.status).toBe("subscribed");
 		expect(table.broker.sent).toEqual([
 			{
 				from: "1",
@@ -483,13 +483,13 @@ describe("CallMesh announcements", () => {
 	});
 
 	it("sends one addressed resync to each silent online holder and never repeats it", async () => {
-		const north = table.take("1");
+		const player1 = table.take("1");
 		table.take("2");
 		table.take("3");
 		table.take("4");
 		table.broker.online.delete("4");
 		table.publish();
-		north.mesh.join(AUDIO);
+		player1.mesh.join(AUDIO);
 		const addressed = () =>
 			table.broker.sent
 				.filter((traffic) => traffic.addressed)
@@ -504,18 +504,18 @@ describe("CallMesh announcements", () => {
 
 	it("answers a join and a resync from one seat within 300 ms with one prefs message", async () => {
 		table.take("1");
-		const west = table.take("4");
-		west.mesh.join(AUDIO);
+		const player4 = table.take("4");
+		player4.mesh.join(AUDIO);
 		await settle();
 		const before = table.broker.sent.length;
 		table.broker.deliver(
-			west.inbox,
-			envelope("1", 1, west, announce("join", session(50))),
+			player4.inbox,
+			envelope("1", 1, player4, announce("join", session(50))),
 		);
 		await settle(REPLY_COALESCE_MS / 2);
 		table.broker.deliver(
-			west.inbox,
-			envelope("1", 1, west, announce("resync", session(50))),
+			player4.inbox,
+			envelope("1", 1, player4, announce("resync", session(50))),
 		);
 		await settle();
 		expect(
@@ -523,42 +523,42 @@ describe("CallMesh announcements", () => {
 				.slice(before)
 				.map((t) => `${t.from}>${t.to}:${t.message.type}`),
 		).toEqual(["4>1:prefs"]);
-		expect(west.live("1")).toHaveLength(1);
+		expect(player4.live("1")).toHaveLength(1);
 	});
 
 	it("never shows video for a compact peer, whatever its message says", async () => {
 		table.take("1");
-		const west = table.take("4");
-		west.mesh.join(AUDIO);
+		const player4 = table.take("4");
+		player4.mesh.join(AUDIO);
 		await settle();
 		const message = {
 			...announce("join", session(50)),
 			prefs: BOTH.prefs,
 			form: "compact",
 		} satisfies CallMessage;
-		table.broker.deliver(west.inbox, envelope("1", 1, west, message));
-		expect(west.mesh.peer("1")).toEqual({
+		table.broker.deliver(player4.inbox, envelope("1", 1, player4, message));
+		expect(player4.mesh.peer("1")).toEqual({
 			prefs: AUDIO.prefs,
 			form: "compact",
 		});
-		expect(west.live("1")[0]?.remote).toEqual({
+		expect(player4.live("1")[0]?.remote).toEqual({
 			prefs: AUDIO.prefs,
 			form: "compact",
 		});
 	});
 
 	it("Retry restarts the link from the polite side and announces a resync", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
-		north.live("2")[0]?.fail();
-		east.live("1")[0]?.fail();
-		east.mesh.retry("1");
+		player1.live("2")[0]?.fail();
+		player2.live("1")[0]?.fail();
+		player2.mesh.retry("1");
 		await settle();
-		expectConnected(north, east);
-		expect(east.live("1")[0]?.offers).toEqual([2]);
+		expectConnected(player1, player2);
+		expect(player2.live("1")[0]?.offers).toEqual([2]);
 		expect(table.broker.count("resync", { from: "2", addressed: false })).toBe(
 			1,
 		);
@@ -567,55 +567,55 @@ describe("CallMesh announcements", () => {
 
 describe("CallMesh membership and lifecycle", () => {
 	it("closes the link when the peer's seat changes generation and ignores the old generation", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
-		const [oldLink] = north.live("2");
+		const [oldLink] = player1.live("2");
 		const before = table.broker.sent.length;
 		table.take("2");
-		expect(north.live("2")).toEqual([]);
-		expect(north.mesh.peer("2")).toBeUndefined();
-		expect(east.mesh.status).toBe("outside");
-		expect(east.live("1")).toEqual([]);
+		expect(player1.live("2")).toEqual([]);
+		expect(player1.mesh.peer("2")).toBeUndefined();
+		expect(player2.mesh.status).toBe("outside");
+		expect(player2.live("1")).toEqual([]);
 		oldLink?.options.send({ type: "offer", negotiation: 9, sdp: "v=0" });
 		table.broker.deliver(
-			north.inbox,
-			envelope("2", 1, north, announce("join", session(50))),
+			player1.inbox,
+			envelope("2", 1, player1, announce("join", session(50))),
 		);
 		await settle();
-		expect(north.mesh.peer("2")).toBeUndefined();
-		expect(north.live("2")).toEqual([]);
+		expect(player1.mesh.peer("2")).toBeUndefined();
+		expect(player1.live("2")).toEqual([]);
 		expect(table.broker.sent.slice(before)).toEqual([]);
 	});
 
 	it("drops a queued message when no snapshot confirms the sender within 3 s", async () => {
-		const north = table.take("1");
-		north.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		player1.mesh.join(AUDIO);
 		await settle();
 		table.broker.drop = (traffic) => traffic.from === "2" && traffic.addressed;
 		table.take("2", true).mesh.join(AUDIO);
 		await settle(STALE_SNAPSHOT_MS + 500);
-		table.publish(north);
+		table.publish(player1);
 		await settle();
-		expect(north.mesh.peer("2")).toBeUndefined();
-		expect(north.links).toEqual([]);
+		expect(player1.mesh.peer("2")).toBeUndefined();
+		expect(player1.links).toEqual([]);
 	});
 
 	it("routes ICE batches only to the link of the current session", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
-		east.live("1")[0]?.options.send({
+		player2.live("1")[0]?.options.send({
 			type: "ice",
 			negotiation: 1,
 			candidates: [CANDIDATE],
 		});
 		await settle();
-		const link = north.live("2")[0];
+		const link = player1.live("2")[0];
 		expect(link?.received.at(-1)).toEqual({
 			type: "ice",
 			negotiation: 1,
@@ -623,8 +623,8 @@ describe("CallMesh membership and lifecycle", () => {
 		});
 		const received = link?.received.length;
 		table.broker.deliver(
-			north.inbox,
-			envelope("2", 1, north, {
+			player1.inbox,
+			envelope("2", 1, player1, {
 				type: "ice",
 				session: session(2),
 				toSession: session(77),
@@ -636,10 +636,10 @@ describe("CallMesh membership and lifecycle", () => {
 	});
 
 	it("ends the link to a peer that stays offline for 10 s and keeps one that returns", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		const south = table.take("3");
-		for (const player of [north, east, south]) player.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		const player3 = table.take("3");
+		for (const player of [player1, player2, player3]) player.mesh.join(AUDIO);
 		await settle();
 		table.broker.online.delete("2");
 		table.broker.online.delete("3");
@@ -648,126 +648,126 @@ describe("CallMesh membership and lifecycle", () => {
 		table.broker.online.add("3");
 		table.publish();
 		await settle(VANISHED_MS / 2 - 1);
-		expect(north.live("2")).toHaveLength(1);
+		expect(player1.live("2")).toHaveLength(1);
 		await settle(1);
-		expect(north.live("2")).toEqual([]);
-		expect(north.mesh.peer("2")).toBeUndefined();
+		expect(player1.live("2")).toEqual([]);
+		expect(player1.mesh.peer("2")).toBeUndefined();
 		await settle(VANISHED_MS);
-		expectConnected(north, south);
+		expectConnected(player1, player3);
 	});
 
 	it("forgets a peer that returns within 10 s but does not answer the greeting, as after a reload", async () => {
-		const north = table.take("1");
-		const south = table.take("3");
-		north.mesh.join(AUDIO);
-		south.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player3 = table.take("3");
+		player1.mesh.join(AUDIO);
+		player3.mesh.join(AUDIO);
 		await settle();
 		// The page reloads: its inbox is gone, and the new page holds the seat again without joining the call.
 		table.broker.outage("3");
 		table.broker.online.delete("3");
-		table.publish(north);
+		table.publish(player1);
 		await settle(VANISHED_MS / 5);
 		table.broker.online.add("3");
-		table.publish(north);
+		table.publish(player1);
 		await settle(SILENCE_MS - 1);
-		expect(north.mesh.peer("3")).toBeDefined();
+		expect(player1.mesh.peer("3")).toBeDefined();
 		await settle(1);
-		expect(north.mesh.peer("3")).toBeUndefined();
-		expect(north.live("3")).toEqual([]);
+		expect(player1.mesh.peer("3")).toBeUndefined();
+		expect(player1.live("3")).toEqual([]);
 	});
 
 	it("keeps a returning peer that answers the greeting", async () => {
-		const north = table.take("1");
-		const south = table.take("3");
-		north.mesh.join(AUDIO);
-		south.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player3 = table.take("3");
+		player1.mesh.join(AUDIO);
+		player3.mesh.join(AUDIO);
 		await settle();
 		table.broker.online.delete("3");
-		table.publish(north);
+		table.publish(player1);
 		await settle(VANISHED_MS / 5);
 		table.broker.online.add("3");
-		table.publish(north);
+		table.publish(player1);
 		await settle(SILENCE_MS * 2);
-		expect(north.mesh.peer("3")).toEqual(AUDIO);
-		expectConnected(north, south);
+		expect(player1.mesh.peer("3")).toEqual(AUDIO);
+		expectConnected(player1, player3);
 	});
 
 	it("Leave closes every link and the peers forget the seat", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
-		east.mesh.leave();
-		expect(east.mesh.status).toBe("outside");
-		expect(east.live("1")).toEqual([]);
+		player2.mesh.leave();
+		expect(player2.mesh.status).toBe("outside");
+		expect(player2.live("1")).toEqual([]);
 		await settle();
-		expect(north.live("2")).toEqual([]);
-		expect(north.mesh.peer("2")).toBeUndefined();
+		expect(player1.live("2")).toEqual([]);
+		expect(player1.mesh.peer("2")).toBeUndefined();
 	});
 
 	it("Join after Leave opens the inbox only after the old one is removed and the farewell is written", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
 		table.broker.log.length = 0;
 		const before = table.broker.sent.length;
-		east.mesh.leave();
-		east.mesh.join(BOTH);
+		player2.mesh.leave();
+		player2.mesh.join(BOTH);
 		await settle();
 		expect(table.broker.log.filter((entry) => entry.endsWith(" 2"))).toEqual([
 			"remove 2",
 			"subscribe 2",
 		]);
-		const fromEast = table.broker.sent
+		const fromPlayer2 = table.broker.sent
 			.slice(before)
 			.filter((traffic) => traffic.from === "2" && !traffic.addressed)
 			.map((traffic) => traffic.message.type);
-		expect(fromEast.slice(0, 2)).toEqual(["leave", "join"]);
-		expectConnected(north, east);
-		expect(north.mesh.peer("2")).toEqual(BOTH);
+		expect(fromPlayer2.slice(0, 2)).toEqual(["leave", "join"]);
+		expectConnected(player1, player2);
+		expect(player1.mesh.peer("2")).toEqual(BOTH);
 	});
 
 	it("retires the old link when a new session arrives from the same seat after a lost leave", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
 		table.broker.drop = (traffic) => traffic.message.type === "leave";
-		east.mesh.leave();
-		east.mesh.join(AUDIO);
+		player2.mesh.leave();
+		player2.mesh.join(AUDIO);
 		await settle();
-		expectConnected(north, east);
+		expectConnected(player1, player2);
 		expect(
-			north.links.filter((link) => link.options.seat === "2"),
+			player1.links.filter((link) => link.options.seat === "2"),
 		).toHaveLength(2);
 	});
 
 	it("ends the call when the database answers superseded", async () => {
-		const north = table.take("1");
-		const east = table.take("2");
-		north.mesh.join(AUDIO);
-		east.mesh.join(AUDIO);
+		const player1 = table.take("1");
+		const player2 = table.take("2");
+		player1.mesh.join(AUDIO);
+		player2.mesh.join(AUDIO);
 		await settle();
 		table.broker.holders["2"] = 2;
-		east.mesh.setLocal(BOTH);
+		player2.mesh.setLocal(BOTH);
 		await settle();
-		expect(east.mesh.status).toBe("outside");
-		expect(east.live("1")).toEqual([]);
+		expect(player2.mesh.status).toBe("outside");
+		expect(player2.live("1")).toEqual([]);
 	});
 
 	it("reports changes until disposed", async () => {
-		const north = table.take("1");
+		const player1 = table.take("1");
 		const changes = vi.fn();
-		north.mesh.onChange(changes);
-		north.mesh.join(AUDIO);
+		player1.mesh.onChange(changes);
+		player1.mesh.join(AUDIO);
 		await settle();
 		expect(changes).toHaveBeenCalled();
-		north.mesh.dispose();
-		expect(north.mesh.status).toBe("outside");
+		player1.mesh.dispose();
+		expect(player1.mesh.status).toBe("outside");
 		changes.mockClear();
 		table.publish();
 		await settle();
@@ -775,15 +775,15 @@ describe("CallMesh membership and lifecycle", () => {
 	});
 
 	it("throws on caller bugs", () => {
-		const north = table.take("1");
+		const player1 = table.take("1");
 		const outside = party("out");
-		expect(() => north.mesh.setLocal(AUDIO)).toThrow("not in the call");
-		expect(() => north.mesh.join(outside)).toThrow(
+		expect(() => player1.mesh.setLocal(AUDIO)).toThrow("not in the call");
+		expect(() => player1.mesh.join(outside)).toThrow(
 			"join needs in-call preferences",
 		);
-		north.mesh.join(AUDIO);
-		expect(() => north.mesh.join(AUDIO)).toThrow("already in the call");
-		expect(() => north.mesh.setLocal(outside)).toThrow("use leave()");
+		player1.mesh.join(AUDIO);
+		expect(() => player1.mesh.join(AUDIO)).toThrow("already in the call");
+		expect(() => player1.mesh.setLocal(outside)).toThrow("use leave()");
 		const stranger = new CallMesh({
 			openSignaling: () => {
 				throw new Error("unused");

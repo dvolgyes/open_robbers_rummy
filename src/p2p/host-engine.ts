@@ -46,7 +46,7 @@ import {
 } from "./wire";
 
 /**
- * The host side of replication (plan §4.5, §4.6). The host binds each peer to a seat and generation (from
+ * The host side of replication. The host binds each peer to a seat and generation (from
  * `hello` or a seat claim), orders commands in one queue, and commits each accepted command before it answers
  * or broadcasts, so a crash between the two loses nothing: the sender resends, and deduplication answers.
  */
@@ -998,7 +998,7 @@ export class HostEngine {
 		);
 	}
 
-	/** Free, or held by an offline holder past the seat hold or grace period (plan §4.6). */
+	/** Free, or held by an offline holder past the seat hold or grace period. */
 	#available(table: TableRecord, seat: Seat): boolean {
 		if (!seatsOf(table.config).includes(seat)) return false;
 		const row = seatRow(table, seat);

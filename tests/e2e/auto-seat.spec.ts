@@ -12,7 +12,7 @@ const players: Player[] = [];
 
 test.beforeAll(async ({ browser, baseURL }) => {
 	if (!baseURL) throw new Error("baseURL is not configured");
-	for (const name of ["creator", "north", "east", "south"])
+	for (const name of ["creator", "player1", "player2", "player3"])
 		players.push(await Player.open(browser, baseURL, name));
 });
 
@@ -27,7 +27,7 @@ test.afterAll(async () => {
 
 test("the last free seat is taken by the page that opens the link, and the first hand is dealt", async () => {
 	test.setTimeout(240_000);
-	const [creator, north, east, south] = players as [
+	const [creator, player1, player2, player3] = players as [
 		Player,
 		Player,
 		Player,
@@ -36,8 +36,8 @@ test("the last free seat is taken by the page that opens the link, and the first
 	const link = await createRoom(await creator.page("./"));
 
 	for (const [player, seat] of [
-		[north, "1"],
-		[east, "2"],
+		[player1, "1"],
+		[player2, "2"],
 	] as const) {
 		const page = await player.page(link);
 		await expect(page.getByTestId(`pick-${seat}`)).toBeVisible({
@@ -48,7 +48,7 @@ test("the last free seat is taken by the page that opens the link, and the first
 	}
 
 	// Only Player 3 is free: this page takes it without a picker.
-	const page = await south.page(link);
+	const page = await player3.page(link);
 	await expectSeat(page, "3", {
 		timeout: CONNECT_MS,
 	});

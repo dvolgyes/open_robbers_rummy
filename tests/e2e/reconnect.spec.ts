@@ -18,11 +18,11 @@ import {
 } from "./room";
 
 /**
- * Connection loss and reconnection in the UI (plan §12 R1 and R4), on one table through the public trackers. Each
+ * Connection loss and reconnection in the UI, on one table through the public trackers. Each
  * test builds on the table of the tests before it. Every person has their own browser. A crash closes the tab
  * without unload handlers; a reopen is a new tab of the same browser, so its stored replica and seat come back.
  * Every check of the transcript compares the whole list, so a message that is missing, doubled or out of order
- * fails it (R3). A game action that a modified tab sends while a seat is away is in p2p-mesh.spec.ts (R4).
+ * fails it. A game action that a modified tab sends while a seat is away is in p2p-mesh.spec.ts.
  */
 test.describe.configure({ mode: "serial" });
 
@@ -169,7 +169,7 @@ async function actor(): Promise<SeatKey> {
 	return seat;
 }
 
-/** At the position, the seat asked to act draws and discards. Returns that seat. */
+/** At the position, the seat asked to act draws and ends the turn. Returns that seat. */
 async function turn(at: number): Promise<SeatKey> {
 	await expectAt(at);
 	const seat = await actor();
@@ -191,10 +191,10 @@ async function expectWaitingFor(name: string): Promise<void> {
 test.beforeAll(async ({ browser, baseURL }) => {
 	if (!baseURL) throw new Error("baseURL is not configured");
 	for (const [seat, name] of [
-		["4", "west"],
-		["1", "north"],
-		["2", "east"],
-		["3", "south"],
+		["4", "player4"],
+		["1", "player1"],
+		["2", "player2"],
+		["3", "player3"],
 	] as const)
 		players[seat] = await Player.open(browser, baseURL, name);
 });
@@ -245,18 +245,18 @@ test("2: a follower that crashes, or reloads, gets the messages it missed, each 
 	await expectTranscripts();
 
 	const reloading = tab["2"].reload();
-	await say("3", "S: Player 2 reloads");
+	await say("3", "3: Player 2 reloads");
 	await reloading;
 	await expectSeat(tab["2"], "2", {
 		timeout: CONNECT_MS,
 	});
 	await expectTranscripts();
 
-	await say("1", "N: back");
+	await say("1", "1: back");
 	await expectTranscripts();
 });
 
-test("3: a turn waits while a player is away; it goes on after the player returns (R4)", async () => {
+test("3: a turn waits while a player is away; it goes on after the player returns ", async () => {
 	test.setTimeout(180_000);
 	await crash("3");
 	await expectWaitingFor("Player 3");
@@ -290,7 +290,7 @@ test("4: the host crashes mid-hand; a player clicks Make me the host; the old ho
 	await expect(become).toBeEnabled({ timeout: BUTTON_LATEST_MS });
 	await become.click();
 	expect(await commonHost()).toBe("2");
-	// The new host keeps the hand, but Player 4's turn waits for Player 4 (R4).
+	// The new host keeps the hand, but Player 4's turn waits for Player 4.
 	await expectAt(4);
 	await expectWaitingFor("Player 4");
 
@@ -306,7 +306,7 @@ test("4: the host crashes mid-hand; a player clicks Make me the host; the old ho
 		await expect(table(tab[seat])).toHaveAttribute("data-phase", "play");
 });
 
-test("5: a player crashes after drawing; the table waits; the reopened tab holds the drawn cards and finishes the turn (R4)", async () => {
+test("5: a player crashes after drawing; the table waits; the reopened tab holds the drawn cards and finishes the turn ", async () => {
 	test.setTimeout(180_000);
 	expect(await turn(8)).toBe("2");
 	await expectAt(10);
@@ -322,12 +322,11 @@ test("5: a player crashes after drawing; the table waits; the reopened tab holds
 		.poll(() => handCards(tab["3"]), { timeout: CONNECT_MS })
 		.toEqual(drawn);
 	await expect(prompt(tab["3"])).toHaveText(
-		"Your turn: meld, extend, then discard.",
+		"Open with 40 points of new melds from your hand, or end your turn.",
 		{ timeout: CONNECT_MS },
 	);
 	await expect(tab["3"].getByTestId("action-draw")).toHaveCount(0);
-	await tab["3"].locator(".own-hand button.card").first().click();
-	await tab["3"].getByTestId("action-discard").click();
+	await tab["3"].getByTestId("action-end").click();
 	await expectAt(12);
 });
 
@@ -340,7 +339,7 @@ test("6: three players crash while one stays; its message waits; after they reop
 	await expectBanner(tab["3"], "waiting-for-host", {
 		timeout: HOST_LOST_MS + 10_000,
 	});
-	const alone = "S: the others are away";
+	const alone = "3: the others are away";
 	await type("3", alone);
 	const waiting = tab["3"].getByTestId("pending").locator("li");
 	await expect(waiting).toHaveAttribute("data-state", "pending");

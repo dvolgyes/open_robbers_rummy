@@ -44,7 +44,7 @@ async function trackOf(request: Promise<MediaStream> | undefined) {
 	return tracks[0];
 }
 
-describe("LocalMedia on Chrome's test devices (call/layout plan §4.5)", () => {
+describe("LocalMedia on Chrome's test devices", () => {
 	it("asks for the microphone only, so a refused camera does not block it, and holds its track while on", async () => {
 		await commands.clearPermissions();
 		await commands.grantPermissions(["microphone"]);

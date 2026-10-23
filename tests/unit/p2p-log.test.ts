@@ -8,14 +8,14 @@ import {
 	CONFIG,
 	commandId,
 	entries,
-	HOLDER_E,
+	HOLDER_2,
 	TABLE,
 	tableRecord,
 } from "./p2p-fixtures";
 
 // LocalLog and the stored host are tested on Chrome's IndexedDB in tests/browser/p2p-log.test.ts.
 
-const AUTH_3: Authority = { term: 3, tag: `${HOLDER_E}.2`, inc: 4 };
+const AUTH_3: Authority = { term: 3, tag: `${HOLDER_2}.2`, inc: 4 };
 
 describe("commits", () => {
 	it("a replacement keeps the better host and the incarnation, and takes the seats of the new log", () => {
@@ -28,7 +28,7 @@ describe("commits", () => {
 			seat: "2",
 			gen: 1,
 			kind: "seat",
-			op: { type: "claim", holder: HOLDER_E },
+			op: { type: "claim", holder: HOLDER_2 },
 			event: { kind: "seat" },
 		};
 		const commit = replaceCommit(current, {
@@ -50,7 +50,7 @@ describe("commits", () => {
 			lastActivityAt: 3_000,
 		});
 		expect(commit.table.seats.filter((row) => row.holder !== null)).toEqual([
-			{ seat: "2", holder: HOLDER_E, gen: 1 },
+			{ seat: "2", holder: HOLDER_2, gen: 1 },
 		]);
 		expect(commit.sent).toEqual([commandId(2), commandId(3)]);
 	});
@@ -77,7 +77,7 @@ describe("commits", () => {
 			kind: "seat",
 			seat: "2",
 			gen: 1,
-			op: { type: "claim", holder: HOLDER_E },
+			op: { type: "claim", holder: HOLDER_2 },
 		} as Entry;
 		const release: Entry = {
 			...claim,
@@ -87,7 +87,7 @@ describe("commits", () => {
 		} as Entry;
 		expect(seatsAfter(base, [claim]).find((row) => row.seat === "2")).toEqual({
 			seat: "2",
-			holder: HOLDER_E,
+			holder: HOLDER_2,
 			gen: 1,
 		});
 		expect(

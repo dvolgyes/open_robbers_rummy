@@ -6,7 +6,7 @@ import { englishTranslator as english, type Translate } from "../i18n";
 import { SEAT_NAMES, type Seat } from "../protocol";
 
 /**
- * The call controls and the call status of each seat as text and flags (handover §3, §6, §7). Pure, so the
+ * The call controls and the call status of each seat as text and flags. Pure, so the
  * rules are unit-tested without a DOM; call-panel.ts and table.ts only copy these values into elements.
  */
 
@@ -19,7 +19,7 @@ export type CallDisplay =
 			readonly cameraAvailable?: boolean;
 			/**
 			 * The stored call status says this person was in the call, but the browser would ask for a device
-			 * again (plan §12 R2): Join becomes "Rejoin the call" with these switches.
+			 * again: Join becomes "Rejoin the call" with these switches.
 			 */
 			readonly rejoin?: Switches;
 	  }
@@ -151,7 +151,7 @@ function switchView(
 	};
 }
 
-/** Never a global success while one pair has no connection (handover §5). */
+/** Never a global success while one pair has no connection. */
 function peersText(remotes: readonly RemoteView[], t: Translate): string {
 	const having = (...states: RemoteView["status"][]): Seat[] =>
 		remotes
@@ -255,7 +255,7 @@ export function callControlsView(
 }
 
 /**
- * The caption of a connected seat (handover §7). A playing picture needs no video word, so the caption names
+ * The caption of a connected seat. A playing picture needs no video word, so the caption names
  * the audio state; without a picture it says why: this side's Video reception is off, or the seat is audio only.
  */
 function connectedText(

@@ -3,7 +3,7 @@ import type { Clock } from "./ports";
 import type { Echo, Ping } from "./wire";
 
 /**
- * The connection check (plan §4.9): after a peer connects, the page sends PING_COUNT pings with random nonces
+ * The connection check: after a peer connects, the page sends PING_COUNT pings with random nonces
  * and expects every matching echo within PING_TIMEOUT_MS. Only then is the peer "ready". The candidate types of
  * the selected pair are read from `getStats()`; no address ever leaves this module.
  */

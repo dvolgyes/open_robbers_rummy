@@ -44,12 +44,12 @@ const RANDOM_CHAT_MODULE: GameModule = {
 };
 
 const HOST = peerId("host");
-const EAST = peerId("east");
-const EAST2 = peerId("east2");
-const SOUTH = peerId("south");
-const CLIENT_N = "clientN-0123456789abcd";
-const CLIENT_E = "clientE-0123456789abcd";
-const CLIENT_S = "clientS-0123456789abcd";
+const PLAYER2 = peerId("player2");
+const PLAYER2B = peerId("player2b");
+const PLAYER3 = peerId("player3");
+const CLIENT_1 = "client1-0123456789abcd";
+const CLIENT_2 = "client2-0123456789abcd";
+const CLIENT_3 = "client3-0123456789abcd";
 
 let restoreDigest: () => void;
 beforeEach(() => {
@@ -71,7 +71,7 @@ class Rig {
 	#next = 100;
 
 	async create(config: RoomConfig = CONFIG): Promise<this> {
-		const holder = await deriveHolder(TABLE, CLIENT_N);
+		const holder = await deriveHolder(TABLE, CLIENT_1);
 		this.auth = { term: 1, tag: makeTag(holder, "1"), inc: 1 };
 		const written = await this.log.write(() =>
 			creationCommit({
@@ -183,9 +183,9 @@ class Rig {
 
 describe("test kit", () => {
 	it("the synchronous digest gives the same holder as Web Crypto", async () => {
-		const spied = await deriveHolder(TABLE, CLIENT_E);
+		const spied = await deriveHolder(TABLE, CLIENT_2);
 		restoreDigest();
-		const real = await deriveHolder(TABLE, CLIENT_E);
+		const real = await deriveHolder(TABLE, CLIENT_2);
 		restoreDigest = syncDigest();
 		expect(spied).toBe(real);
 	});
@@ -194,16 +194,16 @@ describe("test kit", () => {
 describe("host-local bots", () => {
 	it("rejects autoplay without an authenticated current seat and ignores duplicate requests", async () => {
 		const rig = await new Rig().create();
-		await rig.hello(EAST, CLIENT_E);
-		await rig.from(EAST, { k: "autoplay-request", req: 1, enabled: true });
-		expect(rig.to(EAST)).toContainEqual({
+		await rig.hello(PLAYER2, CLIENT_2);
+		await rig.from(PLAYER2, { k: "autoplay-request", req: 1, enabled: true });
+		expect(rig.to(PLAYER2)).toContainEqual({
 			k: "autoplay-result",
 			req: 1,
 			status: "failed",
 		});
 		expect(rig.autoplayRequests).toEqual([]);
 
-		const gen = await rig.seat(EAST2, "clientE2-0123456789abc", "2");
+		const gen = await rig.seat(PLAYER2B, "clientE2-0123456789abc", "2");
 		const holder = rig.row("2")?.holder;
 		let resolve: ((status: AutoplayStatus) => void) | undefined;
 		rig.autoplay = () =>
@@ -211,13 +211,13 @@ describe("host-local bots", () => {
 				resolve = done;
 			});
 		const request = { k: "autoplay-request", req: 2, enabled: true } as const;
-		await rig.from(EAST2, request);
-		await rig.from(EAST2, request);
+		await rig.from(PLAYER2B, request);
+		await rig.from(PLAYER2B, request);
 		expect(rig.autoplayRequests).toEqual([{ seat: "2", enabled: true }]);
 		expect(rig.row("2")).toEqual({ seat: "2", holder, gen });
 		resolve?.("enabled");
 		await settle();
-		expect(rig.to(EAST2)).toContainEqual({
+		expect(rig.to(PLAYER2B)).toContainEqual({
 			k: "autoplay-result",
 			req: 2,
 			status: "enabled",
@@ -226,11 +226,11 @@ describe("host-local bots", () => {
 
 	it("rejects unavailable autoplay without changing the player's seat", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
 		const holder = rig.row("2")?.holder;
-		rig.to(EAST);
-		await rig.from(EAST, { k: "autoplay-request", req: 1, enabled: true });
-		expect(rig.to(EAST)).toContainEqual({
+		rig.to(PLAYER2);
+		await rig.from(PLAYER2, { k: "autoplay-request", req: 1, enabled: true });
+		expect(rig.to(PLAYER2)).toContainEqual({
 			k: "autoplay-result",
 			req: 1,
 			status: "unavailable",
@@ -241,9 +241,9 @@ describe("host-local bots", () => {
 
 	it("lets a player return control after host autoplay and keeps their seat", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
 		const holder = rig.row("2")?.holder;
-		rig.to(EAST);
+		rig.to(PLAYER2);
 		rig.autoplay = async (seat, enabled) =>
 			(await rig.host.setBotSeat(seat, enabled))
 				? enabled
@@ -251,29 +251,29 @@ describe("host-local bots", () => {
 					: "disabled"
 				: "failed";
 
-		await rig.from(EAST, { k: "autoplay-request", req: 1, enabled: true });
-		expect(rig.to(EAST)).toContainEqual({
+		await rig.from(PLAYER2, { k: "autoplay-request", req: 1, enabled: true });
+		expect(rig.to(PLAYER2)).toContainEqual({
 			k: "autoplay-result",
 			req: 1,
 			status: "enabled",
 		});
 		expect(rig.row("2")).toEqual({ seat: "2", holder, gen });
 		expect(rig.host.roster()?.bots).toContain("2");
-		await rig.command(EAST, 61, gen, "blocked while autoplay is on");
-		expect(rig.to(EAST)).toContainEqual(
+		await rig.command(PLAYER2, 61, gen, "blocked while autoplay is on");
+		expect(rig.to(PLAYER2)).toContainEqual(
 			expect.objectContaining({ id: commandId(61), status: "rejected" }),
 		);
 
-		await rig.from(EAST, { k: "autoplay-request", req: 2, enabled: false });
-		expect(rig.to(EAST)).toContainEqual({
+		await rig.from(PLAYER2, { k: "autoplay-request", req: 2, enabled: false });
+		expect(rig.to(PLAYER2)).toContainEqual({
 			k: "autoplay-result",
 			req: 2,
 			status: "disabled",
 		});
 		expect(rig.row("2")).toEqual({ seat: "2", holder, gen });
 		expect(rig.host.roster()?.bots).not.toContain("2");
-		await rig.command(EAST, 62, gen, "human control restored");
-		expect(rig.to(EAST)).toContainEqual(
+		await rig.command(PLAYER2, 62, gen, "human control restored");
+		expect(rig.to(PLAYER2)).toContainEqual(
 			expect.objectContaining({ id: commandId(62), status: "accepted" }),
 		);
 	});
@@ -302,15 +302,15 @@ describe("host-local bots", () => {
 
 	it("lets the host automate an active player's seat without ending that player's seat", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		rig.to(EAST);
-		const holder = await deriveHolder(TABLE, CLIENT_E);
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		rig.to(PLAYER2);
+		const holder = await deriveHolder(TABLE, CLIENT_2);
 
 		expect(await rig.host.setBotSeat("2", true)).toBe(true);
 		expect(rig.row("2")).toEqual({ seat: "2", holder, gen });
 		expect(rig.host.roster()?.bots).toContain("2");
 		expect(rig.host.roster()?.peers).toContainEqual({
-			peer: EAST,
+			peer: PLAYER2,
 			seat: "2",
 			gen,
 		});
@@ -323,8 +323,8 @@ describe("host-local bots", () => {
 			),
 		).toEqual({ ok: true });
 
-		await rig.command(EAST, 57, gen, "human action while automated");
-		expect(rig.to(EAST)).toContainEqual(
+		await rig.command(PLAYER2, 57, gen, "human action while automated");
+		expect(rig.to(PLAYER2)).toContainEqual(
 			expect.objectContaining({
 				k: "result",
 				id: commandId(57),
@@ -336,12 +336,12 @@ describe("host-local bots", () => {
 		expect(rig.row("2")).toEqual({ seat: "2", holder, gen });
 		expect(rig.host.roster()?.bots).not.toContain("2");
 		expect(rig.host.roster()?.peers).toContainEqual({
-			peer: EAST,
+			peer: PLAYER2,
 			seat: "2",
 			gen,
 		});
-		await rig.command(EAST, 58, gen, "human action after automation");
-		expect(rig.to(EAST)).toContainEqual(
+		await rig.command(PLAYER2, 58, gen, "human action after automation");
+		expect(rig.to(PLAYER2)).toContainEqual(
 			expect.objectContaining({
 				k: "result",
 				id: commandId(58),
@@ -363,8 +363,8 @@ describe("host-local bots", () => {
 describe("hello", () => {
 	it("tells a visitor it is unseated and sends the lobby with the free seats", async () => {
 		const rig = await new Rig().create();
-		await rig.hello(EAST, CLIENT_E);
-		const [welcome, lobby] = rig.to(EAST);
+		await rig.hello(PLAYER2, CLIENT_2);
+		const [welcome, lobby] = rig.to(PLAYER2);
 		expect(welcome).toEqual({
 			k: "welcome",
 			status: "unseated",
@@ -384,10 +384,10 @@ describe("hello", () => {
 
 	it("refuses a claim or a bot for a seat outside the players in play", async () => {
 		const rig = await new Rig().create();
-		await rig.hello(SOUTH, CLIENT_S);
-		rig.to(SOUTH);
-		await rig.from(SOUTH, { k: "claim-seat", req: 9, seat: "5" });
-		expect(rig.to(SOUTH)).toContainEqual({
+		await rig.hello(PLAYER3, CLIENT_3);
+		rig.to(PLAYER3);
+		await rig.from(PLAYER3, { k: "claim-seat", req: 9, seat: "5" });
+		expect(rig.to(PLAYER3)).toContainEqual({
 			k: "seat-result",
 			req: 9,
 			ok: false,
@@ -400,28 +400,28 @@ describe("hello", () => {
 
 	it("refuses another link version", async () => {
 		const rig = await new Rig().create();
-		rig.host.join(EAST);
-		await rig.from(EAST, { k: "hello", b: "p2p-v9", client: CLIENT_E });
-		expect(rig.to(EAST)).toEqual([
+		rig.host.join(PLAYER2);
+		await rig.from(PLAYER2, { k: "hello", b: "p2p-v9", client: CLIENT_2 });
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "welcome", status: "incompatible", auth: rig.auth },
 		]);
 	});
 
 	it("does not let a second active peer take over a named seat", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		rig.to(EAST);
-		await rig.hello(EAST2, CLIENT_E, { seat: "2", gen });
-		const [welcome, roster] = rig.to(EAST2);
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		rig.to(PLAYER2);
+		await rig.hello(PLAYER2B, CLIENT_2, { seat: "2", gen });
+		const [welcome, roster] = rig.to(PLAYER2B);
 		expect(welcome).toEqual({
 			k: "welcome",
 			status: "superseded",
 			auth: rig.auth,
 		});
 		expect(roster).toBeUndefined();
-		expect(rig.to(EAST)).toEqual([]);
-		await rig.command(EAST, 8, gen);
-		expect(rig.to(EAST)).toContainEqual({
+		expect(rig.to(PLAYER2)).toEqual([]);
+		await rig.command(PLAYER2, 8, gen);
+		expect(rig.to(PLAYER2)).toContainEqual({
 			k: "result",
 			id: commandId(8),
 			status: "accepted",
@@ -431,20 +431,20 @@ describe("hello", () => {
 
 	it("supersedes a peer whose generation or holder does not match the seat", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		await rig.hello(EAST2, CLIENT_E, { seat: "2", gen: gen + 1 });
-		await rig.hello(SOUTH, CLIENT_S, { seat: "2", gen });
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.hello(PLAYER2B, CLIENT_2, { seat: "2", gen: gen + 1 });
+		await rig.hello(PLAYER3, CLIENT_3, { seat: "2", gen });
 		const superseded = { k: "welcome", status: "superseded", auth: rig.auth };
-		expect(rig.to(EAST2)).toEqual([superseded]);
-		expect(rig.to(SOUTH)).toEqual([superseded]);
+		expect(rig.to(PLAYER2B)).toEqual([superseded]);
+		expect(rig.to(PLAYER3)).toEqual([superseded]);
 		expect(rig.row("2")?.gen).toBe(gen);
 	});
 
 	it("deletes an expired table, tells every peer and stops", async () => {
 		const rig = await new Rig().create();
 		rig.clock.now += TABLE_IDLE_MS + 1;
-		await rig.hello(EAST, CLIENT_E);
-		expect(rig.to(EAST)).toEqual([
+		await rig.hello(PLAYER2, CLIENT_2);
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "welcome", status: "expired", auth: rig.auth },
 		]);
 		expect(rig.to(null)).toEqual([{ k: "gone", reason: "expired" }]);
@@ -456,9 +456,9 @@ describe("hello", () => {
 describe("seats", () => {
 	it("a claim of a free seat commits a seat entry with the next generation and broadcasts it", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
 		expect(gen).toBe(1);
-		const holder = await deriveHolder(TABLE, CLIENT_E);
+		const holder = await deriveHolder(TABLE, CLIENT_2);
 		expect(rig.row("2")).toEqual({ seat: "2", holder, gen: 1 });
 		const [message] = rig.entries();
 		expect(message?.e).toMatchObject({
@@ -475,35 +475,35 @@ describe("seats", () => {
 
 	it("refuses a seat that another holder holds, and a claim without hello", async () => {
 		const rig = await new Rig().create();
-		await rig.seat(EAST, CLIENT_E, "2");
-		await rig.hello(SOUTH, CLIENT_S);
-		rig.to(SOUTH);
-		await rig.from(SOUTH, { k: "claim-seat", req: 4, seat: "2" });
-		expect(rig.to(SOUTH)).toEqual([
+		await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.hello(PLAYER3, CLIENT_3);
+		rig.to(PLAYER3);
+		await rig.from(PLAYER3, { k: "claim-seat", req: 4, seat: "2" });
+		expect(rig.to(PLAYER3)).toEqual([
 			{ k: "seat-result", req: 4, ok: false, code: "taken" },
 		]);
-		rig.host.join(EAST2);
-		await rig.from(EAST2, { k: "claim-seat", req: 5, seat: "4" });
-		expect(rig.to(EAST2)).toEqual([
+		rig.host.join(PLAYER2B);
+		await rig.from(PLAYER2B, { k: "claim-seat", req: 5, seat: "4" });
+		expect(rig.to(PLAYER2B)).toEqual([
 			{ k: "seat-result", req: 5, ok: false, code: "invalid" },
 		]);
 	});
 
 	it("refuses a same-holder claim while the existing peer is active", async () => {
 		const rig = await new Rig().create();
-		await rig.seat(EAST, CLIENT_E, "2");
-		await rig.hello(EAST2, CLIENT_E);
-		rig.to(EAST2);
-		await rig.from(EAST2, { k: "claim-seat", req: 6, seat: "2" });
-		expect(rig.to(EAST2)).toContainEqual({
+		await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.hello(PLAYER2B, CLIENT_2);
+		rig.to(PLAYER2B);
+		await rig.from(PLAYER2B, { k: "claim-seat", req: 6, seat: "2" });
+		expect(rig.to(PLAYER2B)).toContainEqual({
 			k: "seat-result",
 			req: 6,
 			ok: false,
 			code: "taken",
 		});
-		expect(rig.row("2")?.holder).toBe(await deriveHolder(TABLE, CLIENT_E));
-		await rig.command(EAST, 7, 1);
-		expect(rig.to(EAST)).toContainEqual({
+		expect(rig.row("2")?.holder).toBe(await deriveHolder(TABLE, CLIENT_2));
+		await rig.command(PLAYER2, 7, 1);
+		expect(rig.to(PLAYER2)).toContainEqual({
 			k: "result",
 			id: commandId(7),
 			status: "accepted",
@@ -513,15 +513,15 @@ describe("seats", () => {
 
 	it("does not bind a second active peer to the same seat generation", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		await rig.hello(EAST2, CLIENT_E, { seat: "2", gen });
-		expect(rig.to(EAST2)).toContainEqual({
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.hello(PLAYER2B, CLIENT_2, { seat: "2", gen });
+		expect(rig.to(PLAYER2B)).toContainEqual({
 			k: "welcome",
 			status: "superseded",
 			auth: rig.auth,
 		});
-		await rig.command(EAST, 8, gen);
-		expect(rig.to(EAST)).toContainEqual({
+		await rig.command(PLAYER2, 8, gen);
+		expect(rig.to(PLAYER2)).toContainEqual({
 			k: "result",
 			id: commandId(8),
 			status: "accepted",
@@ -531,44 +531,44 @@ describe("seats", () => {
 
 	it("gives a seat to another holder after the seat hold", async () => {
 		const rig = await new Rig().create();
-		await rig.seat(EAST, CLIENT_E, "2");
+		await rig.seat(PLAYER2, CLIENT_2, "2");
 		rig.clock.now += SEAT_HOLD_MS + 1;
-		const gen = await rig.seat(SOUTH, CLIENT_S, "2");
+		const gen = await rig.seat(PLAYER3, CLIENT_3, "2");
 		expect(gen).toBe(2);
-		expect(rig.row("2")?.holder).toBe(await deriveHolder(TABLE, CLIENT_S));
+		expect(rig.row("2")?.holder).toBe(await deriveHolder(TABLE, CLIENT_3));
 	});
 
 	it("refuses a connected holder's seat to another browser", async () => {
 		const rig = await new Rig().create();
-		await rig.seat(EAST, CLIENT_E, "2");
-		await rig.hello(SOUTH, CLIENT_S);
-		rig.to(SOUTH);
-		await rig.from(SOUTH, { k: "claim-seat", req: 7, seat: "2" });
-		expect(rig.to(SOUTH)).toContainEqual({
+		await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.hello(PLAYER3, CLIENT_3);
+		rig.to(PLAYER3);
+		await rig.from(PLAYER3, { k: "claim-seat", req: 7, seat: "2" });
+		expect(rig.to(PLAYER3)).toContainEqual({
 			k: "seat-result",
 			req: 7,
 			ok: false,
 			code: "taken",
 		});
-		expect(rig.row("2")?.holder).toBe(await deriveHolder(TABLE, CLIENT_E));
+		expect(rig.row("2")?.holder).toBe(await deriveHolder(TABLE, CLIENT_2));
 	});
 
 	it("keeps a seat for SEAT_GRACE_MS after its holder leaves, then gives it to another browser", async () => {
 		const rig = await new Rig().create();
-		await rig.seat(EAST, CLIENT_E, "2");
-		await rig.hello(SOUTH, CLIENT_S);
-		rig.host.leave(EAST);
+		await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.hello(PLAYER3, CLIENT_3);
+		rig.host.leave(PLAYER2);
 		rig.clock.now += SEAT_GRACE_MS - 1;
-		await rig.from(SOUTH, { k: "claim-seat", req: 8, seat: "2" });
-		expect(rig.to(SOUTH)).toContainEqual({
+		await rig.from(PLAYER3, { k: "claim-seat", req: 8, seat: "2" });
+		expect(rig.to(PLAYER3)).toContainEqual({
 			k: "seat-result",
 			req: 8,
 			ok: false,
 			code: "taken",
 		});
 		rig.clock.now += 1;
-		await rig.from(SOUTH, { k: "claim-seat", req: 9, seat: "2" });
-		expect(rig.to(SOUTH)).toContainEqual({
+		await rig.from(PLAYER3, { k: "claim-seat", req: 9, seat: "2" });
+		expect(rig.to(PLAYER3)).toContainEqual({
 			k: "seat-result",
 			req: 9,
 			ok: true,
@@ -579,9 +579,9 @@ describe("seats", () => {
 
 	it("a bound peer cannot claim another seat", async () => {
 		const rig = await new Rig().create();
-		await rig.seat(EAST, CLIENT_E, "2");
-		await rig.from(EAST, { k: "claim-seat", req: 2, seat: "3" });
-		expect(rig.to(EAST)).toContainEqual({
+		await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.from(PLAYER2, { k: "claim-seat", req: 2, seat: "3" });
+		expect(rig.to(PLAYER2)).toContainEqual({
 			k: "seat-result",
 			req: 2,
 			ok: false,
@@ -591,7 +591,7 @@ describe("seats", () => {
 
 	it("releases an offline seat only, and only for a seated player", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
 		await rig.from(HOST, { k: "release", req: 7, seat: "2" });
 		expect(rig.to(HOST)).toEqual([
 			{ k: "release-result", req: 7, ok: false, code: "online" },
@@ -600,15 +600,15 @@ describe("seats", () => {
 		expect(rig.to(HOST)).toEqual([
 			{ k: "release-result", req: 8, ok: false, code: "invalid" },
 		]);
-		await rig.hello(SOUTH, CLIENT_S);
-		await rig.from(SOUTH, { k: "release", req: 9, seat: "2" });
-		expect(rig.to(SOUTH)).toContainEqual({
+		await rig.hello(PLAYER3, CLIENT_3);
+		await rig.from(PLAYER3, { k: "release", req: 9, seat: "2" });
+		expect(rig.to(PLAYER3)).toContainEqual({
 			k: "release-result",
 			req: 9,
 			ok: false,
 			code: "unseated",
 		});
-		rig.host.leave(EAST);
+		rig.host.leave(PLAYER2);
 		rig.entries();
 		await rig.from(HOST, { k: "release", req: 10, seat: "2" });
 		expect(rig.to(HOST)).toEqual([{ k: "release-result", req: 10, ok: true }]);
@@ -623,7 +623,7 @@ describe("seats", () => {
 
 	it("counts a connected seat as offline once its peer is silent for HOST_LOST_MS", async () => {
 		const rig = await new Rig().create();
-		await rig.seat(EAST, CLIENT_E, "2");
+		await rig.seat(PLAYER2, CLIENT_2, "2");
 		rig.clock.now += HOST_LOST_MS;
 		await rig.from(HOST, { k: "release", req: 3, seat: "2" });
 		expect(rig.to(HOST)).toEqual([{ k: "release-result", req: 3, ok: true }]);
@@ -631,27 +631,27 @@ describe("seats", () => {
 
 	it("sends the lobby to visitors when seats change and every LOBBY_REFRESH_MS", async () => {
 		const rig = await new Rig().create();
-		await rig.hello(SOUTH, CLIENT_S);
-		rig.to(SOUTH);
-		await rig.seat(EAST, CLIENT_E, "2");
-		const lobby = rig.to(SOUTH).find((message) => message.k === "lobby");
+		await rig.hello(PLAYER3, CLIENT_3);
+		rig.to(PLAYER3);
+		await rig.seat(PLAYER2, CLIENT_2, "2");
+		const lobby = rig.to(PLAYER3).find((message) => message.k === "lobby");
 		expect(
 			lobby?.k === "lobby" &&
 				lobby.seats.find((row) => row.seat === "2")?.available,
 		).toBe(false);
 		rig.host.tick();
-		rig.to(SOUTH);
+		rig.to(PLAYER3);
 		rig.clock.now += LOBBY_REFRESH_MS;
 		rig.host.tick();
-		expect(rig.to(SOUTH).map((message) => message.k)).toContain("lobby");
+		expect(rig.to(PLAYER3).map((message) => message.k)).toContain("lobby");
 	});
 
 	it("broadcasts the roster after ROSTER_COALESCE_MS, with acknowledgements and bound peers", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
 		rig.host.tick();
 		rig.sent.take();
-		await rig.from(EAST, { k: "ack", rev: 2 });
+		await rig.from(PLAYER2, { k: "ack", rev: 2 });
 		rig.host.tick();
 		expect(rig.sent.of("roster")).toEqual([]);
 		rig.clock.now += ROSTER_COALESCE_MS;
@@ -660,7 +660,7 @@ describe("seats", () => {
 		expect(sent?.to).toBeNull();
 		expect(sent?.message.peers).toEqual([
 			{ peer: HOST, seat: "1", gen: 1 },
-			{ peer: EAST, seat: "2", gen },
+			{ peer: PLAYER2, seat: "2", gen },
 		]);
 		expect(sent?.message.seats.map((row) => [row.seat, row.acked])).toEqual([
 			["1", 2],
@@ -676,14 +676,14 @@ describe("seats", () => {
 describe("commands", () => {
 	it("rejects a deal command from a non-host seat", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		await rig.from(EAST, {
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.from(PLAYER2, {
 			k: "cmd",
 			id: commandId(10),
 			gen,
 			payload: { type: "deal" },
 		});
-		expect(rig.to(EAST)).toEqual([
+		expect(rig.to(PLAYER2)).toEqual([
 			{
 				k: "result",
 				id: commandId(10),
@@ -696,11 +696,11 @@ describe("commands", () => {
 
 	it("orders accepted commands, answers the sender and broadcasts each entry with the state", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
 		rig.entries();
-		rig.to(EAST);
+		rig.to(PLAYER2);
 		rig.host.receive(
-			EAST,
+			PLAYER2,
 			overTheWire(TABLE, "ctl", {
 				k: "cmd",
 				id: commandId(10),
@@ -708,8 +708,8 @@ describe("commands", () => {
 				payload: chatPayload(TABLE, "first"),
 			}),
 		);
-		await rig.command(EAST, 11, gen, "second");
-		expect(rig.to(EAST)).toEqual([
+		await rig.command(PLAYER2, 11, gen, "second");
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "result", id: commandId(10), status: "accepted", seq: 3 },
 			{ k: "result", id: commandId(11), status: "accepted", seq: 4 },
 		]);
@@ -728,17 +728,17 @@ describe("commands", () => {
 
 	it("answers a resent command with the stored result and logs it once", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		await rig.command(EAST, 10, gen);
-		rig.to(EAST);
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.command(PLAYER2, 10, gen);
+		rig.to(PLAYER2);
 		rig.entries();
-		await rig.command(EAST, 10, gen);
-		expect(rig.to(EAST)).toEqual([
+		await rig.command(PLAYER2, 10, gen);
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "result", id: commandId(10), status: "accepted", seq: 3 },
 		]);
 		expect(rig.entries()).toEqual([]);
-		await rig.command(EAST, 10, gen, "another text");
-		expect(rig.to(EAST)).toEqual([
+		await rig.command(PLAYER2, 10, gen, "another text");
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "result", id: commandId(10), status: "invalid" },
 		]);
 		expect(rig.log.position().rev).toBe(3);
@@ -746,21 +746,21 @@ describe("commands", () => {
 
 	it("takes the seat from the binding and refuses a stale generation or an unbound sender", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		await rig.hello(EAST2, CLIENT_E);
-		await rig.from(EAST2, { k: "claim-seat", req: 1, seat: "2" });
-		expect(rig.to(EAST2)).toContainEqual({
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.hello(PLAYER2B, CLIENT_2);
+		await rig.from(PLAYER2B, { k: "claim-seat", req: 1, seat: "2" });
+		expect(rig.to(PLAYER2B)).toContainEqual({
 			k: "seat-result",
 			req: 1,
 			ok: false,
 			code: "taken",
 		});
-		await rig.command(EAST, 10, gen);
-		expect(rig.to(EAST)).toEqual([
+		await rig.command(PLAYER2, 10, gen);
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "result", id: commandId(10), status: "accepted", seq: 3 },
 		]);
-		await rig.command(EAST2, 11, gen);
-		expect(rig.to(EAST2)).toEqual([
+		await rig.command(PLAYER2B, 11, gen);
+		expect(rig.to(PLAYER2B)).toEqual([
 			{ k: "result", id: commandId(11), status: "busy" },
 		]);
 		expect(rig.log.seqOf(commandId(10))).toBe(3);
@@ -769,10 +769,10 @@ describe("commands", () => {
 
 	it("returns the game's reason for a rejected command and stores nothing", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
 		const before = rig.storage.commits;
-		await rig.command(EAST, 10, gen, "   ");
-		expect(rig.to(EAST)).toContainEqual({
+		await rig.command(PLAYER2, 10, gen, "   ");
+		expect(rig.to(PLAYER2)).toContainEqual({
 			k: "result",
 			id: commandId(10),
 			status: "rejected",
@@ -783,11 +783,11 @@ describe("commands", () => {
 
 	it(`answers busy when a seat has ${MAX_PENDING_PER_SEAT} commands waiting`, async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		rig.to(EAST);
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		rig.to(PLAYER2);
 		for (let n = 0; n <= MAX_PENDING_PER_SEAT; n++) {
 			rig.host.receive(
-				EAST,
+				PLAYER2,
 				overTheWire(TABLE, "ctl", {
 					k: "cmd",
 					id: commandId(100 + n),
@@ -797,7 +797,7 @@ describe("commands", () => {
 			);
 		}
 		await settle();
-		const results = rig.to(EAST);
+		const results = rig.to(PLAYER2);
 		expect(results[0]).toEqual({
 			k: "result",
 			id: commandId(100 + MAX_PENDING_PER_SEAT),
@@ -812,17 +812,17 @@ describe("commands", () => {
 
 	it("never accepts a command whose write failed, and stops hosting once", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		rig.to(EAST);
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		rig.to(PLAYER2);
 		rig.entries();
 		rig.storage.fail = true;
-		await rig.command(EAST, 10, gen);
-		expect(rig.to(EAST)).toEqual([
+		await rig.command(PLAYER2, 10, gen);
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "result", id: commandId(10), status: "storage" },
 		]);
 		rig.storage.fail = false;
-		await rig.command(EAST, 11, gen);
-		expect(rig.to(EAST)).toEqual([
+		await rig.command(PLAYER2, 11, gen);
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "result", id: commandId(11), status: "not_host" },
 		]);
 		expect(rig.entries()).toEqual([]);
@@ -833,12 +833,12 @@ describe("commands", () => {
 
 	it("stops with conflict when the stored host changes under it", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		rig.to(EAST);
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		rig.to(PLAYER2);
 		const better = { ...rig.auth, inc: rig.auth.inc + 1 };
 		await storeClaim(rig.log, better);
-		await rig.command(EAST, 10, gen);
-		expect(rig.to(EAST)).toEqual([
+		await rig.command(PLAYER2, 10, gen);
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "result", id: commandId(10), status: "not_host" },
 		]);
 		expect(rig.stops).toEqual(["conflict"]);
@@ -846,8 +846,8 @@ describe("commands", () => {
 
 	it("a crash between the commit and the broadcast leaves one entry; the resend gets the stored result", async () => {
 		const rig = await new Rig().create();
-		const gen = await rig.seat(EAST, CLIENT_E, "2");
-		await rig.command(EAST, 10, gen);
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		await rig.command(PLAYER2, 10, gen);
 		// The page dies before its messages leave: nothing it sent arrives.
 		rig.sent.take();
 		rig.host.stop();
@@ -855,10 +855,10 @@ describe("commands", () => {
 		rig.auth = { ...rig.auth, inc: rig.auth.inc + 1 };
 		await storeClaim(rig.log, rig.auth);
 		rig.start();
-		await rig.hello(EAST, CLIENT_E, { seat: "2", gen });
-		expect(rig.to(EAST)[0]).toMatchObject({ k: "welcome", status: "bound" });
-		await rig.command(EAST, 10, gen);
-		expect(rig.to(EAST)).toEqual([
+		await rig.hello(PLAYER2, CLIENT_2, { seat: "2", gen });
+		expect(rig.to(PLAYER2)[0]).toMatchObject({ k: "welcome", status: "bound" });
+		await rig.command(PLAYER2, 10, gen);
+		expect(rig.to(PLAYER2)).toEqual([
 			{ k: "result", id: commandId(10), status: "accepted", seq: 3 },
 		]);
 		const logged = rig.log.entries.filter(

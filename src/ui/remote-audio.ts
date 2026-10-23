@@ -3,7 +3,7 @@ import type { Seat } from "../protocol";
 import { el } from "./dom";
 
 /**
- * One audio element per remote seat (handover §4). An element plays a track only while the call view gives it
+ * One audio element per remote seat. An element plays a track only while the call view gives it
  * one, so turning Hear others off or leaving the call silences it at once. The elements outlive the table's
  * re-rendering, so playback never restarts because the game changed.
  */

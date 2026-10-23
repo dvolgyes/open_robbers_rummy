@@ -19,7 +19,7 @@ import {
 import type { Seat } from "../../src/protocol";
 
 /**
- * Test kit for the replication modules (plan §8, P5): a virtual clock, a mesh that delivers messages after
+ * Test kit for the replication modules: a virtual clock, a mesh that delivers messages after
  * deterministic delays, a recorder for one component's output, and a storage whose writes fail on demand. Every
  * message goes through `frame`, JSON and the wire validators, as it does between browsers.
  */

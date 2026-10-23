@@ -1,7 +1,7 @@
 import type { Form } from "./device-class";
 
 /**
- * Pure call media policy (handover §2, §3). Local preferences change only through the local functions here;
+ * Pure call media policy. Local preferences change only through the local functions here;
  * a peer's preferences are inputs to the peer's side of `allowed` and are never written into local ones.
  */
 
@@ -51,7 +51,7 @@ function switches(
 	};
 }
 
-/** Handover §2 table, in its order. */
+/** The call modes, in the order of the call panel. */
 export const PRESETS: readonly Preset[] = [
 	{
 		id: "out",
@@ -134,7 +134,7 @@ export function join(selection: Switches, form: Form): Prefs {
 }
 
 /**
- * The status that the peers hear (handover §2: "A denied or missing device disables that outgoing capability"):
+ * The status that the peers hear (a denied or missing device disables that outgoing capability):
  * the Send switch of each `unavailable` medium is off. The local switches keep the user's request.
  */
 export function sendable(prefs: Prefs, unavailable: readonly Medium[]): Prefs {
@@ -192,8 +192,8 @@ export function changeForm(prefs: Prefs, form: Form): Prefs {
 }
 
 /**
- * Handover §3 `allowed(A → B, m)` without the membership term: the caller creates links only for current seat
- * holders (call-layout plan §4.1). An unknown peer (`undefined`) never grants anything.
+ * `allowed(A → B, m)` without the membership term: the caller creates links only for current seat
+ * holders. An unknown peer (`undefined`) never grants anything.
  */
 export function allowed(
 	from: Party | undefined,

@@ -124,7 +124,7 @@ function granted(name: "microphone" | "camera"): Promise<boolean> {
 	);
 }
 
-/** IndexedDB, or a memory store with the reason when this browser does not allow storing data (plan §4.3). */
+/** IndexedDB, or a memory store with the reason when this browser does not allow storing data. */
 async function openStorage(): Promise<{
 	storage: TableStorage;
 	problem: string | undefined;
@@ -143,7 +143,7 @@ async function openStorage(): Promise<{
 
 /**
  * Web Locks, or none when this browser refuses them (blocked site data): a seat then comes back only after the
- * seat hold, when its holder is unseen for SEAT_HOLD_MS (plan §4.6).
+ * seat hold, when its holder is unseen for SEAT_HOLD_MS.
  */
 async function usableLocks(): Promise<LockManager | undefined> {
 	const locks = navigator.locks as LockManager | undefined;
@@ -162,7 +162,7 @@ function askPersistence(): Promise<boolean> {
 }
 
 async function main(root: HTMLElement): Promise<void> {
-	// Trystero and the table identifiers need Web Crypto, which only a secure context has (plan §4.1).
+	// Trystero and the table identifiers need Web Crypto, which only a secure context has.
 	if (!window.isSecureContext) {
 		root.textContent = t("Open this page over HTTPS.");
 		return;

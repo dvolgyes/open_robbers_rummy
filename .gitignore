@@ -220,7 +220,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Node / web tooling (OpenTrick)
+# Node / web tooling
 node_modules/
 test-results/
 .vitest/

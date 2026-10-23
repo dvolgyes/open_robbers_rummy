@@ -11,14 +11,14 @@ import {
 } from "../../src/p2p/wire";
 
 const TABLE = "vKg29g0NeA3vntlnYBW0TP";
-const HOLDER_N = "DFqES54ngHxkS3v5";
-const HOLDER_E = "AAAAAAAAAAAAAAAA";
+const HOLDER_1 = "DFqES54ngHxkS3v5";
+const HOLDER_2 = "AAAAAAAAAAAAAAAA";
 const CLIENT = "AgICAgICAgICAgICAgICAg";
 const PEER = "0123456789AbCdEfGhIj";
 const ID = "123e4567-e89b-42d3-a456-426614174000";
 const ID2 = "123e4567-e89b-42d3-a456-426614174001";
-const AUTH: Authority = { term: 2, tag: `${HOLDER_N}.1`, inc: 1 };
-const OLD_AUTH: Authority = { term: 1, tag: `${HOLDER_E}.2`, inc: 1 };
+const AUTH: Authority = { term: 2, tag: `${HOLDER_1}.1`, inc: 1 };
+const OLD_AUTH: Authority = { term: 1, tag: `${HOLDER_2}.2`, inc: 1 };
 const POS = { rev: 3, lastAuth: OLD_AUTH };
 const EMPTY = { rev: 0, lastAuth: null };
 const CONFIG = {
@@ -60,7 +60,7 @@ const ENTRY_5 = {
 	seat: "2",
 	gen: 3,
 	kind: "seat",
-	op: { type: "claim", holder: HOLDER_E },
+	op: { type: "claim", holder: HOLDER_2 },
 	event: { type: "seat" },
 };
 
@@ -124,7 +124,7 @@ const CTL: Case[] = [
 			role: "host",
 			auth: AUTH,
 			pos: POS,
-			holder: HOLDER_N,
+			holder: HOLDER_1,
 			seat: "1",
 			elig: true,
 		},
@@ -138,7 +138,7 @@ const CTL: Case[] = [
 			auth: AUTH,
 			seenAgoMs: 1200,
 			pos: POS,
-			holder: HOLDER_E,
+			holder: HOLDER_2,
 			seat: "2",
 			elig: true,
 		},
@@ -146,7 +146,7 @@ const CTL: Case[] = [
 	],
 	[
 		"beat (visitor)",
-		{ k: "beat", role: "visitor", holder: HOLDER_E, elig: false },
+		{ k: "beat", role: "visitor", holder: HOLDER_2, elig: false },
 		["role", "holder", "elig"],
 	],
 	["ping", { k: "ping", n: "abcdefgh12" }, ["n"]],
@@ -183,8 +183,8 @@ const CTL: Case[] = [
 			k: "roster",
 			auth: AUTH,
 			seats: [
-				{ seat: "1", holder: HOLDER_N, gen: 2, acked: 3 },
-				{ seat: "2", holder: HOLDER_E, gen: 1, acked: 3 },
+				{ seat: "1", holder: HOLDER_1, gen: 2, acked: 3 },
+				{ seat: "2", holder: HOLDER_2, gen: 1, acked: 3 },
 				{ seat: "3", holder: null, gen: 0, acked: 0 },
 				{ seat: "4", holder: null, gen: 2, acked: 0 },
 				{ seat: "5", holder: null, gen: 0, acked: 0 },
@@ -203,7 +203,7 @@ const CTL: Case[] = [
 const LOG: Case[] = [
 	[
 		"entry",
-		{ k: "entry", e: ENTRY_4, state: { phase: "bidding" } },
+		{ k: "entry", e: ENTRY_4, state: { phase: "play" } },
 		["e", "state"],
 	],
 	[
@@ -215,7 +215,7 @@ const LOG: Case[] = [
 			base: POS,
 			entries: [ENTRY_4, ENTRY_5],
 			last: true,
-			state: { phase: "bidding" },
+			state: { phase: "play" },
 		},
 		["req", "auth", "base", "entries", "last", "state"],
 	],
@@ -233,7 +233,7 @@ const LOG: Case[] = [
 			mode: "replace",
 			config: CONFIG,
 			seats: [
-				{ seat: "1", holder: HOLDER_N, gen: 2 },
+				{ seat: "1", holder: HOLDER_1, gen: 2 },
 				{ seat: "2", holder: null, gen: 0 },
 				{ seat: "3", holder: null, gen: 0 },
 				{ seat: "4", holder: null, gen: 0 },
@@ -508,7 +508,7 @@ describe("message rules", () => {
 		throw new Error("missing sample");
 
 	it.each([
-		["a host tag of another holder", { ...hostBeat, holder: HOLDER_E }],
+		["a host tag of another holder", { ...hostBeat, holder: HOLDER_2 }],
 		["a host tag of another seat", { ...hostBeat, seat: "2" }],
 		["a host with a reported age", { ...hostBeat, seenAgoMs: 0 }],
 		["an ineligible host", { ...hostBeat, elig: false }],

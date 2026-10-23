@@ -14,7 +14,7 @@ import {
 import { type Entry, parseEntry } from "./wire";
 
 /**
- * Replica storage (plan §4.3): IndexedDB, or memory when the browser has no usable IndexedDB. Both implement
+ * Replica storage: IndexedDB, or memory when the browser has no usable IndexedDB. Both implement
  * one contract, which tests/unit/p2p-storage.test.ts checks against both. Every write is one transaction, and
  * a commit writes only when the partition still has the revision and host that the caller expects.
  */

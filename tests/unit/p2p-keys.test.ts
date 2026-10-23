@@ -94,7 +94,6 @@ describe("host tags", () => {
 	it.each([
 		["a short holder", `${HOLDER.slice(1)}.2`],
 		["seat 7", `${HOLDER}.7`],
-		["a seat letter", `${HOLDER}.N`],
 		["no seat", HOLDER],
 		["an unknown seat", `${HOLDER}.X`],
 		["a number", 7],

@@ -255,7 +255,7 @@ export function showRoom(
 	let actionError: string | undefined;
 	let releaseError: string | undefined;
 	let confirming: Seat | undefined;
-	/** The browser's answer to the persistence request (plan §4.3). */
+	/** The browser's answer to the persistence request. */
 	let persisted: boolean | undefined;
 	/** The table as last rendered: an action is sent for the position the player saw. */
 	let shownState: RummyState | undefined;

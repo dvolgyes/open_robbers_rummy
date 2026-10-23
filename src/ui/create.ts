@@ -166,7 +166,7 @@ export function showCreate(
 		errors.replaceChildren(...messages.map((text) => el("li", {}, text)));
 	};
 
-	// Only a browser that keeps data can hold the first copy of the table (plan §4.3).
+	// Only a browser that keeps data can hold the first copy of the table.
 	if (!deps.storage.persistent) {
 		showErrors([deps.t(CANNOT_STORE)]);
 		submit.disabled = true;

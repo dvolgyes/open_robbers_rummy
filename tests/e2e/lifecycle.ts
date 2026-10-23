@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 /**
- * Freezes the page's JavaScript, as Chrome freezes a background tab and as Android suspends a browser (plan §9):
+ * Freezes the page's JavaScript, as Chrome freezes a background tab and as Android suspends a browser:
  * timers and event handlers stop until the thaw, and the browser's network threads keep the WebRTC links open.
  * Headless Chrome reports every page as visible and ignores `Page.setWebLifecycleState` frozen (measured: a 200 ms
  * timer kept firing), so the freeze pauses the page in the debugger instead.

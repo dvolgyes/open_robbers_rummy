@@ -21,7 +21,7 @@ export type ContextOptions = Omit<
 
 /** Test rig options of a player. Kept across restarts. */
 export interface RigOptions {
-	/** Routes the tracker sockets through a `NetworkSwitch`, so that the test can cut them (plan §9). */
+	/** Routes the tracker sockets through a `NetworkSwitch`, so that the test can cut them. */
 	readonly trackerSwitch?: boolean;
 	/**
 	 * Starts a separate Chrome whose profile does not allow sites to save data, the setting a person can choose
@@ -104,7 +104,7 @@ export async function reportNetwork(players: Iterable<Player>): Promise<void> {
 }
 
 /**
- * One person's browser: a context with its own storage, so its own holder (plan §9).
+ * One person's browser: a context with its own storage, so its own holder.
  */
 export class Player {
 	readonly name: string;

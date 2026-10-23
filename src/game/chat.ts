@@ -8,7 +8,7 @@ import {
 } from "../protocol";
 import type { GameModule } from "./module";
 
-/** Milestone 1: ordered text messages between the four seats. */
+/** Ordered text messages between the seats. */
 
 export const MAX_MESSAGE_LENGTH = 500;
 

@@ -5,9 +5,12 @@ import { CONNECT_MS } from "./room";
 /** A shared room link carries setup values; a player's page URL also selects their seat. */
 test.describe.configure({ mode: "serial" });
 
-const BOOKMARK_QUERY = "east=zsdh&west=dvolgyes&host=east";
-const TABLE_LINK =
-	/^http:\/\/localhost:\d+\/\?north=player1&east=zsdh&south=player2&west=dvolgyes&host=east&bot_seats=&bot_model=inception%2Fmercury-3&bot_fallback=openai%2Fgpt-6-luna&bot_retries=5&bot_delay_ms=3000&bot_models=[^&#]+#v=p2p-v1&k=[A-Za-z0-9_-]{43}$/;
+const BOOKMARK_QUERY = "p2=zsdh&p4=dvolgyes&host=2";
+const ROOM_QUERY =
+	"p1=player1&p2=zsdh&p3=player3&p4=dvolgyes&host=2&rules=gamerules&jokers=4&assist=1&bot_seats=";
+const TABLE_LINK = new RegExp(
+	`^http://localhost:\\d+/\\?${ROOM_QUERY}#v=p2p-v2&k=[A-Za-z0-9_-]{43}$`,
+);
 
 const players: Player[] = [];
 let owner: Player;
@@ -48,9 +51,11 @@ test("the create screen is prefilled from the bookmark, with the host seat chose
 test("create opens the game and selects the host seat in the page URL", async () => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 	await page.getByTestId("create").click();
-	await expect(page).toHaveTitle("Open Canasta: zsdh (E)");
+	await expect(page).toHaveTitle(/Open Robber's Rummy: zsdh \(Player 2\)$/);
 	await expect(page).toHaveURL(
-		/\?north=player1&east=zsdh&south=player2&west=dvolgyes&host=east&bot_seats=&bot_model=inception%2Fmercury-3&bot_fallback=openai%2Fgpt-6-luna&bot_retries=5&bot_delay_ms=3000&bot_models=[^&#]+&selected_player=E#v=p2p-v1&k=[A-Za-z0-9_-]{43}$/,
+		new RegExp(
+			`\\?${ROOM_QUERY}&selected_player=2#v=p2p-v2&k=[A-Za-z0-9_-]{43}$`,
+		),
 	);
 	await expect(page.getByRole("textbox", { name: "Table link" })).toHaveCount(
 		0,
@@ -69,12 +74,12 @@ test("the other players see the names and can choose a seat from the shared URL"
 		timeout: CONNECT_MS,
 	});
 	await visitor.getByTestId("pick-4").click();
-	await expect(visitor).toHaveTitle(/dvolgyes \(W\)$/);
+	await expect(visitor).toHaveTitle(/dvolgyes \(Player 4\)$/);
 });
 
 test("reloading the selected-player address seats the host again", async () => {
 	await page.reload();
-	await expect(page).toHaveTitle("Open Canasta: zsdh (E)", {
+	await expect(page).toHaveTitle(/Open Robber's Rummy: zsdh \(Player 2\)$/, {
 		timeout: CONNECT_MS,
 	});
 	await expect(page.getByTestId("pick-2")).toHaveCount(0);

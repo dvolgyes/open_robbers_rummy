@@ -11,7 +11,7 @@ import {
 } from "./messages";
 
 /**
- * Call signaling (call/layout plan §4.4): one inbox per seat holder for receiving, and a `CallTransport` for
+ * Call signaling: one inbox per seat holder for receiving, and a `CallTransport` for
  * sending. Messages from one client leave in send order, one at a time, so the transport delivers them in that
  * order.
  */

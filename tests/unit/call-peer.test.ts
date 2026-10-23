@@ -69,36 +69,36 @@ class Pair {
 	held: Wire[] = [];
 	hold = false;
 	drop: (wire: Wire) => boolean = () => false;
-	readonly northChanges = vi.fn();
-	readonly eastChanges = vi.fn();
-	readonly north: PeerLink;
-	readonly east: PeerLink;
+	readonly player1Changes = vi.fn();
+	readonly player2Changes = vi.fn();
+	readonly player1: PeerLink;
+	readonly player2: PeerLink;
 
 	constructor(
-		north: Party,
-		east: Party,
+		player1: Party,
+		player2: Party,
 		setup: (pair: Pair) => void = () => undefined,
 	) {
 		setup(this);
-		this.north = new PeerLink({
+		this.player1 = new PeerLink({
 			seat: "2",
 			polite: false,
-			local: north,
-			remote: east,
+			local: player1,
+			remote: player2,
 			connection: asConnection(this.a),
 			tracks: { audio: asTrack(this.micA), video: asTrack(this.camA) },
 			send: (signal) => this.#route("1", signal),
-			onState: this.northChanges,
+			onState: this.player1Changes,
 		});
-		this.east = new PeerLink({
+		this.player2 = new PeerLink({
 			seat: "1",
 			polite: true,
-			local: east,
-			remote: north,
+			local: player2,
+			remote: player1,
 			connection: asConnection(this.b),
 			tracks: { audio: asTrack(this.micB), video: asTrack(this.camB) },
 			send: (signal) => this.#route("2", signal),
-			onState: this.eastChanges,
+			onState: this.player2Changes,
 		});
 	}
 
@@ -167,12 +167,12 @@ class Pair {
 	}
 
 	#deliver(wire: Wire): void {
-		(wire.from === "1" ? this.east : this.north).receive(wire.signal);
+		(wire.from === "1" ? this.player2 : this.player1).receive(wire.signal);
 	}
 }
 
-async function connectedPair(north = AUDIO, east = AUDIO): Promise<Pair> {
-	const pair = new Pair(north, east);
+async function connectedPair(player1 = AUDIO, player2 = AUDIO): Promise<Pair> {
+	const pair = new Pair(player1, player2);
 	await settle();
 	pair.connect();
 	return pair;
@@ -193,7 +193,7 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
+describe("PeerLink negotiation", () => {
 	it("connects a symmetric audio pair in one offer/answer round", async () => {
 		const pair = new Pair(AUDIO, AUDIO);
 		await settle();
@@ -208,15 +208,15 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 		expect(pair.tb.currentDirection).toBe("sendrecv");
 		expect(pair.ta.sender.track).toBe(asTrack(pair.micA));
 		expect(pair.tb.sender.track).toBe(asTrack(pair.micB));
-		expect(pair.north.state).toBe("connecting");
-		expect(pair.north.connected).toBe(false);
+		expect(pair.player1.state).toBe("connecting");
+		expect(pair.player1.connected).toBe(false);
 
 		pair.connect();
-		expect(pair.north.state).toBe("connected");
-		expect(pair.north.connected).toBe(true);
-		expect(pair.east.state).toBe("connected");
-		expect(pair.north.remoteAudio).toBe(pair.ta.receiver.track);
-		expect(pair.east.remoteAudio).toBe(pair.tb.receiver.track);
+		expect(pair.player1.state).toBe("connected");
+		expect(pair.player1.connected).toBe(true);
+		expect(pair.player2.state).toBe("connected");
+		expect(pair.player1.remoteAudio).toBe(pair.ta.receiver.track);
+		expect(pair.player2.remoteAudio).toBe(pair.tb.receiver.track);
 	});
 
 	it("never sends a track from a listen-only side", async () => {
@@ -231,27 +231,27 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 	it("removes the track at once when the impolite side turns send off, then renegotiates", async () => {
 		const pair = await connectedPair();
 		const quiet = switched(AUDIO, "send", false);
-		pair.north.update(quiet, AUDIO);
-		pair.east.update(AUDIO, quiet);
+		pair.player1.update(quiet, AUDIO);
+		pair.player2.update(AUDIO, quiet);
 		await settle();
 		expect(pair.ta.sender.track).toBeNull();
 		expect(pair.types("1")).toEqual(["offer", "offer"]);
 		expect(pair.ta.currentDirection).toBe("recvonly");
 		expect(pair.tb.currentDirection).toBe("sendonly");
 		expect(pair.tb.sender.track).toBe(asTrack(pair.micB));
-		expect(pair.north.state).toBe("connected");
+		expect(pair.player1.state).toBe("connected");
 	});
 
 	it("lets the polite side stop sending without an offer of its own", async () => {
 		const pair = await connectedPair();
 		const quiet = switched(AUDIO, "send", false);
-		pair.east.update(quiet, AUDIO);
+		pair.player2.update(quiet, AUDIO);
 		await settle();
 		expect(pair.tb.sender.track).toBeNull();
 		expect(pair.types("2")).toEqual(["answer"]);
 
 		// Its prefs reach the impolite side, which offers the new directions.
-		pair.north.update(AUDIO, quiet);
+		pair.player1.update(AUDIO, quiet);
 		await settle();
 		expect(pair.types("1")).toEqual(["offer", "offer"]);
 		expect(pair.types("2")).toEqual(["answer", "answer"]);
@@ -263,8 +263,8 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 	it("stops receiving after the polite side turns receive off", async () => {
 		const pair = await connectedPair();
 		const deaf = switched(AUDIO, "receive", false);
-		pair.east.update(deaf, AUDIO);
-		pair.north.update(AUDIO, deaf);
+		pair.player2.update(deaf, AUDIO);
+		pair.player1.update(AUDIO, deaf);
 		await settle();
 		expect(pair.ta.currentDirection).toBe("recvonly");
 		expect(pair.tb.currentDirection).toBe("sendonly");
@@ -278,8 +278,8 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 		await settle();
 		expect(pair.held.map((wire) => wire.signal.type)).toEqual(["offer"]);
 		const quiet = switched(AUDIO, "send", false);
-		pair.north.update(quiet, AUDIO);
-		pair.east.update(AUDIO, quiet);
+		pair.player1.update(quiet, AUDIO);
+		pair.player2.update(AUDIO, quiet);
 		await settle();
 		expect(pair.types("1")).toEqual(["offer"]);
 
@@ -293,10 +293,10 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 	it("resolves glare: the impolite side ignores the colliding offer and the polite side rolls back", async () => {
 		const pair = await connectedPair();
 		pair.hold = true;
-		pair.east.restartIce();
+		pair.player2.restartIce();
 		const quiet = switched(AUDIO, "send", false);
-		pair.north.update(quiet, AUDIO);
-		pair.east.update(AUDIO, quiet);
+		pair.player1.update(quiet, AUDIO);
+		pair.player2.update(AUDIO, quiet);
 		await settle();
 		expect(pair.a.signalingState).toBe("have-local-offer");
 		expect(pair.b.signalingState).toBe("have-local-offer");
@@ -316,8 +316,8 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 
 		// The rolled-back offer has no answer timer left.
 		await settle(ANSWER_TIMEOUT_MS + SETTLE_MS);
-		expect(pair.east.state).toBe("connected");
-		expect(pair.north.state).toBe("connected");
+		expect(pair.player2.state).toBe("connected");
+		expect(pair.player1.state).toBe("connected");
 	});
 
 	it("replaces a lost first offer on Retry, from have-local-offer, with new ICE credentials", async () => {
@@ -330,11 +330,11 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 		expect(pair.types("2")).toEqual([]);
 
 		await settle(ANSWER_TIMEOUT_MS);
-		expect(pair.north.state).toBe("unavailable");
-		expect(pair.northChanges).toHaveBeenCalled();
+		expect(pair.player1.state).toBe("unavailable");
+		expect(pair.player1Changes).toHaveBeenCalled();
 
-		pair.north.restartIce();
-		expect(pair.north.state).toBe("connecting");
+		pair.player1.restartIce();
+		expect(pair.player1.state).toBe("connecting");
 		await settle();
 		const [lost, replacement] = pair.signals("1", "offer");
 		expect(replacement?.negotiation).toBeGreaterThan(lost?.negotiation ?? 0);
@@ -343,7 +343,7 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 		);
 		expect(pair.a.signalingState).toBe("stable");
 		pair.connect();
-		expect(pair.north.state).toBe("connected");
+		expect(pair.player1.state).toBe("connected");
 	});
 
 	it("offers a lost renegotiation again while the media still flows", async () => {
@@ -351,8 +351,8 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 		let dropped = 0;
 		pair.drop = (wire) => wire.signal.type === "offer" && dropped++ === 0;
 		const quiet = switched(AUDIO, "send", false);
-		pair.north.update(quiet, AUDIO);
-		pair.east.update(AUDIO, quiet);
+		pair.player1.update(quiet, AUDIO);
+		pair.player2.update(AUDIO, quiet);
 		await settle();
 		expect(pair.a.signalingState).toBe("have-local-offer");
 
@@ -360,7 +360,7 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 		expect(pair.types("1")).toEqual(["offer", "offer", "offer"]);
 		expect(pair.a.signalingState).toBe("stable");
 		expect(pair.ta.currentDirection).toBe("recvonly");
-		expect(pair.north.state).toBe("connected");
+		expect(pair.player1.state).toBe("connected");
 	});
 
 	it("does nothing on a polite Retry before any offer arrived", async () => {
@@ -368,7 +368,7 @@ describe("PeerLink negotiation (call/layout plan §4.4 step 4)", () => {
 			p.drop = (wire) => wire.from === "1";
 		});
 		await settle();
-		pair.east.restartIce();
+		pair.player2.restartIce();
 		await settle();
 		expect(pair.types("2")).toEqual([]);
 		expect(pair.b.getTransceivers()).toHaveLength(0);
@@ -383,17 +383,17 @@ describe("PeerLink stale signals", () => {
 		await settle();
 		const offer = pair.held[0]?.signal;
 		expect(offer?.negotiation).toBe(1);
-		pair.north.receive({
+		pair.player1.receive({
 			type: "answer",
 			negotiation: 7,
 			sdp: JSON.stringify({ type: "answer", ufrag: "x", sections: [] }),
 		});
-		pair.north.receive({
+		pair.player1.receive({
 			type: "ice",
 			negotiation: 0,
 			candidates: [candidate("candidate:old")],
 		});
-		pair.north.receive({
+		pair.player1.receive({
 			type: "ice",
 			negotiation: 1,
 			candidates: [candidate("candidate:early")],
@@ -412,7 +412,7 @@ describe("PeerLink stale signals", () => {
 
 	it("drops a remote candidate that the browser refuses without failing the link", async () => {
 		const pair = await connectedPair();
-		pair.north.receive({
+		pair.player1.receive({
 			type: "ice",
 			negotiation: 1,
 			candidates: [candidate("candidate:refused"), candidate("candidate:good")],
@@ -421,19 +421,19 @@ describe("PeerLink stale signals", () => {
 		expect(pair.a.candidates.map((c) => c.candidate)).toEqual([
 			"candidate:good",
 		]);
-		expect(pair.north.state).toBe("connected");
+		expect(pair.player1.state).toBe("connected");
 	});
 
 	it("makes the link unavailable on a refused description, and reports only the error name", async () => {
 		const pair = await connectedPair();
-		pair.east.receive({ type: "offer", negotiation: 9, sdp: "a=bad" });
+		pair.player2.receive({ type: "offer", negotiation: 9, sdp: "a=bad" });
 		await settle();
-		expect(pair.east.state).toBe("unavailable");
-		expect(pair.east.fault).toBe("SyntaxError");
+		expect(pair.player2.state).toBe("unavailable");
+		expect(pair.player2.fault).toBe("SyntaxError");
 	});
 });
 
-describe("PeerLink half-trickle ICE (call/layout plan §4.4 step 5)", () => {
+describe("PeerLink half-trickle ICE", () => {
 	it("sends the description after gathering or GATHER_WAIT_MS, then batches later candidates", async () => {
 		const pair = new Pair(AUDIO, AUDIO, (p) => {
 			p.a.gathering = "manual";
@@ -482,37 +482,37 @@ describe("PeerLink half-trickle ICE (call/layout plan §4.4 step 5)", () => {
 		});
 		await settle();
 		expect(pair.sent).toEqual([]);
-		expect(pair.north.state).toBe("unavailable");
-		expect(pair.north.fault).toBe("SdpTooLong");
+		expect(pair.player1.state).toBe("unavailable");
+		expect(pair.player1.fault).toBe("SdpTooLong");
 	});
 });
 
-describe("PeerLink state and lifecycle (call/layout plan §4.5)", () => {
+describe("PeerLink state and lifecycle", () => {
 	it("is unavailable when not connected in time, and follows the connection afterwards", async () => {
 		const pair = new Pair(AUDIO, AUDIO);
 		await settle(CONNECT_TIMEOUT_MS - SETTLE_MS);
-		expect(pair.north.state).toBe("connecting");
+		expect(pair.player1.state).toBe("connecting");
 		await settle(SETTLE_MS);
-		expect(pair.north.state).toBe("unavailable");
+		expect(pair.player1.state).toBe("unavailable");
 
 		pair.a.setConnection("connected");
-		expect(pair.north.state).toBe("connected");
+		expect(pair.player1.state).toBe("connected");
 		pair.a.setConnection("disconnected");
-		expect(pair.north.state).toBe("reconnecting");
+		expect(pair.player1.state).toBe("reconnecting");
 		pair.a.setConnection("failed");
-		expect(pair.north.state).toBe("unavailable");
+		expect(pair.player1.state).toBe("unavailable");
 	});
 
 	it("follows the microphone where the plan sends audio", async () => {
 		const pair = await connectedPair(AUDIO, party("listen"));
 		const other = new FakeTrack("audio");
-		pair.north.setTrack("audio", asTrack(other));
-		pair.east.setTrack("audio", asTrack(other));
+		pair.player1.setTrack("audio", asTrack(other));
+		pair.player2.setTrack("audio", asTrack(other));
 		await settle();
 		expect(pair.ta.sender.track).toBe(asTrack(other));
 		expect(pair.tb.sender.track).toBeNull();
 
-		pair.north.setTrack("audio", null);
+		pair.player1.setTrack("audio", null);
 		await settle();
 		expect(pair.ta.sender.track).toBeNull();
 	});
@@ -522,17 +522,17 @@ describe("PeerLink state and lifecycle (call/layout plan §4.5)", () => {
 			p.a.gathering = "manual";
 		});
 		await settle();
-		pair.north.close();
+		pair.player1.close();
 		await settle(CONNECT_TIMEOUT_MS + GATHER_WAIT_MS);
 		expect(pair.a.closed).toBe(true);
 		expect(pair.sent).toEqual([]);
-		expect(pair.northChanges).not.toHaveBeenCalled();
-		pair.north.receive({
+		expect(pair.player1Changes).not.toHaveBeenCalled();
+		pair.player1.receive({
 			type: "ice",
 			negotiation: 1,
 			candidates: [candidate("candidate:late")],
 		});
-		pair.north.restartIce();
+		pair.player1.restartIce();
 		await settle();
 		expect(pair.sent).toEqual([]);
 	});
@@ -549,10 +549,10 @@ function observed(pair: Pair, medium: Medium) {
 }
 
 /** The same, derived from the policy alone. */
-function expected(north: Party, east: Party, medium: Medium) {
+function expected(player1: Party, player2: Party, medium: Medium) {
 	const [n, e] = [
-		mediaPlan(north, east)[medium],
-		mediaPlan(east, north)[medium],
+		mediaPlan(player1, player2)[medium],
+		mediaPlan(player2, player1)[medium],
 	];
 	// The audio section always exists; the video one only when some video may flow.
 	const present = medium === "audio" || n.direction !== "inactive";
@@ -565,22 +565,24 @@ function expected(north: Party, east: Party, medium: Medium) {
 	};
 }
 
-describe("PeerLink video and asymmetric combinations (call/layout plan C6)", () => {
-	const pairs = PRESETS.flatMap((n) =>
-		PRESETS.map((e): [PresetId, PresetId] => [n.id, e.id]),
+describe("PeerLink video and asymmetric combinations", () => {
+	const pairs = PRESETS.flatMap((first) =>
+		PRESETS.map((second): [PresetId, PresetId] => [first.id, second.id]),
 	);
 
 	it.each(pairs)(
-		"N %s, E %s: both media follow the plan in one offer/answer round",
-		async (n, e) => {
-			const north = party(n);
-			const east = party(e);
-			const pair = new Pair(north, east);
+		"Player 1 %s, Player 2 %s: both media follow the plan in one offer/answer round",
+		async (first, second) => {
+			const player1 = party(first);
+			const player2 = party(second);
+			const pair = new Pair(player1, player2);
 			await settle();
 			expect(pair.types("1")).toEqual(["offer"]);
 			expect(pair.types("2")).toEqual(["answer"]);
 			for (const medium of MEDIA) {
-				expect(observed(pair, medium)).toEqual(expected(north, east, medium));
+				expect(observed(pair, medium)).toEqual(
+					expected(player1, player2, medium),
+				);
 			}
 		},
 	);
@@ -600,9 +602,9 @@ describe("PeerLink video and asymmetric combinations (call/layout plan C6)", () 
 		["compact", "desktop"],
 		["compact", "compact"],
 	] as const)(
-		"N %s, E %s on Both: audio only, with no video section",
-		async (n, e) => {
-			const pair = new Pair(party("both", n), party("both", e));
+		"Player 1 %s, Player 2 %s on Both: audio only, with no video section",
+		async (first, second) => {
+			const pair = new Pair(party("both", first), party("both", second));
 			await settle();
 			expect(observed(pair, "audio").directions).toEqual([
 				"sendrecv",
@@ -654,8 +656,8 @@ describe("PeerLink video and asymmetric combinations (call/layout plan C6)", () 
 		expect(pair.section("a", "video")).toBeUndefined();
 
 		const camera = switched(AUDIO, "send", true, "video");
-		pair.north.update(camera, watch);
-		pair.east.update(watch, camera);
+		pair.player1.update(camera, watch);
+		pair.player2.update(watch, camera);
 		await settle();
 		expect(pair.types("1")).toEqual(["offer", "offer"]);
 		expect(observed(pair, "video")).toEqual({
@@ -663,13 +665,13 @@ describe("PeerLink video and asymmetric combinations (call/layout plan C6)", () 
 			directions: ["sendonly", "recvonly"],
 			sends: ["camA", null],
 		});
-		expect(pair.east.remoteVideo).toBe(
+		expect(pair.player2.remoteVideo).toBe(
 			pair.section("b", "video")?.receiver.track,
 		);
 
-		pair.north.setTrack("video", null);
-		pair.north.update(AUDIO, watch);
-		pair.east.update(watch, AUDIO);
+		pair.player1.setTrack("video", null);
+		pair.player1.update(AUDIO, watch);
+		pair.player2.update(watch, AUDIO);
 		await settle();
 		expect(pair.a.getTransceivers()).toHaveLength(2);
 		expect(observed(pair, "video")).toEqual({
@@ -687,12 +689,12 @@ describe("PeerLink video and asymmetric combinations (call/layout plan C6)", () 
 		const watch = party("watch");
 		const pair = await connectedPair(watch, AUDIO);
 		const camera = switched(AUDIO, "send", true, "video");
-		pair.east.update(camera, watch);
+		pair.player2.update(camera, watch);
 		await settle();
 		expect(pair.types("2")).toEqual(["answer"]);
 		expect(pair.section("b", "video")).toBeUndefined();
 
-		pair.north.update(watch, camera);
+		pair.player1.update(watch, camera);
 		await settle();
 		expect(pair.types("1")).toEqual(["offer", "offer"]);
 		expect(pair.types("2")).toEqual(["answer", "answer"]);
@@ -701,10 +703,10 @@ describe("PeerLink video and asymmetric combinations (call/layout plan C6)", () 
 			directions: ["recvonly", "sendonly"],
 			sends: [null, "camB"],
 		});
-		expect(pair.north.remoteVideo).toBe(
+		expect(pair.player1.remoteVideo).toBe(
 			pair.section("a", "video")?.receiver.track,
 		);
-		expect(pair.east.remoteVideo).toBe(
+		expect(pair.player2.remoteVideo).toBe(
 			pair.section("b", "video")?.receiver.track,
 		);
 	});
@@ -713,22 +715,22 @@ describe("PeerLink video and asymmetric combinations (call/layout plan C6)", () 
 		const pair = await connectedPair(BOTH, BOTH);
 		const track = pair.section("a", "video")?.receiver.track;
 		if (track === undefined) throw new Error("no video section at N");
-		expect(pair.north.remoteVideo).toBe(asTrack(track));
-		const changes = pair.northChanges.mock.calls.length;
+		expect(pair.player1.remoteVideo).toBe(asTrack(track));
+		const changes = pair.player1Changes.mock.calls.length;
 
 		// No frames arrive: the peer's camera is blocked, or its first frames are not here yet.
 		track.setMuted(true);
-		expect(pair.north.remoteVideo).toBeUndefined();
-		expect(pair.northChanges).toHaveBeenCalledTimes(changes + 1);
+		expect(pair.player1.remoteVideo).toBeUndefined();
+		expect(pair.player1Changes).toHaveBeenCalledTimes(changes + 1);
 
 		track.setMuted(false);
-		expect(pair.north.remoteVideo).toBe(asTrack(track));
-		expect(pair.northChanges).toHaveBeenCalledTimes(changes + 2);
+		expect(pair.player1.remoteVideo).toBe(asTrack(track));
+		expect(pair.player1Changes).toHaveBeenCalledTimes(changes + 2);
 	});
 
 	it("detaches the camera at once on Send off, before any renegotiation", async () => {
 		const pair = await connectedPair(BOTH, BOTH);
-		pair.east.setTrack("video", null);
+		pair.player2.setTrack("video", null);
 		await settle();
 		expect(pair.sending("b", "video")).toBeNull();
 		expect(pair.types("2")).toEqual(["answer"]);
@@ -753,8 +755,8 @@ describe("PeerLink video and asymmetric combinations (call/layout plan C6)", () 
 		expect(settings()).toEqual([1, 1, 1, 1]);
 
 		const quiet = switched(BOTH, "send", false);
-		pair.north.update(quiet, BOTH);
-		pair.east.update(BOTH, quiet);
+		pair.player1.update(quiet, BOTH);
+		pair.player2.update(BOTH, quiet);
 		await settle();
 		expect(pair.types("1")).toEqual(["offer", "offer"]);
 		expect(settings()).toEqual([1, 1, 1, 1]);

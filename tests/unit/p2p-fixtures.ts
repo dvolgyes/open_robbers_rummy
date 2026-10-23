@@ -10,12 +10,12 @@ import {
 
 export const TABLE = "vKg29g0NeA3vntlnYBW0TP";
 export const OTHER_TABLE = "Other-ID-0123456789abc";
-export const HOLDER_N = "DFqES54ngHxkS3v5";
-export const HOLDER_E = "AAAAAAAAAAAAAAAA";
+export const HOLDER_1 = "DFqES54ngHxkS3v5";
+export const HOLDER_2 = "AAAAAAAAAAAAAAAA";
 
 /** The creator at N hosts term 1; E takes over in term 2. */
-export const AUTH_1: Authority = { term: 1, tag: `${HOLDER_N}.1`, inc: 1 };
-export const AUTH_2: Authority = { term: 2, tag: `${HOLDER_E}.2`, inc: 1 };
+export const AUTH_1: Authority = { term: 1, tag: `${HOLDER_1}.1`, inc: 1 };
+export const AUTH_2: Authority = { term: 2, tag: `${HOLDER_2}.2`, inc: 1 };
 
 export const CONFIG: RoomConfig = {
 	names: { "1": "player1", "2": "player3", "3": "player2", "4": "player4" },
@@ -64,7 +64,7 @@ export function tableRecord(overrides: Partial<TableRecord> = {}): TableRecord {
 		lastActivityAt: 1_000,
 		seats: SEATS.map((seat) => ({
 			seat,
-			holder: seat === "1" ? HOLDER_N : null,
+			holder: seat === "1" ? HOLDER_1 : null,
 			gen: seat === "1" ? 1 : 0,
 		})),
 		...overrides,
