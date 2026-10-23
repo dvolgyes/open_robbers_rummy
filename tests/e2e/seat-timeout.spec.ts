@@ -189,7 +189,6 @@ test("a frozen host is replaced; its seat frees after the timeout; the thawed ol
 	await expectSeat(tab["4"], "4");
 });
 
-test("no uncaught errors and no request to the old backend", () => {
+test("no uncaught errors", () => {
 	expect(players.flatMap((player) => player.errors)).toEqual([]);
-	for (const player of players) expect(player.supabaseRequests).toBe(0);
 });

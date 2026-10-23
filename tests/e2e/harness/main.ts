@@ -77,7 +77,7 @@ export interface Harness {
 	createTable(seat: Seat): Promise<{ readonly key: string }>;
 	/**
 	 * Opens a table link. `seat` stands for the `selected_player` of a player's own URL, which a reload or a
-	 * reopened tab keeps (ADR 0005); the page then takes that seat back from its own replica.
+	 * reopened tab keeps (ADR 0002); the page then takes that seat back from its own replica.
 	 */
 	openTable(key: string, seat?: Seat): Promise<void>;
 	view(): TableView | null;
@@ -381,7 +381,7 @@ window.ocHarness = {
 			},
 			tableId,
 		);
-		const action = room.makeAction("oc-ctl");
+		const action = room.makeAction("rr-ctl");
 		const nonce = randomNonce();
 		const echoed = new Promise<boolean>((resolve) => {
 			action.onMessage = (data) => {

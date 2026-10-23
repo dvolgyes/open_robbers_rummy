@@ -44,7 +44,7 @@ export interface CallDeps {
 }
 
 /**
- * `unknown`: the local user is outside the call, so there is no way to know (ADR 0003: no call presence).
+ * `unknown`: the local user is outside the call, so there is no way to know (ADR 0001: no call presence).
  * `waiting`: the local user is joining, or signaling is down, and the seat was not heard yet.
  * `out`: the seat is not in the call.
  */

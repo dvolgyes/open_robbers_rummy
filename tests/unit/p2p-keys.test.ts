@@ -19,7 +19,7 @@ import { SEATS } from "../../src/protocol";
 const KEY = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE"; // 32 bytes of 0x01
 const TABLE_ID = "epL6jif2XRTHihMIdzmW4B";
 const CLIENT_ID = "AgICAgICAgICAgICAgICAg"; // 16 bytes of 0x02
-const HOLDER = "a_23jCSaYAC1VB2p";
+const HOLDER = "D-p-JCajbG0nNwak";
 
 describe("deriveTableId", () => {
 	it("is the first 22 characters of the SHA-256 of the labelled key", async () => {
@@ -94,7 +94,7 @@ describe("host tags", () => {
 	it.each([
 		["a short holder", `${HOLDER.slice(1)}.2`],
 		["seat 7", `${HOLDER}.7`],
-		["a canasta seat letter", `${HOLDER}.N`],
+		["a seat letter", `${HOLDER}.N`],
 		["no seat", HOLDER],
 		["an unknown seat", `${HOLDER}.X`],
 		["a number", 7],

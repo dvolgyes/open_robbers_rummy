@@ -66,7 +66,7 @@ describe("parseRoomConfig", () => {
 		["no table rules", { names: CONFIG.names }],
 		[
 			"an unknown preset",
-			{ ...CONFIG, table: { ...CONFIG.table, preset: "canasta" } },
+			{ ...CONFIG, table: { ...CONFIG.table, preset: "poker" } },
 		],
 		["one joker", { ...CONFIG, table: { ...CONFIG.table, jokers: 1 } }],
 		["seven jokers", { ...CONFIG, table: { ...CONFIG.table, jokers: 7 } }],

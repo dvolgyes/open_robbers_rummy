@@ -1,10 +1,11 @@
-# Open Canasta
+# Open Robber's Rummy
 
-Open Canasta is a four-player partnership canasta game that runs in the browser.
-It supports human players, optional voice and video calls, and AI players powered by OpenRouter.
-The game deals the cards, offers only legal actions, and keeps the score of the match.
+Open Robber's Rummy is a Robber's Rummy game for 2 to 6 players that runs in the browser.
+It supports human players, optional voice and video calls, and solver bots.
+The game deals the cards, checks every play, and counts the penalty points at the end.
 
-**Source:** [github.com/dvolgyes/open_canasta](https://github.com/dvolgyes/open_canasta)
+**Source:** [github.com/dvolgyes/open_robbers_rummy](https://github.com/dvolgyes/open_robbers_rummy)
+**Play:** [dvolgyes.github.io/open_robbers_rummy](https://dvolgyes.github.io/open_robbers_rummy/)
 
 The game is a static site with no game server or database.
 Players connect through public WebTorrent trackers, then exchange game data directly over WebRTC.
@@ -13,22 +14,25 @@ The table key is in the link fragment and is not sent to the web server.
 
 ## How to play
 
-Open Canasta is a classic four-player partnership canasta table.
-North and South form one side, and East and West form the other.
-The game uses two decks with four jokers, 108 cards in total.
-The first side to reach 5000 points wins the match.
+Robber's Rummy is a rummy game where all melds on the table belong to every player.
+On your turn, you can rearrange the melds on the table, as long as every meld is valid at the end and you added at least one card from your hand.
+The first player who empties the hand wins.
+
+The game uses two 52-card decks and 2 to 6 jokers (4 by default).
 
 ### Create a table and invite friends
 
-1. Open Open Canasta and fill in a name for each seat: North, East, South, and West.
-2. Select **This is me** beside the seat you want to play.
-3. Select **Create game**.
+1. Open Open Robber's Rummy and choose the number of players, from 2 to 6.
+2. Fill in a name for each player, and select **Bot** for the seats that a bot plays.
+3. Select **This is me** beside your seat.
+4. Choose the rules, the number of jokers, and whether **Allow solver suggestions** is on.
+5. Select **Create game**.
    Your browser creates the table, takes your seat, and copies the room link when clipboard access is available.
-4. Use **Copy link** at the table to copy the shared link again, then send the full link to your friends in a private message.
-5. Each friend opens the link and selects one of the available seats.
-   If only one seat remains, Open Canasta takes it automatically.
+6. Use **Copy link** at the table to copy the shared link again, then send the full link to your friends in a private message.
+7. Each friend opens the link and selects one of the available seats.
+   If only one seat remains, the game takes it automatically.
 
-![The create screen lets the table creator name the four seats and choose their own seat.](docs/images/create-room.png)
+The room link holds the player names and the table rules.
 
 The room link is the invitation key.
 Room discovery can announce that a room exists, but a person still needs the complete link to join because the room password is carried in the link fragment.
@@ -42,103 +46,100 @@ Choose the seat the host agreed with you.
 If a seat is already held by an active browser, choose another available seat or ask its player to release it.
 Reopening the link in the same browser normally restores that browser's seat.
 
-When all four seats are ready, the table deals the first hand automatically: eleven cards to each player.
-The first dealer is chosen at random, the deal then passes to the left, and the player at the dealer's left starts.
-In each turn, a player does these steps:
+When every seat is ready, the table deals the cards automatically.
+The first dealer is chosen at random, and the player after the dealer starts.
 
-1. Draw the top card of the stock, or take the whole discard pile.
-2. Optionally meld: lay down sets of three or more cards of the same rank, or add cards to the side's melds.
-3. Discard one card, unless the player goes out.
+The table shows the other players in the top row, each with a small strip that shows how many cards they hold.
+All melds are in the middle, and your hand is at the bottom.
+The cards of the last play have a gold frame.
 
-The table offers only legal actions.
-Select cards in your hand to see the melds, extensions, and discards that use them.
+On your turn:
 
-![A hand in progress on the full-screen felt: the partner and the two opponents in the top row, the stock, the discard pile and both sides' melds in the middle, the player's hand at the bottom, the scores and the call on the left, and the players, the messages and the room controls on the right.](docs/images/gameplay-hand.png)
+1. Select cards in your hand or on the table, then choose a meld with **+**, or **New meld**.
+   **To hand** puts your own cards back, and **Undo changes** restores the table.
+2. **Play** is available when every meld is valid.
+3. If you cannot or do not want to play, **Draw a card**.
+   With the gamerules.com and Wikipedia rules, you can play after a draw, or draw after a play, and then the turn ends.
+4. **End the turn** when you are done.
+
+A player who lays nothing must draw.
+When the stock is empty, a player who cannot play passes.
+If every player passes in a row, the game ends, and the player with the lowest penalty wins.
+
+When **Allow solver suggestions** is on, **Suggest** fills in the play that the solver finds for your hand.
 
 The main rules, in short:
 
-- Jokers and 2s are wild cards.
-  A meld needs at least two natural cards, and it can hold at most three wild cards.
-- A canasta is a meld of seven or more cards.
-  A natural canasta (no wild cards) scores 500, and a mixed canasta scores 300.
-  A side must have at least one canasta before one of its players can go out.
-- A side's first meld in a hand must reach a minimum count, which depends on the side's score: 50 points from 0, 90 from 1500, and 120 from 3000.
-  A side with a negative score needs only 15.
-  When a player takes the pile for the first meld, the top card counts toward the minimum, but the rest of the pile does not.
-- A red 3 is set aside at once, and the player draws a replacement.
-  Each red 3 scores 100 for its side, or subtracts 100 if the side has not melded in that hand.
-  All four red 3s on one side score 800.
-- A black 3 discard blocks the next player from taking the pile.
-  Black 3s can be melded only by a player who goes out in that turn: three or four of them, with no wild card.
-- To take the pile, a player melds its top card: with two matching cards from the hand, with one matching card and a wild card, or on a meld of the side.
-- A pile with a wild card in it is frozen.
-  A red 3 or a wild card turned up as the first pile card at the deal also freezes it.
-  The pile is also frozen for a side that has not melded yet.
-  A frozen pile can be taken only with two natural cards from the hand that match its top card.
-- The hand ends when a player goes out, or when the stock runs out and the next player does not take the pile.
-  At an empty stock, a player must take an unfrozen pile whose top card goes onto a meld of the side.
-  Going out scores 100, or 200 when the player goes out in one turn without an earlier meld.
-  Cards still in a hand count against their side.
+- A set is 3 or 4 cards of one rank, each of a different suit.
+- A run is 3 or more cards of one suit in sequence.
+  The ace is low (A-2-3) or high (Q-K-A).
+- A joker stands for any card in a meld.
+  Table jokers can move to another meld, but no table card goes back to a hand.
+- At the end of the game, cards still in a hand count as penalty points: joker 25, ace 15, 10 to K 10, every other card 5.
 
-After a hand ends, a summary in the middle of the screen names the player who went out and shows the score of the hand, item by item, with the match score.
-After 10 seconds, the host deals the next hand.
-The exact rules and the points that differ between published variants are in [ADR 0007](docs/adr/0007-canasta-engine-written-here.md).
+The table creator chooses one of these rule sets:
 
-You must take one of the four player seats to use the table.
+| Rules | Cards dealt | First play | Turn | Jokers in one meld | Ace |
+| --- | --- | --- | --- | --- | --- |
+| gamerules.com | 11 | 40 points of new melds from your hand | play and draw | one | low or high |
+| Wikipedia | 13 | no minimum | play and draw | any, with one natural card | also K-A-2 |
+| Machiavelli (Pagat) | 13 | no minimum | play or draw | one | low or high |
+
+The sources and the points that they leave open are in [ADR 0005](docs/adr/0005-robbers-rummy-engine-and-solver-bots.md).
+
+You must take one of the player seats to use the table.
 There is no spectator or kibitz mode, so people who are not seated cannot watch the cards from inside the room.
 
-### Reset the match
+### Start a new game
 
-**Reset** clears the scores and starts a new match with the same players.
-Every other player at the table must approve the reset; one rejection cancels it.
+After a game ends, the middle of the screen shows the winner and the penalty points of every player.
+**New game** asks the other players for a new game, and the next player deals.
+During a game, **Reset** sends the same request.
+Every other player at the table must approve; one rejection cancels it.
 The player who asked can cancel the request.
-The game waits while a reset request is open.
+The game waits while a request is open.
 The chat and the call stay as they are.
-After a side wins the match, use **Reset** to play again.
 
 ### Use bots
 
 Bots can fill seats for a game, or the host can turn on autoplay for a player who needs to step away temporarily.
 For a permanent bot seat, select **Bot** for that seat while creating the table.
 For a temporary substitute, the host can enable the bot for the player's seat from the table controls, then turn it off when the player returns.
-The player keeps their seat and stays in the room call while the bot handles canasta actions.
-Bots approve a reset request automatically.
+The player keeps their seat and stays in the room call while the bot plays.
+Bots approve a new-game request automatically.
 
-OpenRouter is a service that provides access to AI models from many providers through one API.
-Bot play can cost money because AI model requests may be billed; the table displays the accumulated OpenRouter cost as you play.
-You bring your own [OpenRouter API key](https://openrouter.ai/).
-Enter the key in the create screen when setting up bot seats, or in the table's bot controls before enabling a substitute.
-The key is stored in the host browser and is not included in the shared room link.
-If the current host has no usable key, bot play is unavailable until a host with a key takes over or the key is set.
-You can choose the model order and retry settings when creating the room.
-A bot chooses from a numbered list of the legal actions.
-If the model gives no usable answer, the bot uses a simple built-in heuristic for that turn.
+The bots use a solver, not an AI model, so they need no account or API key.
+The solver looks for the play that puts the most cards from the hand on the table.
+A bot keeps its jokers for later, except for its first play, for a play that empties its hand, and when another player has 3 cards or fewer.
+A bot thinks for at most a few seconds; if it finds no play in that time, it draws.
+A bot waits until a play was on the table for at least 5 seconds, so that every player can see the cards with the gold frame.
 
 ### Call and finding players
 
 The table includes an optional audio and video call for room members.
 Each player chooses whether to join the call and whether to send a microphone or camera.
 On mobile phones, video calls are intentionally unavailable because the screen has limited space; audio calls remain available.
-The call is separate from canasta actions, so using autoplay does not make the player leave the call.
+The call is separate from the game actions, so using autoplay does not make the player leave the call.
 The call has no kibitz or spectator access.
 
-Open Canasta does not currently provide matchmaking or a way to find random players online.
+Open Robber's Rummy does not currently provide matchmaking or a way to find random players online.
 You need to invite people yourself and share the room link with them.
 
 ### Save and reuse a room link
 
-You can bookmark or save the shared table link and reuse it with regular partners.
-The link keeps the seat names and table setup, so it can start a fresh table for the same group without creating and distributing another invitation.
+You can bookmark or save the shared table link and reuse it with regular players.
+The link keeps the player names and the table rules, so it can start a fresh table for the same group without creating and distributing another invitation.
 The current game state is stored in the players' browsers, not on a game server.
-After about 24 hours without activity on a device, its saved table expires; starting again from the saved link creates a fresh session and does not restore the previous hand, score, or seat claims.
+After about 24 hours without activity on a device, its saved table expires; starting again from the saved link creates a fresh session and does not restore the previous game or seat claims.
 Use **Copy link** in the table if you need to share the invitation again.
 
 ### Fair play
 
 Every seated browser stores the whole table state, including the other hands and the stock, so that any player can take over as the host.
 The screen hides the cards that a player must not see, but a player who inspects the browser's storage or network traffic can see them.
+**Allow solver suggestions** is a table rule that only the screen enforces.
 The game is meant for friends who trust each other.
-[ADR 0008](docs/adr/0008-module-boundaries.md) records this decision.
+[ADR 0004](docs/adr/0004-module-boundaries.md) records this decision.
 
 ## Development
 
@@ -155,7 +156,7 @@ npx playwright test  # end-to-end tests with several browsers
 
 ## License
 
-Open Canasta is all rights reserved.
+Open Robber's Rummy is all rights reserved.
 The source code and original assets are not licensed for reuse or independent hosting.
 Third-party components keep their own licenses.
 See [LICENSE](LICENSE) for the terms.

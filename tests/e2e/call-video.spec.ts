@@ -684,8 +684,6 @@ test("8: the phone leaves with its icon: its microphone and connections end, and
 	}
 });
 
-test("no uncaught errors and no request to the old backend", () => {
+test("no uncaught errors", () => {
 	expect(Object.values(players).flatMap((player) => player.errors)).toEqual([]);
-	for (const player of Object.values(players))
-		expect(player.supabaseRequests).toBe(0);
 });

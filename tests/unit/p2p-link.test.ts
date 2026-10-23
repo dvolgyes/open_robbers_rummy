@@ -52,18 +52,9 @@ describe("parseRoute", () => {
 
 	it("reads the table link that it writes", () => {
 		expect(parseRoute(tableFragment(KEY))).toEqual({ kind: "table", key: KEY });
-		const link = tableLink("https://example.org/canasta/?x=1#old", KEY);
-		expect(link).toBe(`https://example.org/canasta/?x=1#v=p2p-v2&k=${KEY}`);
+		const link = tableLink("https://example.org/rummy/?x=1#old", KEY);
+		expect(link).toBe(`https://example.org/rummy/?x=1#v=p2p-v2&k=${KEY}`);
 		expect(parseRoute(new URL(link).hash)).toEqual({ kind: "table", key: KEY });
-	});
-
-	it("names the links of the Supabase version", () => {
-		expect(parseRoute("#room=abcdefghijklmnopqrstuv")).toEqual({
-			kind: "legacy",
-		});
-		expect(parseRoute("#room=abcdefghijklmnopqrstuv&host")).toEqual({
-			kind: "legacy",
-		});
 	});
 
 	it("reports another link version", () => {
@@ -73,7 +64,7 @@ describe("parseRoute", () => {
 		});
 	});
 
-	it("reports a canasta table link (p2p-v1) as another version", () => {
+	it("reports an earlier link version (p2p-v1) as another version", () => {
 		expect(parseRoute(`#v=p2p-v1&k=${KEY}`)).toEqual({
 			kind: "incompatible",
 			version: "p2p-v1",
@@ -88,6 +79,7 @@ describe("parseRoute", () => {
 		["two versions", `#v=p2p-v2&v=p2p-v2&k=${KEY}`],
 		["a version with markup", `#v=%3Cb%3E&k=${KEY}`],
 		["an unknown fragment", "#hello"],
+		["a room fragment without a version", "#room=abcdefghijklmnopqrstuv"],
 	])("rejects %s", (_label, hash) => {
 		expect(parseRoute(hash)).toEqual({ kind: "invalid" });
 	});

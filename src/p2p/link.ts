@@ -13,8 +13,6 @@ const VERSION_PATTERN = /^[A-Za-z0-9.-]{1,16}$/;
 export type Route =
 	| { readonly kind: "create" }
 	| { readonly kind: "table"; readonly key: string }
-	/** A `#room=` link of the earlier server-based version. */
-	| { readonly kind: "legacy" }
 	| { readonly kind: "incompatible"; readonly version: string }
 	| { readonly kind: "invalid" };
 
@@ -44,10 +42,9 @@ export function parseRoute(hash: string): Route {
 		return { kind: "invalid" };
 	}
 	const version = params.get("v");
-	if (version === null) {
-		return params.has("room") ? { kind: "legacy" } : { kind: "invalid" };
+	if (version === null || !VERSION_PATTERN.test(version)) {
+		return { kind: "invalid" };
 	}
-	if (!VERSION_PATTERN.test(version)) return { kind: "invalid" };
 	if (version !== LINK_VERSION) return { kind: "incompatible", version };
 	const key = params.get("k");
 	return isTableKey(key) ? { kind: "table", key } : { kind: "invalid" };

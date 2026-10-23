@@ -1,8 +1,8 @@
-# Open Canasta
+# Open Robber's Rummy
 
-Four-player partnership canasta in the browser, peer to peer.
+Robber's Rummy for 2 to 6 players in the browser, peer to peer.
 Public WebTorrent trackers make the first contact; WebRTC carries the game, the chat, and the call.
-There is no game server; one seated browser is the elected host (ADR 0004).
+There is no game server; one seated browser is the elected host (ADR 0001).
 
 ## Commands
 
@@ -25,7 +25,7 @@ Never print, log, or commit the OpenRouter key from `.env`.
 
 ## Module map
 
-Each layer imports only the layers below it ([ADR 0008](docs/adr/0008-module-boundaries.md)).
+Each layer imports only the layers below it ([ADR 0004](docs/adr/0004-module-boundaries.md)).
 The `layer-*` hooks in `.pre-commit-config.yaml` refuse imports in the wrong direction.
 
 | Folder | Responsibility |
@@ -40,7 +40,7 @@ The `layer-*` hooks in `.pre-commit-config.yaml` refuse imports in the wrong dir
 
 ## Rules
 
-The engine plays Robber's Rummy in three presets: `gamerules`, `wikipedia` and `machiavelli`.
+The engine plays Robber's Rummy in three presets: `gamerules`, `wikipedia` and `machiavelli` ([ADR 0005](docs/adr/0005-robbers-rummy-engine-and-solver-bots.md)).
 Every value that a preset or the table setup changes is in `RummyRules` (`src/rummy/rules.ts`).
 `applyAction` is the only authority; `legalActions` lists every action except `play`, which the draft editor and the solver build.
 A stored hand whose rules differ from `rulesFor(preset, jokers, assist)` does not parse, so a rule change makes old saved tables unreadable.

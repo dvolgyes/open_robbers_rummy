@@ -186,17 +186,6 @@ test("a browser that does not store data cannot create a table, but it can take 
 	);
 });
 
-test("an old Supabase link shows the old-version message", async () => {
-	const page = await (await openBrowser("visitor")).page(
-		"./#room=0123456789abcdefABCDEF",
-	);
-	await expect(
-		page.getByText(
-			"This link is for the old version. Ask the table creator for a new link.",
-		),
-	).toBeVisible();
-});
-
 test("a link of another version shows the version message", async () => {
 	const page = await (await openBrowser("visitor")).page(
 		`./#v=p2p-v9&k=${"A".repeat(43)}`,
@@ -222,7 +211,7 @@ test("a damaged key opens an empty table: nobody is there", async () => {
 	await expect(
 		page.getByText("Nobody is at this table right now. Keep this page open"),
 	).toBeVisible({ timeout: CONNECT_MS });
-	// The link carries the full setup, so the empty table offers all four seats (ADR 0005). The real table, where
+	// The link carries the full setup, so the empty table offers all four seats (ADR 0002). The real table, where
 	// Player 4 is taken, would offer three.
 	await expect(picks(page)).toHaveCount(4);
 	// The real table is unaffected.
@@ -233,7 +222,7 @@ test("a table without activity for 24 h expires and stays expired; the full room
 	const west = await openBrowser("west");
 	const page = await west.page("./");
 	const link = await createRoom(page);
-	// Without the setup query the link has only the key, so nothing can start the table again (ADR 0005).
+	// Without the setup query the link has only the key, so nothing can start the table again (ADR 0002).
 	const keyOnly = new URL(link);
 	keyOnly.search = "";
 	await sendDraft(page);
@@ -258,7 +247,7 @@ test("a table without activity for 24 h expires and stays expired; the full room
 	await page.getByRole("button", { name: "Create new game" }).click();
 	await expect(page.getByTestId("create")).toBeVisible();
 	// The room link carries the names and the host seat: it clears the tombstone, offers all four seats, and the
-	// host seat starts a fresh table (ADR 0005).
+	// host seat starts a fresh table (ADR 0002).
 	await page.goto(link);
 	await expect(picks(page)).toHaveCount(4, { timeout: CONNECT_MS });
 	await pick(page, "4");
@@ -269,7 +258,6 @@ test("a table without activity for 24 h expires and stays expired; the full room
 	);
 });
 
-test("no uncaught errors and no request to the old backend", () => {
+test("no uncaught errors", () => {
 	expect(all.flatMap((player) => player.errors)).toEqual([]);
-	for (const player of all) expect(player.supabaseRequests).toBe(0);
 });

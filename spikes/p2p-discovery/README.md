@@ -1,6 +1,6 @@
 # P2P discovery probe
 
-This probe answers one question before the Supabase-to-P2P migration starts.
+This probe answers one question for the peer-to-peer table (ADR 0001).
 Can public WebTorrent trackers connect the browsers of one card table?
 The probe is not app code.
 It does not change `src/`, the root `package.json` or the root lockfile.
@@ -89,7 +89,7 @@ A library update can change this behavior, so keep test 8 when the version chang
   The selected ICE pairs were `host/host`, so that spec does not test NAT traversal.
   The phone probe tested NAT traversal once (see above).
   Without TURN, peers behind symmetric NAT or carrier-grade NAT can fail to connect after discovery.
-  This applies to every WebRTC design, also with Supabase as the signaling path.
+  This applies to every WebRTC design, whatever the signaling path.
 - The probe used one network and one day.
   Public trackers are volunteer services, and two of the five in Trystero's list were down on this day.
 - The tracker-loss test closed the sockets and made new sockets fail.

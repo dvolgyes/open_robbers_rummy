@@ -105,7 +105,6 @@ test("one browser: create, three seats from one link, ordered messages, and a re
 		}
 		await takeTurn(await firstPage(), 0);
 		expect(player.errors).toEqual([]);
-		expect(player.supabaseRequests).toBe(0);
 	} finally {
 		await player.close();
 	}

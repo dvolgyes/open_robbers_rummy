@@ -469,7 +469,7 @@ export class TableController {
 			const opened = await this.#openSeat(seat);
 			if (!opened.ok) return this.#openFailed(opened.code);
 			// A host's lobby means the table is live: the seat is claimed from that host, never seeded as a second
-			// table (ADR 0005).
+			// table (ADR 0002).
 			if (
 				this.#bootstrapAllowed &&
 				this.#deps.bootstrap?.host === seat &&

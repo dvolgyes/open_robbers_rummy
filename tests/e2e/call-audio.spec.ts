@@ -717,8 +717,6 @@ test("14: a tab that vanishes without leaving is out of the call 10 s after its 
 	}
 });
 
-test("no uncaught errors and no request to the old backend", () => {
+test("no uncaught errors", () => {
 	expect(Object.values(players).flatMap((player) => player.errors)).toEqual([]);
-	for (const player of Object.values(players))
-		expect(player.supabaseRequests).toBe(0);
 });

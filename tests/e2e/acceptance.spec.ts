@@ -22,9 +22,8 @@ import {
 
 /**
  * Milestone 1 acceptance on the peer-to-peer table (plan §9). Each test is one row and builds on the table of the
- * rows before it. Every person has their own browser, so their own holder. The Supabase version's row 10 (the
- * backend is unreachable) has two P2P forms: no host (row 6) and a tracker outage (resilience.spec.ts); expiry is
- * in resilience.spec.ts as well.
+ * rows before it. Every person has their own browser, so their own holder. An unreachable table has two forms: no
+ * host (row 6) and a tracker outage (resilience.spec.ts); expiry is in resilience.spec.ts as well.
  */
 test.describe.configure({ mode: "serial" });
 
@@ -247,7 +246,7 @@ test("6: the host crashes; a guest message waits; it is stored once after the ho
 	await expect(waiting).toContainText("Pending — waiting for the host");
 	await expect(texts(tab["1"])).toHaveText(expected);
 
-	// The table link opens the seat picker (ADR 0005); a player reopens with their own URL, which names the seat.
+	// The table link opens the seat picker (ADR 0002); a player reopens with their own URL, which names the seat.
 	tab["4"] = await west.page(ownLink(link, "4"));
 	await expectSeat(tab["4"], "4", {
 		timeout: CONNECT_MS,
@@ -331,7 +330,6 @@ test("9: a second game gets a new link and shows no old messages", async () => {
 	await expect(texts(tab["1"])).toHaveText(expected);
 });
 
-test("no uncaught errors and no request to the old backend", () => {
+test("no uncaught errors", () => {
 	expect(players.flatMap((player) => player.errors)).toEqual([]);
-	for (const player of players) expect(player.supabaseRequests).toBe(0);
 });

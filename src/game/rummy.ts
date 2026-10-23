@@ -122,7 +122,7 @@ function accept(event: JsonObject, state: RummyState): ApplyResult {
 }
 
 /**
- * "Waiting for East, South and West to come back" when seats are not present; undefined when all are.
+ * "Waiting for Player 2, Player 3 and Player 5 to come back" when seats are not present; undefined when all are.
  * The table screen shows the same text before the host would refuse the command.
  */
 export function waitingText(

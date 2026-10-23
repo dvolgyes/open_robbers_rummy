@@ -54,7 +54,7 @@ describe("parseBookmark", () => {
 	it("ignores unknown keys, seats outside 1 to 6 and invalid rule values", () => {
 		expect(
 			parseBookmark(
-				"?P1=zsdh&p7=x&p0=y&host=7&rules=canasta&jokers=7&assist=yes&room=1",
+				"?P1=zsdh&p7=x&p0=y&host=7&rules=poker&jokers=7&assist=yes&room=1",
 			),
 		).toEqual({ names: {}, table: {} });
 	});
@@ -119,7 +119,7 @@ describe("parseRoomSetup", () => {
 			"p1=ann&p3=cy&host=1&rules=gamerules&jokers=4&assist=1",
 		],
 		["a host outside the table", VALID.replace("host=1", "host=4")],
-		["an unknown preset", VALID.replace("rules=gamerules", "rules=canasta")],
+		["an unknown preset", VALID.replace("rules=gamerules", "rules=poker")],
 		["a missing preset", VALID.replace("&rules=gamerules", "")],
 		["one joker", VALID.replace("jokers=4", "jokers=1")],
 		["seven jokers", VALID.replace("jokers=4", "jokers=7")],

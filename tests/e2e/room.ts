@@ -65,7 +65,7 @@ export async function createRoom(page: Page): Promise<string> {
 	return link;
 }
 
-/** A player's own URL: the table link with `selected_player`, which a reopened tab keeps its seat with (ADR 0005). */
+/** A player's own URL: the table link with `selected_player`, which a reopened tab keeps its seat with (ADR 0002). */
 export function ownLink(link: string, seat: SeatKey): string {
 	const url = new URL(link);
 	url.searchParams.set("selected_player", seat);

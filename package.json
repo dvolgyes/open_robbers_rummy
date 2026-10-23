@@ -1,9 +1,9 @@
 {
-	"name": "open-canasta",
+	"name": "open-robbers-rummy",
 	"version": "0.1.0",
 	"private": true,
 	"license": "SEE LICENSE IN LICENSE",
-	"description": "Four-player partnership canasta in the browser, peer to peer: public trackers for the first contact, WebRTC for the game and the call.",
+	"description": "Robber's Rummy for 2 to 6 players in the browser, peer to peer: public trackers for the first contact, WebRTC for the game and the call.",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",

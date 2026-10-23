@@ -114,7 +114,7 @@ async function create(player: Player, seat: Seat): Promise<string> {
 	return key;
 }
 
-/** `seat` opens the player's own URL, which keeps the selected seat (ADR 0005); without it, the shared link. */
+/** `seat` opens the player's own URL, which keeps the selected seat (ADR 0002); without it, the shared link. */
 function openTable(page: Page, key: string, seat?: Seat): Promise<void> {
 	return page.evaluate(
 		({ link, chosen }) => (window.ocHarness as Harness).openTable(link, chosen),

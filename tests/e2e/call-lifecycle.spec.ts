@@ -696,10 +696,9 @@ test("8: no page and no console message shows an address", async () => {
 	).toBe(0);
 });
 
-test("9: no page reported an error, and no page contacted Supabase", () => {
+test("9: no page reported an error", () => {
 	for (const player of [...Object.values(players), newcomer]) {
 		expect(player.errors).toEqual([]);
-		expect(player.supabaseRequests, player.name).toBe(0);
 	}
 	expect(harnessErrors).toEqual([]);
 });

@@ -77,7 +77,7 @@ async function reopen(seat: SeatKey): Promise<void> {
 }
 
 /**
- * When no host is reachable, the shared link opens the seat picker with all four seats (ADR 0005), so a crashed
+ * When no host is reachable, the shared link opens the seat picker with all four seats (ADR 0002), so a crashed
  * player reopens with their own URL, which names the seat. No host holds a link to the crashed page.
  */
 async function reopenOwn(seat: SeatKey): Promise<void> {
@@ -387,8 +387,6 @@ test("7: a frozen player shows offline, and after the thaw it has everything it 
 	await expectAt(16);
 });
 
-test("no uncaught errors and no request to the old backend", () => {
+test("no uncaught errors", () => {
 	expect(Object.values(players).flatMap((player) => player.errors)).toEqual([]);
-	for (const player of Object.values(players))
-		expect(player.supabaseRequests).toBe(0);
 });

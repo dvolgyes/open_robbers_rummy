@@ -21,8 +21,8 @@ describe("host OpenRouter API key", () => {
 		writeHostApiKey(storage, "  fresh-key\n");
 		expect(readHostApiKey(storage)).toBe("fresh-key");
 
-		storage.setItem("open-canasta.openrouter-api-key", "\tlegacy-key  ");
-		expect(readHostApiKey(storage)).toBe("legacy-key");
+		storage.setItem("open-robbers-rummy.openrouter-api-key", "\told-key  ");
+		expect(readHostApiKey(storage)).toBe("old-key");
 	});
 
 	it("removes a saved key when the input contains only whitespace", () => {

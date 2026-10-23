@@ -408,7 +408,6 @@ test("a second tab cannot take the host's active seat", async () => {
 	await expect(texts(north)).toHaveText([MESSAGE["4"]]);
 });
 
-test("no uncaught errors and no request to the old backend", () => {
+test("no uncaught errors", () => {
 	expect(all.flatMap((player) => player.errors)).toEqual([]);
-	for (const player of all) expect(player.supabaseRequests).toBe(0);
 });

@@ -73,8 +73,6 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"Gib einen OpenRouter-API-Schlüssel ein, um Bots in diesem Browser zu verwenden.",
 			"This browser could not store the OpenRouter API key.":
 				"Dieser Browser konnte den OpenRouter-API-Schlüssel nicht speichern.",
-			"This link is for the old version. Ask the table creator for a new link.":
-				"Dieser Link gehört zu einer alten Version. Bitte den Ersteller des Tisches um einen neuen Link.",
 			"This link is for another version of the app. Reload the page, or ask the table creator for a new link.":
 				"Dieser Link gehört zu einer anderen App-Version. Lade die Seite neu oder bitte den Ersteller um einen neuen Link.",
 			"This link is not valid. Check that you copied all of it.":
@@ -396,8 +394,6 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"Adj meg egy OpenRouter API-kulcsot a botok futtatásához ebben a böngészőben.",
 			"This browser could not store the OpenRouter API key.":
 				"A böngésző nem tudta eltárolni az OpenRouter API-kulcsot.",
-			"This link is for the old version. Ask the table creator for a new link.":
-				"Ez a hivatkozás egy régi verzióhoz tartozik. Kérj új hivatkozást a játék létrehozójától.",
 			"This link is for another version of the app. Reload the page, or ask the table creator for a new link.":
 				"Ez a hivatkozás az alkalmazás másik verziójához tartozik. Töltsd újra az oldalt, vagy kérj új hivatkozást a létrehozótól.",
 			"This link is not valid. Check that you copied all of it.":
@@ -962,8 +958,6 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"Nettleseren lagrer ikke data ({problem}). Du kan spille, men ikke bli vert. Hvis du laster inn siden på nytt, går denne bordkopien tapt.",
 			"This link is for another version of the app. Reload the page, or ask the table creator for a new link.":
 				"Denne lenken er for en annen versjon av appen. Last inn siden på nytt, eller be den som opprettet bordet om en ny lenke.",
-			"This link is for the old version. Ask the table creator for a new link.":
-				"Denne lenken er for en eldre versjon. Be den som opprettet bordet om en ny lenke.",
 			"This link is not valid. Check that you copied all of it.":
 				"Denne lenken er ugyldig. Kontroller at du kopierte hele lenken.",
 			"This table has too many open pages":

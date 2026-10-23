@@ -1385,14 +1385,6 @@ const rows: readonly TranslationRow[] = [
 		"Deze link is voor een andere versie van de app. Herlaad de pagina of vraag de maker van de tafel om een nieuwe link.",
 	],
 	[
-		"This link is for the old version. Ask the table creator for a new link.",
-		"Este enlace es de una versión antigua. Pide un enlace nuevo al creador de la mesa.",
-		"Esta ligação é da versão antiga. Peça uma nova ligação a quem criou a mesa.",
-		"Ce lien correspond à l'ancienne version. Demandez un nouveau lien au créateur de la table.",
-		"Questo link è per la vecchia versione. Chiedi un nuovo link a chi ha creato il tavolo.",
-		"Deze link is voor de oude versie. Vraag de maker van de tafel om een nieuwe link.",
-	],
-	[
 		"This link is not valid. Check that you copied all of it.",
 		"Este enlace no es válido. Comprueba que lo copiaste completo.",
 		"Esta ligação não é válida. Verifique se a copiou por completo.",

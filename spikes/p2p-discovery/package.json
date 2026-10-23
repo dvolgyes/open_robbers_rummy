@@ -1,5 +1,5 @@
 {
-	"name": "open-canasta-p2p-discovery-probe",
+	"name": "open-robbers-rummy-p2p-discovery-probe",
 	"version": "0.0.0",
 	"private": true,
 	"description": "Throwaway probe: can public WebTorrent trackers connect the browsers of one card table? It does not touch the app.",

@@ -83,16 +83,6 @@ export function startApp(root: HTMLElement, deps: AppDeps): void {
 				);
 				return;
 			}
-			case "legacy":
-				dispose = showLinkProblem(
-					root,
-					navigation,
-					deps.t(
-						"This link is for the old version. Ask the table creator for a new link.",
-					),
-					deps.t,
-				);
-				return;
 			case "incompatible":
 				dispose = showLinkProblem(
 					root,

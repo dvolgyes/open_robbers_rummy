@@ -16,7 +16,7 @@ import {
  * order.
  */
 
-/** The receive cap of the `oc-call` action is the same (src/p2p/limits.ts). */
+/** The receive cap of the `rr-call` action is the same (src/p2p/limits.ts). */
 export const MAX_ENVELOPE_OCTETS = 64 * 1024;
 /** At most this many accepted messages per sending seat in any `FLOOD_WINDOW_MS`; the rest are dropped. */
 export const FLOOD_LIMIT = 20;

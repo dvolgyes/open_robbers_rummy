@@ -1342,7 +1342,7 @@ body:has(main[data-screen="table"]) main {
 
 /*
  * Wide landscape screen: the room is one felt canvas of 1920×1080 CSS pixels, which room-view scales to fit the
- * window, as the bridge table did. The stage, the table, the felt and the footer give their children to one room
+ * window. The stage, the table, the felt and the footer give their children to one room
  * grid. The other players fill the top row across all columns. The left column holds the status, with the call in
  * the bottom-left corner. The centre holds the stock and the melds, with the own hand at the bottom. The right column holds the players and messages, with the room controls in the bottom-right corner.
  * The side columns fill the auto rows in order; the 1fr row takes the rest of the height.

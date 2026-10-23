@@ -44,7 +44,7 @@ export async function deriveHolder(
 	tableId: string,
 	clientId: string,
 ): Promise<string> {
-	return (await digest(`oc-holder|${tableId}|${clientId}`)).slice(
+	return (await digest(`rr-holder|${tableId}|${clientId}`)).slice(
 		0,
 		HOLDER_LENGTH,
 	);
