@@ -5,7 +5,7 @@ Status: accepted (2026-10-20).
 ## Context
 
 Host bot controls let the host ask a bot to take the game actions for a seat.
-The player who holds that seat can also be in a room call.
+The player who holds that seat can also be in a table call.
 Replacing the player's seat holder ends that player's call, although autoplay only needs to take over the game actions.
 
 ## Decision
@@ -13,7 +13,7 @@ Replacing the player's seat holder ends that player's call, although autoplay on
 When a host enables a bot for a seat held by a player, keep the player's holder and seat generation.
 Bind a private host-local bot actor to that generation and mark the seat as bot controlled.
 The host may submit game actions through that local actor while the player's commands are refused.
-The player remains bound to the room and can continue sending or receiving call media.
+The player remains bound to the table and can continue sending or receiving call media.
 The local table view disables the game actions for the player's seat while the bot controls it.
 When the host disables the bot, remove the local actor and restore the player's game controls without changing the seat.
 For an unheld seat, the host bot claims its deterministic holder and releases it when disabled.

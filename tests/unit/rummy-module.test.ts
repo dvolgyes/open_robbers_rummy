@@ -33,7 +33,7 @@ import {
 	RULE_PRESETS,
 } from "../../src/rummy";
 
-const ROOM = "room-1";
+const TABLE = "table-1";
 const names = { "1": "Ann", "2": "Ben", "3": "Cy", "4": "Dee" } as const;
 const config = { names, table: DEFAULT_TABLE_SETUP };
 
@@ -50,7 +50,7 @@ const module = createRummyModule(seededRandom(42));
 
 function context(seat: Seat, present: readonly Seat[] = SEATS): ApplyContext {
 	return {
-		roomId: ROOM,
+		tableId: TABLE,
 		config,
 		seat,
 		holder: `holder-${seat}`,
@@ -81,11 +81,11 @@ function applied(
 }
 
 function started(): JsonObject {
-	return applied(module.initialState(ROOM, config), "1", startPayload(ROOM));
+	return applied(module.initialState(TABLE, config), "1", startPayload(TABLE));
 }
 
 function table(state: JsonObject): RummyState {
-	const parsed = parseRummyState(state, ROOM);
+	const parsed = parseRummyState(state, TABLE);
 	if (parsed === undefined) throw new Error("state does not parse");
 	return parsed;
 }
@@ -109,7 +109,7 @@ function playToBlockedEnd(start: JsonObject): JsonObject {
 		state = applied(
 			state,
 			tableSeat(match.hand.turn),
-			actionPayload(ROOM, match, parsed.actions, pick),
+			actionPayload(TABLE, match, parsed.actions, pick),
 		);
 	}
 	throw new Error("the hand did not end");
@@ -123,9 +123,9 @@ function requestId(state: JsonObject): string {
 
 /** Ends the game through a reset that every other player approves. */
 function resetByAll(state: JsonObject): JsonObject {
-	let next = applied(state, "1", resetRequestPayload(ROOM));
+	let next = applied(state, "1", resetRequestPayload(TABLE));
 	for (const seat of ["2", "3", "4"] as const)
-		next = applied(next, seat, resetVotePayload(ROOM, requestId(next), true));
+		next = applied(next, seat, resetVotePayload(TABLE, requestId(next), true));
 	return next;
 }
 
@@ -141,16 +141,16 @@ describe("rummy module: table setup", () => {
 
 describe("rummy module: starting and presence", () => {
 	it("creates a valid empty table", () => {
-		const initial = module.initialState(ROOM, config);
-		expect(module.isState(initial, ROOM)).toBe(true);
+		const initial = module.initialState(TABLE, config);
+		expect(module.isState(initial, TABLE)).toBe(true);
 		expect(table(initial)).toMatchObject({ match: null, lastDealer: null });
 	});
 
 	it("refuses to start while a seat is away, and names the seat", () => {
 		const result = module.apply(
-			module.initialState(ROOM, config),
+			module.initialState(TABLE, config),
 			context("1", ["1", "2", "3"]),
-			startPayload(ROOM),
+			startPayload(TABLE),
 		);
 		expect(result).toEqual({
 			ok: false,
@@ -177,9 +177,9 @@ describe("rummy module: starting and presence", () => {
 		const dealers = new Set(
 			Array.from({ length: 40 }, (_, seed) => {
 				const result = createRummyModule(seededRandom(seed)).apply(
-					module.initialState(ROOM, config),
+					module.initialState(TABLE, config),
 					context("1"),
-					startPayload(ROOM),
+					startPayload(TABLE),
 				);
 				if (!result.ok) throw new Error(result.reason);
 				return table(result.state).match?.hand.dealer;
@@ -191,9 +191,9 @@ describe("rummy module: starting and presence", () => {
 	it("deals the same hand for the same randomness", () => {
 		const deal = (seed: number) => {
 			const result = createRummyModule(seededRandom(seed)).apply(
-				module.initialState(ROOM, config),
+				module.initialState(TABLE, config),
 				context("1"),
-				startPayload(ROOM),
+				startPayload(TABLE),
 			);
 			if (!result.ok) throw new Error(result.reason);
 			return table(result.state).match?.hand.hands;
@@ -203,21 +203,21 @@ describe("rummy module: starting and presence", () => {
 
 	it("starts only once while the game runs", () => {
 		expect(
-			module.apply(started(), context("1"), startPayload(ROOM)),
+			module.apply(started(), context("1"), startPayload(TABLE)),
 		).toMatchObject({ ok: false, reason: "the game has already started" });
 	});
 
 	it("is a host-only command, because it deals cards", () => {
-		expect(module.isRandomCommand?.(startPayload(ROOM))).toBe(true);
-		expect(module.isRandomCommand?.(resetRequestPayload(ROOM))).toBe(false);
+		expect(module.isRandomCommand?.(startPayload(TABLE))).toBe(true);
+		expect(module.isRandomCommand?.(resetRequestPayload(TABLE))).toBe(false);
 	});
 
 	it("refuses a command from a seat that does not play at the table", () => {
 		const twoPlayers = { names: { "1": "Ann", "2": "Ben" } } as never;
 		const result = module.apply(
-			module.initialState(ROOM, twoPlayers),
+			module.initialState(TABLE, twoPlayers),
 			{ ...context("3"), config: twoPlayers },
-			startPayload(ROOM),
+			startPayload(TABLE),
 		);
 		expect(result).toEqual({
 			ok: false,
@@ -234,7 +234,7 @@ describe("rummy module: actions", () => {
 		const result = module.apply(
 			state,
 			context(currentSeat(state)),
-			actionPayload(ROOM, match, 0, { type: "draw" }),
+			actionPayload(TABLE, match, 0, { type: "draw" }),
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) expect(table(result.state).actions).toBe(1);
@@ -248,7 +248,7 @@ describe("rummy module: actions", () => {
 			module.apply(
 				state,
 				context(currentSeat(state)),
-				actionPayload(ROOM, match, 5, { type: "draw" }),
+				actionPayload(TABLE, match, 5, { type: "draw" }),
 			),
 		).toMatchObject({
 			ok: false,
@@ -265,7 +265,7 @@ describe("rummy module: actions", () => {
 			module.apply(
 				state,
 				context(other),
-				actionPayload(ROOM, match, 0, { type: "draw" }),
+				actionPayload(TABLE, match, 0, { type: "draw" }),
 			),
 		).toMatchObject({ ok: false, reason: "it is not your turn" });
 	});
@@ -278,7 +278,7 @@ describe("rummy module: actions", () => {
 		const result = module.apply(
 			state,
 			context(seat, [seat]),
-			actionPayload(ROOM, match, 0, { type: "draw" }),
+			actionPayload(TABLE, match, 0, { type: "draw" }),
 		);
 		expect(result).toMatchObject({ ok: false, waiting: true });
 	});
@@ -317,12 +317,15 @@ describe("rummy module: actions", () => {
 			module.apply(
 				state,
 				context("1"),
-				actionPayload(ROOM, match, actions, { type: "pass" }),
+				actionPayload(TABLE, match, actions, { type: "pass" }),
 			),
 		).toMatchObject({ ok: false, reason: "this game is over" });
-		expect(module.apply(state, context("1"), startPayload(ROOM))).toMatchObject(
-			{ ok: false, reason: "the game is over; ask for a new game" },
-		);
+		expect(
+			module.apply(state, context("1"), startPayload(TABLE)),
+		).toMatchObject({
+			ok: false,
+			reason: "the game is over; ask for a new game",
+		});
 	});
 });
 
@@ -339,7 +342,7 @@ describe("rummy module: replicated state", () => {
 	};
 	const copy = (): Raw => JSON.parse(JSON.stringify(started())) as Raw;
 	const valid = (raw: Raw) =>
-		module.isState(raw as unknown as JsonObject, ROOM);
+		module.isState(raw as unknown as JsonObject, TABLE);
 
 	it("reads its own state back after a JSON round trip", () => {
 		expect(valid(copy())).toBe(true);
@@ -379,32 +382,40 @@ describe("rummy module: replicated state", () => {
 		expect(valid(raw)).toBe(false);
 	});
 
-	it("rejects a state for another room", () => {
-		expect(module.isState(started(), "other-room")).toBe(false);
+	it("rejects a state for another table", () => {
+		expect(module.isState(started(), "other-table")).toBe(false);
 	});
 
 	it("is the module for rummy tables", () => {
-		expect(rummyModule.isState(started(), ROOM)).toBe(true);
+		expect(rummyModule.isState(started(), TABLE)).toBe(true);
 	});
 });
 
 describe("rummy module: reset and new game", () => {
 	it("waits for the other players, then ends the game and keeps the messages", () => {
-		let state = applied(started(), "2", chatPayload(ROOM, "hi"));
-		state = applied(state, "1", resetRequestPayload(ROOM));
+		let state = applied(started(), "2", chatPayload(TABLE, "hi"));
+		state = applied(state, "1", resetRequestPayload(TABLE));
 		expect(table(state).reset).toEqual({
 			id: commandIdOf("1"),
 			requester: "1",
 			required: ["2", "3", "4"],
 			approved: [],
 		});
-		state = applied(state, "2", resetVotePayload(ROOM, requestId(state), true));
-		state = applied(state, "3", resetVotePayload(ROOM, requestId(state), true));
+		state = applied(
+			state,
+			"2",
+			resetVotePayload(TABLE, requestId(state), true),
+		);
+		state = applied(
+			state,
+			"3",
+			resetVotePayload(TABLE, requestId(state), true),
+		);
 		expect(table(state).match).not.toBeNull();
 		const result = module.apply(
 			state,
 			context("4"),
-			resetVotePayload(ROOM, requestId(state), true),
+			resetVotePayload(TABLE, requestId(state), true),
 		);
 		expect(result).toMatchObject({
 			ok: true,
@@ -424,7 +435,7 @@ describe("rummy module: reset and new game", () => {
 		const finished = playToBlockedEnd(started());
 		const dealer = table(finished).match?.hand.dealer;
 		if (dealer === undefined) throw new Error("no game");
-		const next = applied(resetByAll(finished), "1", startPayload(ROOM));
+		const next = applied(resetByAll(finished), "1", startPayload(TABLE));
 		expect(table(next).matches).toBe(2);
 		expect(table(next).match?.handNo).toBe(2);
 		expect(table(next).match?.hand.dealer).toBe((dealer + 1) % 4);
@@ -432,13 +443,17 @@ describe("rummy module: reset and new game", () => {
 	});
 
 	it("ends the request when one player rejects it, and keeps the game", () => {
-		let state = applied(started(), "3", resetRequestPayload(ROOM));
+		let state = applied(started(), "3", resetRequestPayload(TABLE));
 		const match = table(state).match;
-		state = applied(state, "4", resetVotePayload(ROOM, requestId(state), true));
+		state = applied(
+			state,
+			"4",
+			resetVotePayload(TABLE, requestId(state), true),
+		);
 		const result = module.apply(
 			state,
 			context("1"),
-			resetVotePayload(ROOM, requestId(state), false),
+			resetVotePayload(TABLE, requestId(state), false),
 		);
 		expect(result).toMatchObject({
 			ok: true,
@@ -449,21 +464,21 @@ describe("rummy module: reset and new game", () => {
 	});
 
 	it("lets only the requester cancel the request", () => {
-		const state = applied(started(), "3", resetRequestPayload(ROOM));
+		const state = applied(started(), "3", resetRequestPayload(TABLE));
 		const id = requestId(state);
 		expect(
-			module.apply(state, context("2"), resetCancelPayload(ROOM, id)),
+			module.apply(state, context("2"), resetCancelPayload(TABLE, id)),
 		).toEqual({
 			ok: false,
 			reason: "only the requester can cancel this reset",
 		});
 		expect(
-			table(applied(state, "3", resetCancelPayload(ROOM, id))).reset,
+			table(applied(state, "3", resetCancelPayload(TABLE, id))).reset,
 		).toBeNull();
 	});
 
 	it("blocks the game and a second request while a reset waits for answers", () => {
-		const state = applied(started(), "1", resetRequestPayload(ROOM));
+		const state = applied(started(), "1", resetRequestPayload(TABLE));
 		const { match, actions } = table(state);
 		if (match === null) throw new Error("no game");
 		const blocked = {
@@ -474,16 +489,16 @@ describe("rummy module: reset and new game", () => {
 			module.apply(
 				state,
 				context(currentSeat(state)),
-				actionPayload(ROOM, match, actions, { type: "draw" }),
+				actionPayload(TABLE, match, actions, { type: "draw" }),
 			),
 		).toEqual(blocked);
 		expect(
-			module.apply(state, context("2"), resetRequestPayload(ROOM)),
+			module.apply(state, context("2"), resetRequestPayload(TABLE)),
 		).toEqual(blocked);
 	});
 
 	it("asks only the players who are present, and resets at once when the requester is alone", () => {
-		const partial = applied(started(), "1", resetRequestPayload(ROOM), [
+		const partial = applied(started(), "1", resetRequestPayload(TABLE), [
 			"1",
 			"3",
 		]);
@@ -491,33 +506,33 @@ describe("rummy module: reset and new game", () => {
 		const alone = module.apply(
 			started(),
 			context("1", ["1"]),
-			resetRequestPayload(ROOM),
+			resetRequestPayload(TABLE),
 		);
 		expect(alone).toMatchObject({ ok: true, event: { kind: "reset-applied" } });
 	});
 
 	it("refuses a vote from a seat that was not asked, a repeated approval, and a vote for another request", () => {
-		let state = applied(started(), "1", resetRequestPayload(ROOM), [
+		let state = applied(started(), "1", resetRequestPayload(TABLE), [
 			"1",
 			"2",
 			"3",
 		]);
 		const id = requestId(state);
 		expect(
-			module.apply(state, context("4"), resetVotePayload(ROOM, id, true)),
+			module.apply(state, context("4"), resetVotePayload(TABLE, id, true)),
 		).toMatchObject({
 			ok: false,
 			reason: "your seat is not asked to approve this reset",
 		});
 		expect(
-			module.apply(state, context("2"), resetVotePayload(ROOM, "other", true)),
+			module.apply(state, context("2"), resetVotePayload(TABLE, "other", true)),
 		).toMatchObject({
 			ok: false,
 			reason: "there is no matching reset request",
 		});
-		state = applied(state, "2", resetVotePayload(ROOM, id, true));
+		state = applied(state, "2", resetVotePayload(TABLE, id, true));
 		expect(
-			module.apply(state, context("2"), resetVotePayload(ROOM, id, true)),
+			module.apply(state, context("2"), resetVotePayload(TABLE, id, true)),
 		).toMatchObject({
 			ok: false,
 			reason: "your seat has already approved this reset",
@@ -525,13 +540,13 @@ describe("rummy module: reset and new game", () => {
 	});
 
 	it("keeps a waiting request in the replicated state, and refuses a malformed one", () => {
-		const state = applied(started(), "1", resetRequestPayload(ROOM));
-		expect(module.isState(JSON.parse(JSON.stringify(state)), ROOM)).toBe(true);
+		const state = applied(started(), "1", resetRequestPayload(TABLE));
+		expect(module.isState(JSON.parse(JSON.stringify(state)), TABLE)).toBe(true);
 		const reset = table(state).reset;
 		expect(
 			module.isState(
 				{ ...state, reset: { ...reset, required: ["1", "2"] } },
-				ROOM,
+				TABLE,
 			),
 		).toBe(false);
 	});

@@ -39,8 +39,8 @@ import { trysteroMesh } from "../../../src/p2p/trystero";
 import { frame } from "../../../src/p2p/wire";
 import {
 	DEFAULT_TABLE_SETUP,
-	type RoomConfig,
 	type Seat,
+	type TableConfig,
 } from "../../../src/protocol";
 import { legalActions } from "../../../src/rummy";
 import { guardedStorage, SeatMemory, webSeatLocks } from "../../../src/session";
@@ -148,7 +148,7 @@ declare global {
 	}
 }
 
-const CONFIG: RoomConfig = {
+const CONFIG: TableConfig = {
 	names: { "1": "player1", "2": "player2", "3": "player3", "4": "player4" },
 	table: DEFAULT_TABLE_SETUP,
 };
@@ -416,7 +416,7 @@ window.ocHarness = {
 		return new Promise((resolve) => {
 			signaling = createCallSignaling(
 				table.callTransport,
-				{ roomId: table.tableId, ...self },
+				{ tableId: table.tableId, ...self },
 				{
 					onStatus: (status) => {
 						if (status === "subscribed") resolve(self);

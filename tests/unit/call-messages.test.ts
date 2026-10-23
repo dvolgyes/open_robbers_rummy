@@ -13,7 +13,7 @@ import {
 	parseEnvelope,
 } from "../../src/call/messages";
 
-const ROOM = "abcdefghijklmnopqrstuv";
+const TABLE = "abcdefghijklmnopqrstuv";
 const SESSION_A = "0f8e2c1a-1b2c-4d3e-8f90-a1b2c3d4e5f6";
 const SESSION_B = "11111111-2222-4333-8444-555555555555";
 const PREFS = {
@@ -72,20 +72,20 @@ describe("isSession", () => {
 
 describe("inboxTopic", () => {
 	it("builds the topic that the receive policy expects", () => {
-		expect(inboxTopic({ roomId: ROOM, seat: "2", generation: 7 })).toBe(
-			`call:${ROOM}:2:7`,
+		expect(inboxTopic({ tableId: TABLE, seat: "2", generation: 7 })).toBe(
+			`call:${TABLE}:2:7`,
 		);
 		expect(
-			inboxTopic({ roomId: ROOM, seat: "1", generation: MAX_GENERATION }),
-		).toBe(`call:${ROOM}:1:999999999`);
+			inboxTopic({ tableId: TABLE, seat: "1", generation: MAX_GENERATION }),
+		).toBe(`call:${TABLE}:1:999999999`);
 	});
 
 	it.each([
-		{ roomId: "short", seat: "1", generation: 1 },
-		{ roomId: ROOM, seat: "X", generation: 1 },
-		{ roomId: ROOM, seat: "1", generation: 0 },
-		{ roomId: ROOM, seat: "1", generation: MAX_GENERATION + 1 },
-		{ roomId: ROOM, seat: "1", generation: 1.5 },
+		{ tableId: "short", seat: "1", generation: 1 },
+		{ tableId: TABLE, seat: "X", generation: 1 },
+		{ tableId: TABLE, seat: "1", generation: 0 },
+		{ tableId: TABLE, seat: "1", generation: MAX_GENERATION + 1 },
+		{ tableId: TABLE, seat: "1", generation: 1.5 },
 	])("throws on an invalid identity %o", (inbox) => {
 		expect(() => inboxTopic(inbox as InboxIdentity)).toThrow(
 			"invalid call inbox identity",
@@ -251,10 +251,10 @@ describe("parseCallMessage: ICE batches", () => {
 });
 
 describe("parseEnvelope", () => {
-	const inbox: InboxIdentity = { roomId: ROOM, seat: "1", generation: 4 };
+	const inbox: InboxIdentity = { tableId: TABLE, seat: "1", generation: 4 };
 	const envelope = (extra: Record<string, unknown> = {}) => ({
 		v: 1,
-		roomId: ROOM,
+		tableId: TABLE,
 		from: "2",
 		fromGen: 2,
 		toGen: 4,
@@ -273,7 +273,7 @@ describe("parseEnvelope", () => {
 
 	it.each([
 		["another version", { v: 2 }],
-		["another room", { roomId: "vutsrqponmlkjihgfedcba" }],
+		["another table", { tableId: "vutsrqponmlkjihgfedcba" }],
 		["an older generation of this seat", { toGen: 3 }],
 		["a sender at this seat", { from: "1" }],
 		["an invalid sender", { from: "X" }],

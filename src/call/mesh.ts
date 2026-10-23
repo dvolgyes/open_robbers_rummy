@@ -30,16 +30,16 @@ export const STALE_SNAPSHOT_MS = 3000;
 /** A peer that is offline at its current generation this long is out of the call. */
 export const VANISHED_MS = 10_000;
 
-/** What the room tells the call, on every change. */
-export interface CallRoomSnapshot {
-	readonly roomId: string;
-	/** Null when this tab is superseded, the room expired, or the room stopped. */
+/** What the table tells the call, on every change. */
+export interface CallTableSnapshot {
+	readonly tableId: string;
+	/** Null when this tab is superseded, the table expired, or the table stopped. */
 	readonly self: { readonly seat: Seat; readonly generation: number } | null;
 	/** The seats in play at this table, in `SEATS` order. */
 	readonly seats: readonly Seat[];
 	/** Seats with a holder → the holder's current generation. */
 	readonly holders: Partial<Record<Seat, number>>;
-	/** Seats whose current holder is present in the room channel. */
+	/** Seats whose current holder is present in the table channel. */
 	readonly online: ReadonlySet<Seat>;
 }
 
@@ -114,8 +114,8 @@ function remoteParty(announcement: Announcement): Party {
 
 /** Other held seats that are online in `next` but were not in `previous` (none before a first snapshot). */
 export function returnedSeats(
-	previous: CallRoomSnapshot | undefined,
-	next: CallRoomSnapshot,
+	previous: CallTableSnapshot | undefined,
+	next: CallTableSnapshot,
 	self: Seat,
 ): Seat[] {
 	if (previous === undefined) return [];
@@ -131,7 +131,7 @@ export function returnedSeats(
 export class CallMesh {
 	readonly #deps: CallMeshDeps;
 	readonly #listeners = new Set<() => void>();
-	#snapshot: CallRoomSnapshot | undefined;
+	#snapshot: CallTableSnapshot | undefined;
 	/** Set from Join to Leave. */
 	#local: Party | undefined;
 	#self: InboxIdentity | undefined;
@@ -175,14 +175,14 @@ export class CallMesh {
 		return () => this.#listeners.delete(listener);
 	}
 
-	update(snapshot: CallRoomSnapshot): void {
+	update(snapshot: CallTableSnapshot): void {
 		const previous = this.#snapshot;
 		this.#snapshot = snapshot;
 		const self = this.#self;
 		if (
 			self !== undefined &&
 			(snapshot.self === null ||
-				snapshot.roomId !== self.roomId ||
+				snapshot.tableId !== self.tableId ||
 				snapshot.self.seat !== self.seat ||
 				snapshot.self.generation !== self.generation)
 		) {
@@ -209,7 +209,7 @@ export class CallMesh {
 		this.#local = local;
 		this.#prefVersion = 0;
 		this.#problem = undefined;
-		this.#self = { roomId: snapshot.roomId, ...snapshot.self };
+		this.#self = { tableId: snapshot.tableId, ...snapshot.self };
 		const token = ++this.#opening;
 		// A failed removal still reports its error; the new inbox opens anyway.
 		void this.#closing.finally(() => {
@@ -258,7 +258,7 @@ export class CallMesh {
 		this.#emit();
 	}
 
-	/** The room view is gone: leave the call and stop notifying. */
+	/** The table view is gone: leave the call and stop notifying. */
 	dispose(): void {
 		this.leave();
 		this.#listeners.clear();
@@ -362,8 +362,8 @@ export class CallMesh {
 	 * forgotten: its old link would only show a failed connection.
 	 */
 	#greetReturned(
-		previous: CallRoomSnapshot | undefined,
-		snapshot: CallRoomSnapshot,
+		previous: CallTableSnapshot | undefined,
+		snapshot: CallTableSnapshot,
 	): void {
 		const self = this.#self;
 		if (self === undefined || !this.#joined?.announced) return;

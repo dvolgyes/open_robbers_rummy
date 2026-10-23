@@ -12,9 +12,9 @@ import {
 } from "../../src/call/signaling";
 import type { Seat } from "../../src/protocol";
 import type { Result } from "../../src/result";
-import { ROOM_ID } from "./fixtures";
+import { TABLE_ID } from "./fixtures";
 
-const INBOX: InboxIdentity = { roomId: ROOM_ID, seat: "1", generation: 3 };
+const INBOX: InboxIdentity = { tableId: TABLE_ID, seat: "1", generation: 3 };
 const SESSION = "0f8e2c1a-1b2c-4d3e-8f90-a1b2c3d4e5f6";
 const OTHER_SESSION = "11111111-2222-4333-8444-555555555555";
 const PREFS = {
@@ -126,7 +126,7 @@ function open(transport: FakeTransport, record = recorder()) {
 function envelope(from: Seat, extra: Record<string, unknown> = {}) {
 	return {
 		v: 1,
-		roomId: ROOM_ID,
+		tableId: TABLE_ID,
 		from,
 		fromGen: 1,
 		toGen: INBOX.generation,
@@ -297,7 +297,7 @@ describe("call signaling: receiving", () => {
 	it("subscribes to its own inbox and delivers valid envelopes", () => {
 		const transport = new FakeTransport();
 		const { record } = open(transport);
-		expect(transport.current.topic).toBe(`call:${ROOM_ID}:1:3`);
+		expect(transport.current.topic).toBe(`call:${TABLE_ID}:1:3`);
 		expect(record.statuses).toEqual(["joining"]);
 		transport.current.onStatus("open");
 		expect(record.statuses).toEqual(["joining", "subscribed"]);

@@ -9,7 +9,7 @@ import { freeze } from "./lifecycle";
 import { Player, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
-	createRoom,
+	createTable,
 	expectBanner,
 	expectSeat,
 	hostRows,
@@ -19,7 +19,7 @@ import {
 	type SeatKey,
 	sendDraft,
 	texts,
-} from "./room";
+} from "./table";
 
 /**
  * A seat whose player has gone silent (a suspended phone, a frozen tab) becomes free when the host sees it offline
@@ -93,7 +93,7 @@ test.afterAll(async () => {
 test("a frozen player's seat shows offline, frees after the timeout, and the thawed tab is superseded", async () => {
 	test.setTimeout(180_000);
 	tab["4"] = await host.page("./");
-	link = await createRoom(tab["4"]);
+	link = await createTable(tab["4"]);
 	for (const [player, seat] of [
 		[player1, "1"],
 		[player2, "2"],

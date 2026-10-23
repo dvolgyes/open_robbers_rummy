@@ -28,7 +28,7 @@ export type SignalingEnd = "superseded" | "unavailable";
 export interface CallSignalingHandlers {
 	onStatus(status: SignalingStatus): void;
 	onEnvelope(envelope: CallEnvelope): void;
-	/** This tab no longer holds the seat, or the room is gone: the call ends here. */
+	/** This tab no longer holds the seat, or the table is gone: the call ends here. */
 	onEnd(reason: SignalingEnd): void;
 	/** A message was refused and dropped (for example `invalid`); signaling continues. */
 	onProblem(failure: Failure): void;

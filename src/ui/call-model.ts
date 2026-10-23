@@ -10,7 +10,7 @@ import { SEAT_NAMES, type Seat } from "../protocol";
  * rules are unit-tested without a DOM; call-panel.ts and table.ts only copy these values into elements.
  */
 
-/** The call as the room screen sees it: a live view, or the reason why this browser cannot make calls. */
+/** The call as the table screen sees it: a live view, or the reason why this browser cannot make calls. */
 export type CallDisplay =
 	| {
 			readonly available: true;

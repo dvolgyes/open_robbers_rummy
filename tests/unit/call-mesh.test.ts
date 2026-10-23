@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	CallMesh,
-	type CallRoomSnapshot,
+	type CallTableSnapshot,
 	REPLY_COALESCE_MS,
 	SILENCE_MS,
 	STALE_SNAPSHOT_MS,
@@ -23,7 +23,7 @@ import {
 import { SEATS, type Seat } from "../../src/protocol";
 import type { Result } from "../../src/result";
 import { AUDIO, BOTH, FakeLink, party, session } from "./call-fakes";
-import { ROOM_ID } from "./fixtures";
+import { TABLE_ID } from "./fixtures";
 
 /** Delays in the measured range: an inbox join of about 60 ms, RPC to delivery about 70 ms. */
 const SUBSCRIBE_MS = 60;
@@ -63,7 +63,7 @@ interface BrokerInbox {
 }
 
 /**
- * A call transport for one room: a sender that is not the current holder gets `superseded`, and a copy reaches an
+ * A call transport for one table: a sender that is not the current holder gets `superseded`, and a copy reaches an
  * inbox only while that inbox is subscribed.
  */
 class Broker implements CallTransport {
@@ -119,13 +119,13 @@ class Broker implements CallTransport {
 			};
 			this.sent.push(traffic);
 			const topic = inboxTopic({
-				roomId: signal.roomId,
+				tableId: signal.tableId,
 				seat: to,
 				generation: toGen,
 			});
 			const envelope = {
 				v: 1,
-				roomId: signal.roomId,
+				tableId: signal.tableId,
 				from: signal.seat,
 				fromGen: signal.generation,
 				toGen,
@@ -220,7 +220,7 @@ class Player {
 
 	get inbox(): string {
 		return inboxTopic({
-			roomId: ROOM_ID,
+			tableId: TABLE_ID,
 			seat: this.seat,
 			generation: this.generation,
 		});
@@ -246,17 +246,17 @@ class Table {
 		return player;
 	}
 
-	/** The room channel brings the current seats to these players (all when none are named). */
+	/** The table channel brings the current seats to these players (all when none are named). */
 	publish(...only: Player[]): void {
 		for (const player of only.length > 0 ? only : this.#players) {
 			player.mesh.update(this.snapshot(player));
 		}
 	}
 
-	snapshot(player: Player): CallRoomSnapshot {
+	snapshot(player: Player): CallTableSnapshot {
 		const { holders, online } = this.broker;
 		return {
-			roomId: ROOM_ID,
+			tableId: TABLE_ID,
 			self:
 				holders[player.seat] === player.generation
 					? { seat: player.seat, generation: player.generation }
@@ -277,7 +277,7 @@ function envelope(
 ): unknown {
 	return {
 		v: 1,
-		roomId: ROOM_ID,
+		tableId: TABLE_ID,
 		from,
 		fromGen,
 		toGen: to.generation,

@@ -1,11 +1,11 @@
-import { isCommandId, isRoomId } from "../ids";
+import { isCommandId, isTableId } from "../ids";
 import {
 	isNonNegativeInteger,
 	isObject,
 	isSeat,
 	type JsonObject,
-	type RoomConfig,
 	type Seat,
+	type TableConfig,
 } from "../protocol";
 import {
 	type Authority,
@@ -24,8 +24,8 @@ import {
 	type Entry,
 	jsonBytes,
 	parseEntry,
+	parseLimitedTableConfig,
 	parseSeatHolders,
-	parseTableConfig,
 	type SeatHolder,
 	withinDepth,
 } from "./wire";
@@ -40,7 +40,7 @@ export interface TableRecord {
 	readonly tableId: string;
 	/** The seat of this replica. */
 	readonly replica: Seat;
-	readonly config: RoomConfig;
+	readonly config: TableConfig;
 	/** The state after entry `rev`. */
 	readonly state: JsonObject;
 	readonly rev: number;
@@ -97,13 +97,13 @@ function isJsonObjectWithin(
 export function parseTableRecord(value: unknown): TableRecord | undefined {
 	if (!isObject(value)) return undefined;
 	const { tableId, replica, state, rev, inc, lastActivityAt } = value;
-	if (!isRoomId(tableId) || !isSeat(replica)) return undefined;
+	if (!isTableId(tableId) || !isSeat(replica)) return undefined;
 	if (!isNonNegativeInteger(rev) || rev < 1 || rev > MAX_LOG_ENTRIES)
 		return undefined;
 	if (!isNonNegativeInteger(inc) || inc > MAX_TERM) return undefined;
 	if (!isTimestamp(lastActivityAt)) return undefined;
 	if (!isJsonObjectWithin(state, MAX_STATE_BYTES)) return undefined;
-	const config = parseTableConfig(value.config);
+	const config = parseLimitedTableConfig(value.config);
 	const lastAuth = parseAuthority(value.lastAuth);
 	const host = parseAuthority(value.host);
 	const seats = parseSeatHolders(value.seats);
@@ -127,7 +127,7 @@ export function parseTableRecord(value: unknown): TableRecord | undefined {
 export function parseOutboxRecord(value: unknown): OutboxRecord | undefined {
 	if (!isObject(value)) return undefined;
 	const { tableId, replica, id, order, payload } = value;
-	if (!isRoomId(tableId) || !isSeat(replica) || !isCommandId(id))
+	if (!isTableId(tableId) || !isSeat(replica) || !isCommandId(id))
 		return undefined;
 	if (!isNonNegativeInteger(order)) return undefined;
 	if (!isJsonObjectWithin(payload, MAX_PAYLOAD_BYTES)) return undefined;
@@ -137,7 +137,7 @@ export function parseOutboxRecord(value: unknown): OutboxRecord | undefined {
 export function parseTombstone(value: unknown): Tombstone | undefined {
 	if (!isObject(value)) return undefined;
 	const { tableId, expiredAt } = value;
-	return isRoomId(tableId) && isTimestamp(expiredAt)
+	return isTableId(tableId) && isTimestamp(expiredAt)
 		? { tableId, expiredAt }
 		: undefined;
 }

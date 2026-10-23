@@ -4,7 +4,7 @@ import { freeze } from "./lifecycle";
 import { Player, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
-	createRoom,
+	createTable,
 	expectBanner,
 	expectSeat,
 	hostRows,
@@ -15,7 +15,7 @@ import {
 	type SeatKey,
 	takeTurn,
 	texts,
-} from "./room";
+} from "./table";
 
 /**
  * Connection loss and reconnection in the UI, on one table through the public trackers. Each
@@ -211,7 +211,7 @@ test.afterAll(async () => {
 
 test("1: four browsers sit down at one table, and the first hand is dealt", async () => {
 	tab["4"] = await players["4"].page("./");
-	link = await createRoom(tab["4"]);
+	link = await createTable(tab["4"]);
 	open.add("4");
 	for (const seat of ["1", "2"] as const) {
 		tab[seat] = await players[seat].page(link);

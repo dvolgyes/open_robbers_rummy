@@ -1,4 +1,4 @@
-import { isRoomId } from "../ids";
+import { isTableId } from "../ids";
 import { isObject, isSeat, type JsonObject, type Seat } from "../protocol";
 import type { Form } from "./device-class";
 import type { MediaSwitches, Prefs } from "./policy";
@@ -75,7 +75,7 @@ export interface CallEnvelope {
 
 /** The seat holder that owns one inbox. */
 export interface InboxIdentity {
-	readonly roomId: string;
+	readonly tableId: string;
 	readonly seat: Seat;
 	readonly generation: number;
 }
@@ -112,13 +112,13 @@ function isNegotiation(value: unknown): value is number {
 /** The inbox topic of one seat holder. */
 export function inboxTopic(inbox: InboxIdentity): string {
 	if (
-		!isRoomId(inbox.roomId) ||
+		!isTableId(inbox.tableId) ||
 		!isSeat(inbox.seat) ||
 		!isGeneration(inbox.generation)
 	) {
 		throw new Error("invalid call inbox identity");
 	}
-	return `call:${inbox.roomId}:${inbox.seat}:${inbox.generation}`;
+	return `call:${inbox.tableId}:${inbox.seat}:${inbox.generation}`;
 }
 
 function parseSwitches(value: unknown): MediaSwitches | undefined {
@@ -235,7 +235,7 @@ export function parseCallMessage(value: unknown): CallMessage | undefined {
 }
 
 /**
- * A payload for this inbox. Unknown keys are ignored. The room and the addressed generation must be this inbox's.
+ * A payload for this inbox. Unknown keys are ignored. The table and the addressed generation must be this inbox's.
  */
 export function parseEnvelope(
 	value: unknown,
@@ -244,7 +244,7 @@ export function parseEnvelope(
 	if (
 		!isObject(value) ||
 		value.v !== 1 ||
-		value.roomId !== inbox.roomId ||
+		value.tableId !== inbox.tableId ||
 		value.toGen !== inbox.generation
 	) {
 		return undefined;

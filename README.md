@@ -27,21 +27,21 @@ The game uses two 52-card decks and 2 to 6 jokers (4 by default).
 3. Select **This is me** beside your seat.
 4. Choose the rules, the number of jokers, and whether **Allow solver suggestions** is on.
 5. Select **Create game**.
-   Your browser creates the table, takes your seat, and copies the room link when clipboard access is available.
+   Your browser creates the table, takes your seat, and copies the table link when clipboard access is available.
 6. Use **Copy link** at the table to copy the shared link again, then send the full link to your friends in a private message.
 7. Each friend opens the link and selects one of the available seats.
    If only one seat remains, the game takes it automatically.
 
-The room link holds the player names and the table rules.
+The table link holds the player names and the table rules.
 
-The room link is the invitation key.
-Room discovery can announce that a room exists, but a person still needs the complete link to join because the room password is carried in the link fragment.
+The table link is the invitation key.
+Tracker discovery can announce that a table exists, but a person still needs the complete link to join because the table key is carried in the link fragment.
 Treat the full link like a password: send it only to people you want at the table.
 Do not post it publicly.
 
 ### Take a seat and play
 
-The room opens at a seat-selection screen when more than one seat is free.
+The table opens at a seat-selection screen when more than one seat is free.
 Choose the seat the host agreed with you.
 If a seat is already held by an active browser, choose another available seat or ask its player to release it.
 Reopening the link in the same browser normally restores that browser's seat.
@@ -88,7 +88,7 @@ The table creator chooses one of these rule sets:
 The sources and the points that they leave open are in [ADR 0005](docs/adr/0005-robbers-rummy-engine-and-solver-bots.md).
 
 You must take one of the player seats to use the table.
-There is no spectator or kibitz mode, so people who are not seated cannot watch the cards from inside the room.
+There is no spectator or kibitz mode, so people who are not seated cannot watch the cards at the table.
 
 ### Start a new game
 
@@ -105,7 +105,7 @@ The chat and the call stay as they are.
 Bots can fill seats for a game, or the host can turn on autoplay for a player who needs to step away temporarily.
 For a permanent bot seat, select **Bot** for that seat while creating the table.
 For a temporary substitute, the host can enable the bot for the player's seat from the table controls, then turn it off when the player returns.
-The player keeps their seat and stays in the room call while the bot plays.
+The player keeps their seat and stays in the table call while the bot plays.
 Bots approve a new-game request automatically.
 
 The bots use a solver, not an AI model, so they need no account or API key.
@@ -116,16 +116,16 @@ A bot waits until a play was on the table for at least 5 seconds, so that every 
 
 ### Call and finding players
 
-The table includes an optional audio and video call for room members.
+The table includes an optional audio and video call for table members.
 Each player chooses whether to join the call and whether to send a microphone or camera.
 On mobile phones, video calls are intentionally unavailable because the screen has limited space; audio calls remain available.
 The call is separate from the game actions, so using autoplay does not make the player leave the call.
 The call has no kibitz or spectator access.
 
 Open Robber's Rummy does not currently provide matchmaking or a way to find random players online.
-You need to invite people yourself and share the room link with them.
+You need to invite people yourself and share the table link with them.
 
-### Save and reuse a room link
+### Save and reuse a table link
 
 You can bookmark or save the shared table link and reuse it with regular players.
 The link keeps the player names and the table rules, so it can start a fresh table for the same group without creating and distributing another invitation.

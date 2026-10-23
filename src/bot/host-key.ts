@@ -7,7 +7,7 @@ export function normalizeHostApiKey(apiKey: string): string {
 	return apiKey.trim();
 }
 
-/** The key stays in this browser's local storage and is never part of room setup. */
+/** The key stays in this browser's local storage and is never part of table setup. */
 export function readHostApiKey(storage: MaybeStorage): string {
 	return normalizeHostApiKey(storage?.getItem(STORAGE_KEY) ?? "");
 }

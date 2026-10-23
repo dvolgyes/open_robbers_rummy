@@ -13,10 +13,10 @@ import type { CommandFailure } from "../p2p/table";
 import type { Entry } from "../p2p/wire";
 import {
 	isObject,
-	type RoomConfig,
 	SEAT_NAMES,
 	type Seat,
 	seatsOf,
+	type TableConfig,
 } from "../protocol";
 import {
 	type Action,
@@ -417,9 +417,9 @@ export interface TableView {
 }
 
 export interface TableViewInput {
-	readonly config: RoomConfig;
+	readonly config: TableConfig;
 	readonly seat: Seat;
-	/** The parsed table; `undefined` while the room is loading, `null` when its state is not a rummy table. */
+	/** The parsed table; `undefined` while the table is loading, `null` when its state is not a rummy table. */
 	readonly state: RummyState | null | undefined;
 	/** The tab can no longer act (superseded, expired or stopped). */
 	readonly terminal: boolean;
@@ -497,7 +497,7 @@ function turnPrompt(view: HandView, seat: number, t: Translate): string {
 
 function resultView(
 	hand: HandState,
-	config: RoomConfig,
+	config: TableConfig,
 	viewer: Seat,
 	t: Translate,
 ): ResultView {
@@ -539,7 +539,7 @@ export function tableView(input: TableViewInput): TableView {
 	const t = input.t ?? english;
 	if (state === undefined) return emptyView("loading", t("Loading the table…"));
 	if (state === null)
-		return emptyView("unreadable", t("This room has no rummy table."));
+		return emptyView("unreadable", t("This table has no rummy game."));
 
 	const match = state.match;
 	const dealWait = waitingText(seatsOf(config), [...input.present]);
@@ -547,7 +547,7 @@ export function tableView(input: TableViewInput): TableView {
 		return {
 			...emptyView("waiting", ""),
 			heading: t("Lobby"),
-			details: t("Room lobby"),
+			details: t("Table lobby"),
 			prompt:
 				dealWait === undefined
 					? t("The cards are dealt now.")

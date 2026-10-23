@@ -72,7 +72,7 @@ function viewOf(
 ): TableView {
 	const state: RummyState = {
 		v: PROTOCOL_VERSION,
-		roomId: "room-1",
+		tableId: "table-1",
 		game: "rummy",
 		messages: 0,
 		matches: 1,

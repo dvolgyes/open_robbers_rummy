@@ -26,7 +26,7 @@ A reviewer can see a wrong import in one file, but not a slow drift across many 
 - The shared root files in `src/` (`protocol.ts`, `bookmark.ts`, `session.ts`, `ids.ts`, `random.ts`, `result.ts`, `backoff.ts`, `i18n.ts`, `i18n-translations.ts`, `i18n-rummy.ts`) import no layer folder.
   `src/main.ts` is the entry point and is exempt.
 - `src/p2p/` reaches the rules only through the `GameModule` interface in `src/game/module.ts`.
-- The bot seat holders are in `src/p2p/bot-seats.ts`, and the room link parser is in `src/bookmark.ts`, so the table and the bot CLI can use them without an upward import.
+- The bot seat holders are in `src/p2p/bot-seats.ts`, and the table link parser is in `src/bookmark.ts`, so the table and the bot CLI can use them without an upward import.
 - Pre-commit `pygrep` hooks (`layer-*` in `.pre-commit-config.yaml`) refuse a relative import or a dynamic import that crosses a boundary in the wrong direction.
   Each hook was checked against a planted violation.
 - The replicated table state holds every hand and the stock, as ADR 0001 requires so that any seated browser can become the host.

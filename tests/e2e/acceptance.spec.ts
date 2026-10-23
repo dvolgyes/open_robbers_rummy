@@ -4,7 +4,7 @@ import { freeze } from "./lifecycle";
 import { Player, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
-	createRoom,
+	createTable,
 	expectBanner,
 	expectSeat,
 	hostRows,
@@ -18,7 +18,7 @@ import {
 	type SeatKey,
 	sendDraft,
 	texts,
-} from "./room";
+} from "./table";
 
 /**
  * Acceptance on the peer-to-peer table. Each test builds on the table of the
@@ -93,7 +93,7 @@ test.afterAll(async () => {
 
 test("1: the creator gets one table link and hosts from Player 4", async () => {
 	tab["4"] = await player4.page("./");
-	link = await createRoom(tab["4"]);
+	link = await createTable(tab["4"]);
 	const roster = tab["4"].getByTestId("roster");
 	await expect(roster.locator('li[data-state="online"]')).toHaveCount(1);
 	await expect(roster.locator('li[data-state="free"]')).toHaveCount(3);
@@ -322,7 +322,7 @@ test("8: a message whose result is lost is stored once", async () => {
 test("9: a second game gets a new link and shows no old messages", async () => {
 	const oldKey = new URL(link).hash;
 	await tab["4"].goto("./");
-	const second = await createRoom(tab["4"]);
+	const second = await createTable(tab["4"]);
 	expect(new URL(second).hash).not.toBe(oldKey);
 	await expect(lines(tab["4"])).toHaveCount(0);
 	const page = await player3.page(second);

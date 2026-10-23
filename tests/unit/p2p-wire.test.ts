@@ -25,8 +25,8 @@ const CONFIG = {
 	names: { "1": "player1", "2": "player3", "3": "player2", "4": "player4" },
 	table: { preset: "gamerules", jokers: 4, assist: true },
 };
-const PAYLOAD = { v: 1, roomId: TABLE, type: "chat", text: "hi" };
-const EVENT = { v: 1, roomId: TABLE, type: "event", seq: 4 };
+const PAYLOAD = { v: 1, tableId: TABLE, type: "chat", text: "hi" };
+const EVENT = { v: 1, tableId: TABLE, type: "event", seq: 4 };
 
 type Sample = Record<string, unknown> & { k: string };
 /** A label, one valid message, and the fields whose removal or wrong type must reject it. */

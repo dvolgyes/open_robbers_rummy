@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isRoomId } from "../../src/ids";
+import { isTableId } from "../../src/ids";
 import {
 	deriveHolder,
 	derivePairRoomId,
@@ -25,7 +25,7 @@ describe("deriveTableId", () => {
 	it("is the first 22 characters of the SHA-256 of the labelled key", async () => {
 		const tableId = await deriveTableId(KEY);
 		expect(tableId).toBe(TABLE_ID);
-		expect(isRoomId(tableId)).toBe(true);
+		expect(isTableId(tableId)).toBe(true);
 	});
 
 	it("differs for another key", async () => {

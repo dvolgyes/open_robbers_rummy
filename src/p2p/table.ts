@@ -1,13 +1,13 @@
-import type { CallRoomSnapshot } from "../call/mesh";
+import type { CallTableSnapshot } from "../call/mesh";
 import type { CallTransport } from "../call/signaling";
 import type { GameModule } from "../game/module";
 import { storageName } from "../project";
 import {
 	type JsonObject,
-	type RoomConfig,
 	SEATS,
 	type Seat,
 	seatsOf,
+	type TableConfig,
 } from "../protocol";
 import type { MaybeStorage, SeatLocks, SeatMemory } from "../session";
 import { botSeatClaims } from "./bot-seats";
@@ -98,7 +98,7 @@ export interface TableCreation {
 	readonly storage: TableStorage;
 	readonly identity: TableIdentity;
 	readonly seat: Seat;
-	readonly config: RoomConfig;
+	readonly config: TableConfig;
 	readonly module: GameModule;
 	readonly newId: () => string;
 	readonly clock: Clock;
@@ -176,10 +176,10 @@ export interface TableDeps {
 	readonly hostEligible?: boolean;
 	/** This page load created the table: it hosts term 1 at once. */
 	readonly creator?: boolean;
-	/** An explicit seat from the room URL takes priority over remembered seats. */
+	/** An explicit seat from the table URL takes priority over remembered seats. */
 	readonly preferredSeat?: Seat;
-	/** Valid setup values from the shared URL can initialize a missing local room. */
-	readonly bootstrap?: { readonly config: RoomConfig; readonly host: Seat };
+	/** Valid setup values from the shared URL can initialize a missing local table. */
+	readonly bootstrap?: { readonly config: TableConfig; readonly host: Seat };
 }
 
 export type TableStatus =
@@ -352,7 +352,7 @@ export class TableController {
 	 * The call's view of the table: holders from the replica, and online = the seats whose peer the roster binds
 	 * at the current generation and that have a data channel to this page.
 	 */
-	callSnapshot(): CallRoomSnapshot {
+	callSnapshot(): CallTableSnapshot {
 		const table = this.#closed() ? null : this.#replication?.log?.table;
 		const holders: Partial<Record<Seat, number>> = {};
 		for (const row of table?.seats ?? []) {
@@ -370,7 +370,7 @@ export class TableController {
 		}
 		const self = this.#callSelf();
 		return {
-			roomId: this.#tableId,
+			tableId: this.#tableId,
 			seats: table ? seatsOf(table.config) : [],
 			self:
 				self && holders[self.seat] === self.gen
@@ -383,7 +383,7 @@ export class TableController {
 
 	/**
 	 * Cleans up expired tables, restores an explicit URL seat, and joins the mesh.
-	 * A valid setup URL can revive a tombstoned room when this browser has no remaining replica.
+	 * A valid setup URL can revive a tombstoned table when this browser has no remaining replica.
 	 */
 	async start(): Promise<void> {
 		if (this.#started) throw new Error("the table controller already started");
@@ -499,7 +499,7 @@ export class TableController {
 		}
 	}
 
-	/** Starts a fresh room from its shared setup when the configured host seat is selected. */
+	/** Starts a fresh table from its shared setup when the configured host seat is selected. */
 	async #seedHost(seated: Seated, seat: Seat): Promise<boolean> {
 		const bootstrap = this.#deps.bootstrap;
 		if (!bootstrap || !this.#deps.storage.persistent) return false;

@@ -6,10 +6,10 @@ import {
 	parseChatEvent,
 } from "../../src/game/chat";
 import { envelopeEvent } from "../../src/protocol";
-import { CONFIG, OTHER_ROOM_ID, ROOM_ID } from "./fixtures";
+import { CONFIG, OTHER_TABLE_ID, TABLE_ID } from "./fixtures";
 
 const CONTEXT = {
-	roomId: ROOM_ID,
+	tableId: TABLE_ID,
 	config: CONFIG,
 	seat: "3" as const,
 	holder: "holder-3",
@@ -19,7 +19,7 @@ const CONTEXT = {
 };
 
 function initial() {
-	return chatModule.initialState(ROOM_ID, CONFIG);
+	return chatModule.initialState(TABLE_ID, CONFIG);
 }
 
 describe("checkMessageText", () => {
@@ -54,11 +54,11 @@ describe("checkMessageText", () => {
 });
 
 describe("chatModule.apply", () => {
-	it("accepts a message, names the sender from the room config and counts it", () => {
+	it("accepts a message, names the sender from the table config and counts it", () => {
 		const result = chatModule.apply(
 			initial(),
 			CONTEXT,
-			chatPayload(ROOM_ID, " hi "),
+			chatPayload(TABLE_ID, " hi "),
 		);
 		expect(result).toEqual({
 			ok: true,
@@ -71,20 +71,20 @@ describe("chatModule.apply", () => {
 		["a non-object payload", "hi", "command is not an object"],
 		[
 			"another protocol version",
-			{ ...chatPayload(ROOM_ID, "hi"), v: 2 },
+			{ ...chatPayload(TABLE_ID, "hi"), v: 2 },
 			"unsupported protocol version",
 		],
 		[
-			"another room",
-			chatPayload(OTHER_ROOM_ID, "hi"),
-			"command is for another room",
+			"another table",
+			chatPayload(OTHER_TABLE_ID, "hi"),
+			"command is for another table",
 		],
 		[
 			"an unknown type",
-			{ ...chatPayload(ROOM_ID, "hi"), type: "meld" },
+			{ ...chatPayload(TABLE_ID, "hi"), type: "meld" },
 			"unknown command type",
 		],
-		["an empty text", chatPayload(ROOM_ID, ""), "message is empty"],
+		["an empty text", chatPayload(TABLE_ID, ""), "message is empty"],
 	])("rejects %s", (_label, payload, reason) => {
 		expect(chatModule.apply(initial(), CONTEXT, payload)).toEqual({
 			ok: false,
@@ -92,16 +92,16 @@ describe("chatModule.apply", () => {
 		});
 	});
 
-	it("refuses to continue from a state of another room or game", () => {
-		const foreign = chatModule.initialState(OTHER_ROOM_ID, CONFIG);
+	it("refuses to continue from a state of another table or game", () => {
+		const foreign = chatModule.initialState(OTHER_TABLE_ID, CONFIG);
 		expect(
-			chatModule.apply(foreign, CONTEXT, chatPayload(ROOM_ID, "hi")).ok,
+			chatModule.apply(foreign, CONTEXT, chatPayload(TABLE_ID, "hi")).ok,
 		).toBe(false);
 		expect(
 			chatModule.apply(
 				{ ...initial(), game: "poker" },
 				CONTEXT,
-				chatPayload(ROOM_ID, "hi"),
+				chatPayload(TABLE_ID, "hi"),
 			).ok,
 		).toBe(false);
 	});
@@ -110,7 +110,7 @@ describe("chatModule.apply", () => {
 describe("parseChatEvent", () => {
 	it("reads an enveloped event and refuses an incomplete one", () => {
 		const event = envelopeEvent(
-			{ roomId: ROOM_ID, seq: 2, commandId: "cmd-2", fromSeat: "3" },
+			{ tableId: TABLE_ID, seq: 2, commandId: "cmd-2", fromSeat: "3" },
 			{ fromName: "player2", text: "hi" },
 		);
 		expect(parseChatEvent(event)).toEqual({

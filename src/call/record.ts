@@ -65,13 +65,13 @@ function isHolderText(value: unknown): value is string {
 
 /** A `media` command; the host takes the seat from the sender's binding. */
 export function callRecordPayload(
-	roomId: string,
+	tableId: string,
 	record: CallRecord,
 ): JsonObject {
 	const { prefs } = record;
 	return {
 		v: PROTOCOL_VERSION,
-		roomId,
+		tableId,
 		type: "media",
 		version: record.version,
 		prefs: {

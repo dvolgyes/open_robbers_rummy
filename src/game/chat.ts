@@ -44,8 +44,8 @@ export function checkMessageText(text: unknown): TextCheck {
 	return { ok: true, text: trimmed };
 }
 
-export function chatPayload(roomId: string, text: string): JsonObject {
-	return { v: PROTOCOL_VERSION, roomId, type: "chat", text };
+export function chatPayload(tableId: string, text: string): JsonObject {
+	return { v: PROTOCOL_VERSION, tableId, type: "chat", text };
 }
 
 /** Chat commands, as opposed to table actions and call status. */
@@ -78,29 +78,29 @@ export function parseChatEvent(event: JsonObject): ChatEvent | undefined {
 }
 
 export const chatModule: GameModule = {
-	initialState(roomId) {
-		return { v: PROTOCOL_VERSION, roomId, game: "chat", messages: 0 };
+	initialState(tableId) {
+		return { v: PROTOCOL_VERSION, tableId, game: "chat", messages: 0 };
 	},
 
-	isState(state, roomId) {
+	isState(state, tableId) {
 		return (
 			state.v === PROTOCOL_VERSION &&
-			state.roomId === roomId &&
+			state.tableId === tableId &&
 			state.game === "chat" &&
 			isNonNegativeInteger(state.messages)
 		);
 	},
 
 	apply(state, context, payload) {
-		if (!chatModule.isState(state, context.roomId)) {
-			return { ok: false, reason: "room state is not a chat state" };
+		if (!chatModule.isState(state, context.tableId)) {
+			return { ok: false, reason: "table state is not a chat state" };
 		}
 		if (!isObject(payload))
 			return { ok: false, reason: "command is not an object" };
 		if (payload.v !== PROTOCOL_VERSION)
 			return { ok: false, reason: "unsupported protocol version" };
-		if (payload.roomId !== context.roomId)
-			return { ok: false, reason: "command is for another room" };
+		if (payload.tableId !== context.tableId)
+			return { ok: false, reason: "command is for another table" };
 		if (payload.type !== "chat")
 			return { ok: false, reason: "unknown command type" };
 		const check = checkMessageText(payload.text);

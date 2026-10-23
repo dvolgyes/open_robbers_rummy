@@ -8,9 +8,9 @@ import {
 import type { TableController } from "../p2p/table";
 import {
 	type JsonObject,
-	type RoomConfig,
 	SEATS,
 	type Seat,
+	type TableConfig,
 } from "../protocol";
 import { BotPacer, type BotTime, realTime } from "./pacing";
 import { actionPositionKey } from "./position";
@@ -24,7 +24,7 @@ export interface BotTable {
 		readonly ready: boolean;
 		readonly seat: Seat | null;
 		readonly table: {
-			readonly config: RoomConfig;
+			readonly config: TableConfig;
 			readonly state: JsonObject;
 		} | null;
 		readonly roster: { readonly bots: readonly Seat[] } | null;
@@ -35,7 +35,7 @@ export interface BotTable {
 	sendBot: TableController["sendBot"];
 }
 
-export function configuredBotSeats(config: RoomConfig): Seat[] {
+export function configuredBotSeats(config: TableConfig): Seat[] {
 	return SEATS.filter((seat) => config.botSetup?.seats.includes(seat) === true);
 }
 
@@ -130,7 +130,7 @@ export class HostBotRunner {
 				await this.#step();
 			} while (this.#rerun && !this.#stopped && !this.#paused);
 		} catch (error) {
-			// The room remains playable, and the host can start the bots again.
+			// The table remains playable, and the host can start the bots again.
 			if (this.#stopped) return;
 			this.stop();
 			this.#onError(error instanceof Error ? error.message : String(error));

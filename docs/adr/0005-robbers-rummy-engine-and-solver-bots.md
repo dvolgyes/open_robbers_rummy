@@ -9,7 +9,7 @@ The owner set these requirements:
 
 - 2 to 6 players, each playing alone.
 - 2 to 6 jokers, 4 by default.
-- The player count, the names, and the table rules are set at table creation and are in the room link.
+- The player count, the names, and the table rules are set at table creation and are in the table link.
 - The centre of the table shows every meld.
   The other players are in the top row, at most five, and the viewer is at the bottom.
 - Each other player shows only a dense card count below the video tile.
@@ -79,11 +79,11 @@ These choices are not in any source, and the project made them:
 - A game is one hand.
   After it, any player can ask for a new game through the reset request, which every other present player must approve.
 
-### Seats and room link
+### Seats and table link
 
 - The seats are `"1"` to `"6"`; `seatsOf(config)` gives the seats in play.
   Wire messages always carry six seat rows, so the message shapes stay fixed; the seats that are not in play are never available.
-- The room link query holds the names (`p1` to `p6`), the host seat, `rules`, `jokers`, `assist`, and `bot_seats`.
+- The table link query holds the names (`p1` to `p6`), the host seat, `rules`, `jokers`, `assist`, and `bot_seats`.
   A link with a wrong value fails closed as an invalid link.
 - The link version is `p2p-v2`, the key labels start with the project ID `github.com/dvolgyes/open_robbers_rummy|`, and the browser database is `github.com/dvolgyes/open_robbers_rummy/p2p`.
   A link with another version gets the "other version" message.

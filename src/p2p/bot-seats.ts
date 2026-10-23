@@ -1,10 +1,10 @@
 import { PROJECT_ID } from "../project";
 import {
 	isBotName,
-	type RoomConfig,
 	type Seat,
 	seatName,
 	seatsOf,
+	type TableConfig,
 } from "../protocol";
 import { deriveHolder } from "./keys";
 
@@ -14,7 +14,7 @@ export interface BotSeatClaim {
 	readonly id: string;
 }
 
-export function botSeats(config: RoomConfig): Seat[] {
+export function botSeats(config: TableConfig): Seat[] {
 	return seatsOf(config).filter(
 		(seat) =>
 			config.botSetup?.seats.includes(seat) === true ||
@@ -28,7 +28,7 @@ export function botSeatHolder(tableId: string, seat: Seat): Promise<string> {
 
 export async function botSeatClaims(
 	tableId: string,
-	config: RoomConfig,
+	config: TableConfig,
 	newId: () => string,
 	exclude?: Seat,
 ): Promise<BotSeatClaim[]> {

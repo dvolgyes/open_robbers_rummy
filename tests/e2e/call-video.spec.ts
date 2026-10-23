@@ -22,7 +22,7 @@ import {
 	toggle,
 } from "./call-probe";
 import { type ContextOptions, Player, reportNetwork } from "./player";
-import { createRoom, pick, type SeatKey } from "./room";
+import { createTable, pick, type SeatKey } from "./table";
 
 /**
  * Desktop video and the asymmetric combinations, on one P2P table through the public
@@ -258,7 +258,7 @@ test.afterAll(async () => {
 
 test("1: the phone cannot turn on video, the desktop can receive it, and nothing asks for the camera before Join", async () => {
 	tab["4"] = await players["4"].page("./");
-	const link = await createRoom(tab["4"]);
+	const link = await createTable(tab["4"]);
 	for (const seat of ["1", "2", "3"] as const) {
 		tab[seat] = await players[seat].page(link);
 		await pick(tab[seat], seat);

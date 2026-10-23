@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type CallRoomSnapshot, returnedSeats } from "../../src/call/mesh";
+import { type CallTableSnapshot, returnedSeats } from "../../src/call/mesh";
 import {
 	type CallMessage,
 	inboxTopic,
@@ -66,7 +66,7 @@ describe("call targets", () => {
 describe("inbound call frames", () => {
 	it("takes the sender seat from the roster and builds an envelope for the addressed inbox", () => {
 		const inbound = inboundCall(TABLE, BINDINGS, PEER_2, frame("1", 3, 1));
-		const inbox = { roomId: TABLE, seat: "1" as const, generation: 3 };
+		const inbox = { tableId: TABLE, seat: "1" as const, generation: 3 };
 		expect(inbound?.topic).toBe(inboxTopic(inbox));
 		expect(parseEnvelope(inbound?.envelope, inbox)).toEqual({
 			from: "2",
@@ -86,21 +86,21 @@ describe("inbound call frames", () => {
 
 	it("addresses a frame with an old receiver generation to that old inbox, not to the current one", () => {
 		const inbound = inboundCall(TABLE, BINDINGS, PEER_2, frame("1", 2, 1));
-		const current = { roomId: TABLE, seat: "1" as const, generation: 3 };
+		const current = { tableId: TABLE, seat: "1" as const, generation: 3 };
 		expect(inbound?.topic).not.toBe(inboxTopic(current));
 		expect(parseEnvelope(inbound?.envelope, current)).toBeUndefined();
 	});
 
 	it("never lets a frame name its own seat as the sender", () => {
 		const fromPlayer1 = inboundCall(TABLE, BINDINGS, PEER_1, frame("1", 3, 3));
-		const inbox = { roomId: TABLE, seat: "1" as const, generation: 3 };
+		const inbox = { tableId: TABLE, seat: "1" as const, generation: 3 };
 		expect(parseEnvelope(fromPlayer1?.envelope, inbox)).toBeUndefined();
 	});
 });
 
-function snapshot(online: readonly Seat[]): CallRoomSnapshot {
+function snapshot(online: readonly Seat[]): CallTableSnapshot {
 	return {
-		roomId: TABLE,
+		tableId: TABLE,
 		self: { seat: "1", generation: 3 },
 		seats: ["1", "2", "3"],
 		holders: { "1": 3, "2": 1, "3": 2 },

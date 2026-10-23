@@ -23,12 +23,12 @@ import {
 	isObject,
 	MAX_NAME_LENGTH,
 	MIN_PLAYERS,
-	type RoomConfig,
 	SEAT_NAMES,
 	SEATS,
 	type Seat,
 	seatLabel,
 	seatsOf,
+	type TableConfig,
 	type TableSetup,
 } from "../protocol";
 
@@ -67,10 +67,10 @@ export interface CreateFields {
 }
 
 export type CreateCheck =
-	| { readonly ok: true; readonly config: RoomConfig; readonly seat: Seat }
+	| { readonly ok: true; readonly config: TableConfig; readonly seat: Seat }
 	| { readonly ok: false; readonly errors: readonly string[] };
 
-/** The room config rules, so the form explains a refusal before the table is written. */
+/** The table config rules, so the form explains a refusal before the table is written. */
 export function checkCreateFields(
 	fields: CreateFields,
 	t: Translate = english,
@@ -357,7 +357,7 @@ export type LobbyScreen =
 export interface LobbyInput extends BannerInput {
 	readonly lobby: Lobby | null;
 	readonly heldElsewhere: readonly Seat[];
-	readonly setup?: { readonly config: RoomConfig };
+	readonly setup?: { readonly config: TableConfig };
 	readonly t?: Translate;
 }
 
@@ -480,7 +480,7 @@ function storageLine(input: NetworkInput, t: Translate): string {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Room view
+// Table page
 
 export interface RosterRow {
 	readonly seat: Seat;
@@ -516,15 +516,15 @@ export interface SendState {
 	readonly hint?: string;
 }
 
-export interface RoomView {
+export interface TablePageView {
 	readonly roster: readonly RosterRow[];
 	readonly transcript: readonly TranscriptLine[];
 	readonly pending: readonly PendingLine[];
 	readonly send: SendState;
 }
 
-export interface RoomViewInput {
-	readonly config: RoomConfig;
+export interface TablePageViewInput {
+	readonly config: TableConfig;
 	readonly seat: Seat;
 	/** The tab can no longer act (superseded, expired or stopped). */
 	readonly terminal: boolean;
@@ -569,7 +569,7 @@ export function presentSeats(
 	return present;
 }
 
-export function roomView(input: RoomViewInput): RoomView {
+export function tablePageView(input: TablePageViewInput): TablePageView {
 	return {
 		roster: seatsOf(input.config).map((rowSeat) => rosterRow(input, rowSeat)),
 		transcript: transcriptLines(input),
@@ -578,7 +578,7 @@ export function roomView(input: RoomViewInput): RoomView {
 	};
 }
 
-function rosterRow(input: RoomViewInput, seat: Seat): RosterRow {
+function rosterRow(input: TablePageViewInput, seat: Seat): RosterRow {
 	const held = input.held.has(seat);
 	const online = input.online.has(seat);
 	return {
@@ -592,7 +592,7 @@ function rosterRow(input: RoomViewInput, seat: Seat): RosterRow {
 }
 
 /** Chat messages only: deals, calls and plays show on the table, and the call status in the call panel. */
-function transcriptLines(input: RoomViewInput): TranscriptLine[] {
+function transcriptLines(input: TablePageViewInput): TranscriptLine[] {
 	const lines: TranscriptLine[] = [];
 	for (const entry of input.entries) {
 		if (entry.kind !== "cmd" || !isChatEvent(entry.event)) continue;
@@ -618,7 +618,7 @@ function payloadText(payload: unknown): string {
 		: "";
 }
 
-/** Shared by the room and the table: one own command that is not in the log. */
+/** Shared by the page view and the rummy table view: one own command that is not in the log. */
 export interface OwnCommandLine<State extends string> {
 	readonly id: string;
 	readonly payload: unknown;
@@ -631,7 +631,7 @@ export interface OwnCommandLine<State extends string> {
  * the outbox, in that order.
  */
 export function ownCommands(
-	input: Pick<RoomViewInput, "outbox" | "failures" | "undone">,
+	input: Pick<TablePageViewInput, "outbox" | "failures" | "undone">,
 ): OwnCommandLine<PendingState>[] {
 	const lines: OwnCommandLine<PendingState>[] = [];
 	for (const entry of input.undone) {
@@ -660,7 +660,7 @@ export function ownCommands(
 	return lines;
 }
 
-function pendingLines(input: RoomViewInput): PendingLine[] {
+function pendingLines(input: TablePageViewInput): PendingLine[] {
 	return ownCommands(input)
 		.filter((line) => isChatCommand(line.payload))
 		.map((line) => ({
@@ -672,7 +672,7 @@ function pendingLines(input: RoomViewInput): PendingLine[] {
 }
 
 /** A seated tab may always send: the outbox stores the message until a host is connected. */
-function sendState(input: RoomViewInput): SendState {
+function sendState(input: TablePageViewInput): SendState {
 	if (input.terminal) return { label: TEXT.send, enabled: false };
 	return input.ready
 		? { label: TEXT.send, enabled: true }

@@ -1,15 +1,15 @@
 import { expect, type Page, test } from "@playwright/test";
 import { Player, reportNetwork } from "./player";
-import { CONNECT_MS } from "./room";
+import { CONNECT_MS } from "./table";
 
-/** A shared room link carries setup values; a player's page URL also selects their seat. */
+/** A shared table link carries setup values; a player's page URL also selects their seat. */
 test.describe.configure({ mode: "serial" });
 
 const BOOKMARK_QUERY = "p2=zsdh&p4=dvolgyes&host=2";
-const ROOM_QUERY =
+const TABLE_QUERY =
 	"p1=player1&p2=zsdh&p3=player3&p4=dvolgyes&host=2&rules=gamerules&jokers=4&assist=1&bot_seats=";
 const TABLE_LINK = new RegExp(
-	`^http://localhost:\\d+/\\?${ROOM_QUERY}#v=p2p-v2&k=[A-Za-z0-9_-]{43}$`,
+	`^http://localhost:\\d+/\\?${TABLE_QUERY}#v=p2p-v2&k=[A-Za-z0-9_-]{43}$`,
 );
 
 const players: Player[] = [];
@@ -54,7 +54,7 @@ test("create opens the game and selects the host seat in the page URL", async ()
 	await expect(page).toHaveTitle(/Open Robber's Rummy: zsdh \(Player 2\)$/);
 	await expect(page).toHaveURL(
 		new RegExp(
-			`\\?${ROOM_QUERY}&selected_player=2#v=p2p-v2&k=[A-Za-z0-9_-]{43}$`,
+			`\\?${TABLE_QUERY}&selected_player=2#v=p2p-v2&k=[A-Za-z0-9_-]{43}$`,
 		),
 	);
 	await expect(page.getByRole("textbox", { name: "Table link" })).toHaveCount(

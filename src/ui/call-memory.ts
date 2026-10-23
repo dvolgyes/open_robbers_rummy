@@ -11,14 +11,14 @@ import {
 import type { JsonObject, Seat } from "../protocol";
 
 /**
- * Keeps this person's call status in the table and restores it on the next room screen.
+ * Keeps this person's call status in the table and restores it on the next table screen.
  *
  * It stores a record only after an explicit call action of the user (Join, Leave, a switch), never because the
  * page closed, the seat was lost or the device class changed: a reload or a crash then restores the call. One
  * record at a time waits in the outbox; a later change goes when it has left, so call switches never fill the
  * outbox that game commands need.
  *
- * Once per room screen, when the page holds its seat, it restores the newest own record. It joins on its own
+ * Once per table screen, when the page holds its seat, it restores the newest own record. It joins on its own
  * only when no capture needs a question: every device whose Send switch is on is already granted. Otherwise it
  * offers "Rejoin the call", so a page that opened without its user never asks for, or opens, a device.
  */

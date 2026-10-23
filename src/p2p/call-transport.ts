@@ -58,7 +58,7 @@ export interface InboundCall {
 	/** The value that `parseEnvelope` checks. */
 	readonly envelope: {
 		readonly v: 1;
-		readonly roomId: string;
+		readonly tableId: string;
 		readonly toGen: number;
 		readonly from: Seat;
 		readonly fromGen: number;
@@ -77,13 +77,13 @@ export function inboundCall(
 	if (binding === undefined || binding.gen !== frame.fromGen) return undefined;
 	return {
 		topic: inboxTopic({
-			roomId: tableId,
+			tableId: tableId,
 			seat: frame.to,
 			generation: frame.toGen,
 		}),
 		envelope: {
 			v: 1,
-			roomId: tableId,
+			tableId: tableId,
 			toGen: frame.toGen,
 			from: binding.seat,
 			fromGen: frame.fromGen,

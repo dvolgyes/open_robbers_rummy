@@ -7,7 +7,7 @@ import {
 	SeatMemory,
 	webSeatLocks,
 } from "../../src/session";
-import { OTHER_ROOM_ID, ROOM_ID } from "../unit/fixtures";
+import { OTHER_TABLE_ID, TABLE_ID } from "../unit/fixtures";
 
 // The tests use the Web Storage and the Web Locks of this page in Chrome. Vitest keeps neither, so the
 // tests clear them.
@@ -54,39 +54,39 @@ function fillLocalStorage(): unknown {
 describe("SeatMemory on the page's sessionStorage and localStorage", () => {
 	const seats = () => new SeatMemory(sessionStorage, localStorage, Date.now);
 
-	it("remembers the seat per tab and per browser, by room, across a reload", () => {
+	it("remembers the seat per tab and per browser, by table, across a reload", () => {
 		const before = Date.now();
-		seats().remember(ROOM_ID, "2");
+		seats().remember(TABLE_ID, "2");
 		const after = Date.now();
 		expect(
 			sessionStorage.getItem(
-				`github.com/dvolgyes/open_robbers_rummy/tab/${ROOM_ID}`,
+				`github.com/dvolgyes/open_robbers_rummy/tab/${TABLE_ID}`,
 			),
 		).toBe("2");
 		const record = JSON.parse(
 			localStorage.getItem(
-				`github.com/dvolgyes/open_robbers_rummy/seat/${ROOM_ID}`,
+				`github.com/dvolgyes/open_robbers_rummy/seat/${TABLE_ID}`,
 			) ?? "null",
 		);
 		expect(record.seat).toBe("2");
 		expect(record.savedAt).toBeGreaterThanOrEqual(before);
 		expect(record.savedAt).toBeLessThanOrEqual(after);
 		const reloaded = seats();
-		expect(reloaded.tabSeat(ROOM_ID)).toBe("2");
-		expect(reloaded.browserSeat(ROOM_ID)).toBe("2");
-		expect(reloaded.tabSeat(OTHER_ROOM_ID)).toBeUndefined();
-		expect(reloaded.browserSeat(OTHER_ROOM_ID)).toBeUndefined();
+		expect(reloaded.tabSeat(TABLE_ID)).toBe("2");
+		expect(reloaded.browserSeat(TABLE_ID)).toBe("2");
+		expect(reloaded.tabSeat(OTHER_TABLE_ID)).toBeUndefined();
+		expect(reloaded.browserSeat(OTHER_TABLE_ID)).toBeUndefined();
 	});
 
 	it("forgets the browser seat after 24 hours and prunes stale records", () => {
 		// Records that pages of this browser wrote 24 hours and 23 hours 59 minutes ago.
 		const now = Date.now();
 		localStorage.setItem(
-			`github.com/dvolgyes/open_robbers_rummy/seat/${ROOM_ID}`,
+			`github.com/dvolgyes/open_robbers_rummy/seat/${TABLE_ID}`,
 			JSON.stringify({ seat: "2", savedAt: now - SEAT_MEMORY_TTL_MS }),
 		);
 		localStorage.setItem(
-			`github.com/dvolgyes/open_robbers_rummy/seat/${OTHER_ROOM_ID}`,
+			`github.com/dvolgyes/open_robbers_rummy/seat/${OTHER_TABLE_ID}`,
 			JSON.stringify({ seat: "1", savedAt: now - SEAT_MEMORY_TTL_MS + 60_000 }),
 		);
 		localStorage.setItem(
@@ -95,12 +95,12 @@ describe("SeatMemory on the page's sessionStorage and localStorage", () => {
 		);
 		localStorage.setItem("unrelated", "kept");
 		const memory = seats();
-		expect(memory.browserSeat(ROOM_ID)).toBeUndefined();
-		expect(memory.browserSeat(OTHER_ROOM_ID)).toBe("1");
+		expect(memory.browserSeat(TABLE_ID)).toBeUndefined();
+		expect(memory.browserSeat(OTHER_TABLE_ID)).toBe("1");
 		memory.prune();
 		expect(
 			localStorage.getItem(
-				`github.com/dvolgyes/open_robbers_rummy/seat/${ROOM_ID}`,
+				`github.com/dvolgyes/open_robbers_rummy/seat/${TABLE_ID}`,
 			),
 		).toBeNull();
 		expect(
@@ -110,7 +110,7 @@ describe("SeatMemory on the page's sessionStorage and localStorage", () => {
 		).toBeNull();
 		expect(
 			localStorage.getItem(
-				`github.com/dvolgyes/open_robbers_rummy/seat/${OTHER_ROOM_ID}`,
+				`github.com/dvolgyes/open_robbers_rummy/seat/${OTHER_TABLE_ID}`,
 			),
 		).not.toBeNull();
 		expect(localStorage.getItem("unrelated")).toBe("kept");
@@ -118,19 +118,19 @@ describe("SeatMemory on the page's sessionStorage and localStorage", () => {
 
 	it("treats unreadable records and missing storage as no memory", () => {
 		sessionStorage.setItem(
-			`github.com/dvolgyes/open_robbers_rummy/tab/${ROOM_ID}`,
+			`github.com/dvolgyes/open_robbers_rummy/tab/${TABLE_ID}`,
 			"X",
 		);
 		localStorage.setItem(
-			`github.com/dvolgyes/open_robbers_rummy/seat/${ROOM_ID}`,
+			`github.com/dvolgyes/open_robbers_rummy/seat/${TABLE_ID}`,
 			'{"seat":"Q","savedAt":0}',
 		);
-		expect(seats().tabSeat(ROOM_ID)).toBeUndefined();
-		expect(seats().browserSeat(ROOM_ID)).toBeUndefined();
+		expect(seats().tabSeat(TABLE_ID)).toBeUndefined();
+		expect(seats().browserSeat(TABLE_ID)).toBeUndefined();
 		const none = new SeatMemory(undefined, undefined, Date.now);
-		none.remember(ROOM_ID, "1");
+		none.remember(TABLE_ID, "1");
 		none.prune();
-		expect(none.tabSeat(ROOM_ID)).toBeUndefined();
+		expect(none.tabSeat(TABLE_ID)).toBeUndefined();
 	});
 });
 
@@ -160,14 +160,14 @@ describe("guardedStorage", () => {
 				guardedStorage(() => localStorage),
 				Date.now,
 			);
-			memory.remember(ROOM_ID, "1");
+			memory.remember(TABLE_ID, "1");
 			expect(
 				localStorage.getItem(
-					`github.com/dvolgyes/open_robbers_rummy/seat/${ROOM_ID}`,
+					`github.com/dvolgyes/open_robbers_rummy/seat/${TABLE_ID}`,
 				),
 			).toBeNull();
-			expect(memory.browserSeat(ROOM_ID)).toBeUndefined();
-			expect(memory.tabSeat(ROOM_ID)).toBe("1");
+			expect(memory.browserSeat(TABLE_ID)).toBeUndefined();
+			expect(memory.tabSeat(TABLE_ID)).toBe("1");
 		} finally {
 			localStorage.clear();
 		}
@@ -199,11 +199,11 @@ describe("webSeatLocks on the page's lock manager", () => {
 	const releases: (() => void)[] = [];
 
 	function hold(
-		roomId: string,
+		tableId: string,
 		seat: Seat,
 		options: HoldOptions = {},
 	): () => void {
-		const release = locks.hold(roomId, seat, options);
+		const release = locks.hold(tableId, seat, options);
 		releases.push(release);
 		return release;
 	}
@@ -222,36 +222,36 @@ describe("webSeatLocks on the page's lock manager", () => {
 		await expect.poll(() => seatLocks("pending")).toEqual([]);
 	});
 
-	it("reports the seats of this room that are held in this browser", async () => {
+	it("reports the seats of this table that are held in this browser", async () => {
 		const held: string[] = [];
-		hold(ROOM_ID, "1", { onAcquired: () => held.push("1") });
-		hold(OTHER_ROOM_ID, "2", { onAcquired: () => held.push("other E") });
+		hold(TABLE_ID, "1", { onAcquired: () => held.push("1") });
+		hold(OTHER_TABLE_ID, "2", { onAcquired: () => held.push("other E") });
 		let releaseBogus: () => void = () => {};
 		const bogus = new Promise<void>((resolve) => {
 			releaseBogus = resolve;
 		});
 		releases.push(releaseBogus);
-		void navigator.locks.request(`${LOCK_PREFIX}${ROOM_ID}.bogus`, () => {
+		void navigator.locks.request(`${LOCK_PREFIX}${TABLE_ID}.bogus`, () => {
 			held.push("bogus");
 			return bogus;
 		});
 		await expect.poll(() => held.length).toBe(3);
-		expect(await locks.heldElsewhere(ROOM_ID)).toEqual(new Set(["1"]));
+		expect(await locks.heldElsewhere(TABLE_ID)).toEqual(new Set(["1"]));
 	});
 
 	it("reports nothing without the Web Locks API", async () => {
 		const none = webSeatLocks(undefined);
-		expect(await none.heldElsewhere(ROOM_ID)).toEqual(new Set());
-		expect(() => none.hold(ROOM_ID, "1")()).not.toThrow();
+		expect(await none.heldElsewhere(TABLE_ID)).toEqual(new Set());
+		expect(() => none.hold(TABLE_ID, "1")()).not.toThrow();
 	});
 
 	it("does not let another tab take an active seat lock", async () => {
 		const events: string[] = [];
-		const releaseOld = hold(ROOM_ID, "1", {
+		const releaseOld = hold(TABLE_ID, "1", {
 			onAcquired: () => events.push("old acquired"),
 		});
 		await expect.poll(() => events).toEqual(["old acquired"]);
-		const releaseNew = hold(ROOM_ID, "1", {
+		const releaseNew = hold(TABLE_ID, "1", {
 			ifAvailable: true,
 			onAcquired: () => events.push("new acquired"),
 			onLost: () => events.push("new refused"),
@@ -266,20 +266,20 @@ describe("webSeatLocks on the page's lock manager", () => {
 	});
 
 	it("tells a tab when it holds the lock: at once when free, after the holder releases when it waits", async () => {
-		const name = `${LOCK_PREFIX}${ROOM_ID}.1`;
+		const name = `${LOCK_PREFIX}${TABLE_ID}.1`;
 		const acquired: string[] = [];
-		const releaseFirst = hold(ROOM_ID, "1", {
+		const releaseFirst = hold(TABLE_ID, "1", {
 			onAcquired: () => acquired.push("first"),
 		});
 		await expect.poll(() => acquired).toEqual(["first"]);
-		const releaseSecond = hold(ROOM_ID, "1", {
+		const releaseSecond = hold(TABLE_ID, "1", {
 			onAcquired: () => acquired.push("second"),
 		});
 		await expect.poll(() => seatLocks("pending")).toEqual([name]);
 		expect(acquired).toEqual(["first"]);
 		releaseFirst();
 		await expect.poll(() => acquired).toEqual(["first", "second"]);
-		const releaseWaiting = hold(ROOM_ID, "1", {
+		const releaseWaiting = hold(TABLE_ID, "1", {
 			onAcquired: () => acquired.push("released while waiting"),
 		});
 		await expect.poll(() => seatLocks("pending")).toEqual([name]);
@@ -292,7 +292,7 @@ describe("webSeatLocks on the page's lock manager", () => {
 
 	it("tells a tab at once that it holds the lock without the Web Locks API", async () => {
 		const acquired: string[] = [];
-		webSeatLocks(undefined).hold(ROOM_ID, "1", {
+		webSeatLocks(undefined).hold(TABLE_ID, "1", {
 			onAcquired: () => acquired.push("1"),
 		});
 		await Promise.resolve();
@@ -305,9 +305,9 @@ describe("webSeatLocks on the page's lock manager", () => {
 			onAcquired: () => events.push(`${label} acquired`),
 			onLost: () => events.push(`${label} lost`),
 		});
-		const releaseFirst = hold(ROOM_ID, "1", record("first"));
-		const releaseSecond = hold(ROOM_ID, "1", record("second"));
-		const releaseOther = hold(ROOM_ID, "2", record("other"));
+		const releaseFirst = hold(TABLE_ID, "1", record("first"));
+		const releaseSecond = hold(TABLE_ID, "1", record("second"));
+		const releaseOther = hold(TABLE_ID, "2", record("other"));
 		await expect
 			.poll(() => [...events].sort())
 			.toEqual(["first acquired", "other acquired"]);

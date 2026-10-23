@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import type { SeatKey } from "./room";
+import type { SeatKey } from "./table";
 
 /**
  * The call probe and page helpers shared by the call specs. The probe runs in each tab before the app: it wraps
@@ -500,7 +500,7 @@ export const SEAT_NAMES: Readonly<Record<SeatKey, string>> = {
 	"4": "Player 4",
 };
 
-/** The name on the tile of a seated player: the player name that createRoom gives. */
+/** The name on the tile of a seated player: the player name that createTable gives. */
 export const TILE_NAMES: Readonly<Record<SeatKey, string>> = {
 	"1": "player1",
 	"2": "player2",

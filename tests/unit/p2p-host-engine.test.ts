@@ -21,7 +21,7 @@ import type {
 	Entry,
 	EntryMessage,
 } from "../../src/p2p/wire";
-import type { RoomConfig, Seat } from "../../src/protocol";
+import type { Seat, TableConfig } from "../../src/protocol";
 import {
 	overTheWire,
 	peerId,
@@ -70,7 +70,7 @@ class Rig {
 	autoplayRequests: { seat: Seat; enabled: boolean }[] = [];
 	#next = 100;
 
-	async create(config: RoomConfig = CONFIG): Promise<this> {
+	async create(config: TableConfig = CONFIG): Promise<this> {
 		const holder = await deriveHolder(TABLE, CLIENT_1);
 		this.auth = { term: 1, tag: makeTag(holder, "1"), inc: 1 };
 		const written = await this.log.write(() =>

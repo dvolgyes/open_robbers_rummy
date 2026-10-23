@@ -4,9 +4,9 @@ import { translator } from "../../src/i18n";
 import {
 	DEFAULT_TABLE_SETUP,
 	PROTOCOL_VERSION,
-	type RoomConfig,
 	SEATS,
 	type Seat,
+	type TableConfig,
 } from "../../src/protocol";
 import { type HandState, type Phase, rulesFor } from "../../src/rummy";
 import { moveCards, newDraft } from "../../src/ui/draft";
@@ -20,8 +20,8 @@ import {
 	translateReason,
 } from "../../src/ui/table-model";
 
-const ROOM = "room-1";
-const CONFIG: RoomConfig = {
+const TABLE = "table-1";
+const CONFIG: TableConfig = {
 	names: { "1": "Ann", "2": "Ben", "3": "Cy", "4": "Dee" },
 	table: DEFAULT_TABLE_SETUP,
 };
@@ -70,7 +70,7 @@ function hand(input: HandInput = {}): HandState {
 function stateOf(match: HandState | null, actions = 3): RummyState {
 	return {
 		v: PROTOCOL_VERSION,
-		roomId: ROOM,
+		tableId: TABLE,
 		game: "rummy",
 		messages: 0,
 		matches: match === null ? 0 : 1,
@@ -103,7 +103,7 @@ function inputFor(
 }
 
 describe("table phases", () => {
-	it("shows no seats while loading, and names an unreadable room", () => {
+	it("shows no seats while loading, and names an unreadable table", () => {
 		expect(tableView(inputFor(undefined)).phase).toBe("loading");
 		const unreadable = tableView(inputFor(null));
 		expect(unreadable.phase).toBe("unreadable");

@@ -10,11 +10,11 @@ import {
 	isSeat,
 	type JsonObject,
 	PROTOCOL_VERSION,
-	type RoomConfig,
 	SEAT_NAMES,
 	SEATS,
 	type Seat,
 	seatsOf,
+	type TableConfig,
 } from "../protocol";
 import { cryptoRandomBelow, type RandomBelow } from "../random";
 import {
@@ -58,7 +58,7 @@ import type { ApplyContext, ApplyResult, GameModule } from "./module";
 
 export type RummyState = {
 	readonly v: typeof PROTOCOL_VERSION;
-	readonly roomId: string;
+	readonly tableId: string;
 	readonly game: "rummy";
 	readonly messages: number;
 	readonly match: RummyMatch | null;
@@ -88,8 +88,8 @@ export interface ResetRequest {
 	readonly approved: readonly Seat[];
 }
 
-/** The table's rules; every peer reads them from the room configuration. */
-export function rulesOf(config: RoomConfig): RummyRules {
+/** The table's rules; every peer reads them from the table configuration. */
+export function rulesOf(config: TableConfig): RummyRules {
 	return rulesFor(
 		config.table.preset,
 		config.table.jokers,
@@ -285,10 +285,10 @@ function parseResetRequest(value: unknown): ResetRequest | null | undefined {
 	return { id, requester, required, approved };
 }
 
-/** Returns the table state, or undefined when the value is not a rummy table of this room. */
+/** Returns the table state, or undefined when the value is not a rummy table of this table. */
 export function parseRummyState(
 	value: unknown,
-	roomId: string,
+	tableId: string,
 ): RummyState | undefined {
 	if (!isJsonObject(value)) return undefined;
 	const {
@@ -303,7 +303,7 @@ export function parseRummyState(
 		media,
 	} = value;
 	if (v !== PROTOCOL_VERSION || game !== "rummy") return undefined;
-	if (value.roomId !== roomId) return undefined;
+	if (value.tableId !== tableId) return undefined;
 	if (!isNonNegativeInteger(messages) || !isNonNegativeInteger(actions))
 		return undefined;
 	if (!isNonNegativeInteger(matches)) return undefined;
@@ -318,7 +318,7 @@ export function parseRummyState(
 	if (parsedMedia === undefined) return undefined;
 	return {
 		v: PROTOCOL_VERSION,
-		roomId,
+		tableId,
 		game: "rummy",
 		messages,
 		matches,
@@ -537,10 +537,10 @@ function applyMedia(
 
 export function createRummyModule(randomBelow: RandomBelow): GameModule {
 	return {
-		initialState(roomId) {
+		initialState(tableId) {
 			const state: RummyState = {
 				v: PROTOCOL_VERSION,
-				roomId,
+				tableId,
 				game: "rummy",
 				messages: 0,
 				matches: 0,
@@ -553,18 +553,18 @@ export function createRummyModule(randomBelow: RandomBelow): GameModule {
 			return state as unknown as JsonObject;
 		},
 
-		isState(state, roomId) {
-			return parseRummyState(state, roomId) !== undefined;
+		isState(state, tableId) {
+			return parseRummyState(state, tableId) !== undefined;
 		},
 
 		apply(state, context, payload) {
-			const table = parseRummyState(state, context.roomId);
-			if (!table) return reject("room state is not a rummy table");
+			const table = parseRummyState(state, context.tableId);
+			if (!table) return reject("table state is not a rummy game");
 			if (!isJsonObject(payload)) return reject("command is not an object");
 			if (payload.v !== PROTOCOL_VERSION)
 				return reject("unsupported protocol version");
-			if (payload.roomId !== context.roomId)
-				return reject("command is for another room");
+			if (payload.tableId !== context.tableId)
+				return reject("command is for another table");
 			if (!seatsOf(context.config).includes(context.seat))
 				return reject("your seat does not play at this table");
 			switch (payload.type) {
@@ -594,20 +594,20 @@ export function createRummyModule(randomBelow: RandomBelow): GameModule {
 
 export const rummyModule: GameModule = createRummyModule(cryptoRandomBelow);
 
-export function startPayload(roomId: string): JsonObject {
-	return { v: PROTOCOL_VERSION, roomId, type: "start" };
+export function startPayload(tableId: string): JsonObject {
+	return { v: PROTOCOL_VERSION, tableId, type: "start" };
 }
 
 /** An action at the current position of `match`. */
 export function actionPayload(
-	roomId: string,
+	tableId: string,
 	match: RummyMatch,
 	accepted: number,
 	action: Action,
 ): JsonObject {
 	return {
 		v: PROTOCOL_VERSION,
-		roomId,
+		tableId,
 		type: "action",
 		hand: match.handNo,
 		at: accepted,
@@ -615,18 +615,18 @@ export function actionPayload(
 	};
 }
 
-export function resetRequestPayload(roomId: string): JsonObject {
-	return { v: PROTOCOL_VERSION, roomId, type: "reset-request" };
+export function resetRequestPayload(tableId: string): JsonObject {
+	return { v: PROTOCOL_VERSION, tableId, type: "reset-request" };
 }
 
 export function resetVotePayload(
-	roomId: string,
+	tableId: string,
 	requestId: string,
 	approve: boolean,
 ): JsonObject {
 	return {
 		v: PROTOCOL_VERSION,
-		roomId,
+		tableId,
 		type: "reset-vote",
 		requestId,
 		approve,
@@ -634,10 +634,10 @@ export function resetVotePayload(
 }
 
 export function resetCancelPayload(
-	roomId: string,
+	tableId: string,
 	requestId: string,
 ): JsonObject {
-	return { v: PROTOCOL_VERSION, roomId, type: "reset-cancel", requestId };
+	return { v: PROTOCOL_VERSION, tableId, type: "reset-cancel", requestId };
 }
 
 /** Start and action commands, as opposed to chat and call status. */

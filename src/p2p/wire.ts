@@ -10,12 +10,12 @@ import {
 	isSeat,
 	type JsonObject,
 	MAX_NAME_LENGTH,
-	parseRoomConfig,
-	type RoomConfig,
+	parseTableConfig,
 	SEATS,
 	type Seat,
 	seatName,
 	seatsOf,
+	type TableConfig,
 } from "../protocol";
 import {
 	type Authority,
@@ -95,7 +95,7 @@ export interface LobbySeat {
 export interface Lobby {
 	readonly k: "lobby";
 	readonly auth: Authority;
-	readonly config: RoomConfig;
+	readonly config: TableConfig;
 	readonly idleMs: number;
 	readonly seats: readonly LobbySeat[];
 }
@@ -339,7 +339,7 @@ export interface Snapshot {
 	readonly req: number;
 	readonly auth: Authority | null;
 	readonly mode: "replace";
-	readonly config: RoomConfig;
+	readonly config: TableConfig;
 	readonly seats: readonly SeatHolder[];
 	/** The responder's position; pages from the empty position up to it follow. */
 	readonly pos: Position;
@@ -498,9 +498,11 @@ function ageOf(value: unknown): number | undefined {
 	return isIntegerIn(value, 0, MAX_TERM) ? value : undefined;
 }
 
-/** The room configuration with the create form's limits (src/ui/model.ts `checkCreateFields`). */
-export function parseTableConfig(value: unknown): RoomConfig | undefined {
-	const config = parseRoomConfig(value);
+/** The table configuration with the create form's limits (src/ui/model.ts `checkCreateFields`). */
+export function parseLimitedTableConfig(
+	value: unknown,
+): TableConfig | undefined {
+	const config = parseTableConfig(value);
 	if (config === undefined) return undefined;
 	for (const seat of seatsOf(config)) {
 		const name = seatName(config, seat);
@@ -739,7 +741,7 @@ const parseWelcome: Parser<Welcome> = (value) => {
 
 const parseLobby: Parser<Lobby> = (value) => {
 	const auth = parseAuthority(value.auth);
-	const config = parseTableConfig(value.config);
+	const config = parseLimitedTableConfig(value.config);
 	const seats = parseSeatList(value.seats, parseLobbySeat);
 	const { idleMs } = value;
 	if (!auth || !config || !seats || !isDuration(idleMs)) return undefined;
@@ -959,7 +961,7 @@ const parsePage: Parser<Page> = (value) => {
 const parseSnapshot: Parser<Snapshot> = (value) => {
 	const { req, mode, idleMs } = value;
 	const auth = parseOptionalAuthority(value.auth);
-	const config = parseTableConfig(value.config);
+	const config = parseLimitedTableConfig(value.config);
 	const seats = parseSeatHolders(value.seats);
 	const pos = parsePosition(value.pos);
 	if (!isRequest(req) || mode !== "replace" || auth === undefined)

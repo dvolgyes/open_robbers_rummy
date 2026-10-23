@@ -1,7 +1,7 @@
 import {
 	bookmarkQuery,
 	parseBookmark,
-	parseRoomSetup,
+	parseLinkSetup,
 	parseSelectedPlayer,
 	selectedPlayerQuery,
 } from "../bookmark";
@@ -79,7 +79,7 @@ export function startApp(root: HTMLElement, deps: AppDeps): void {
 					false,
 					navigation,
 					parseSelectedPlayer(location.search),
-					parseRoomSetup(location.search),
+					parseLinkSetup(location.search),
 				);
 				return;
 			}

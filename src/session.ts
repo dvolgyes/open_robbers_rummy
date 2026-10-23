@@ -42,7 +42,7 @@ export function guardedStorage(open: () => Storage): MaybeStorage {
 
 /**
  * sessionStorage holds this tab's seat (survives reload and an Android tab restore). localStorage holds
- * the browser's last seat per room for 24 hours (survives closing the tab).
+ * the browser's last seat per table for 24 hours (survives closing the tab).
  */
 export class SeatMemory {
 	readonly #tab: MaybeStorage;
@@ -55,27 +55,27 @@ export class SeatMemory {
 		this.#now = now;
 	}
 
-	tabSeat(roomId: string): Seat | undefined {
-		const value = this.#tab?.getItem(TAB_PREFIX + roomId);
+	tabSeat(tableId: string): Seat | undefined {
+		const value = this.#tab?.getItem(TAB_PREFIX + tableId);
 		return isSeat(value) ? value : undefined;
 	}
 
-	browserSeat(roomId: string): Seat | undefined {
-		const record = this.#readBrowser(BROWSER_PREFIX + roomId);
+	browserSeat(tableId: string): Seat | undefined {
+		const record = this.#readBrowser(BROWSER_PREFIX + tableId);
 		return record && this.#now() - record.savedAt < SEAT_MEMORY_TTL_MS
 			? record.seat
 			: undefined;
 	}
 
-	remember(roomId: string, seat: Seat): void {
-		this.#tab?.setItem(TAB_PREFIX + roomId, seat);
+	remember(tableId: string, seat: Seat): void {
+		this.#tab?.setItem(TAB_PREFIX + tableId, seat);
 		this.#browser?.setItem(
-			BROWSER_PREFIX + roomId,
+			BROWSER_PREFIX + tableId,
 			JSON.stringify({ seat, savedAt: this.#now() }),
 		);
 	}
 
-	/** Removes browser records older than the room lifetime. */
+	/** Removes browser records older than the table lifetime. */
 	prune(): void {
 		const storage = this.#browser;
 		if (!storage) return;
@@ -122,15 +122,15 @@ export interface HoldOptions {
 }
 
 export interface SeatLocks {
-	heldElsewhere(roomId: string): Promise<ReadonlySet<Seat>>;
+	heldElsewhere(tableId: string): Promise<ReadonlySet<Seat>>;
 	/** Holds the seat's lock until the returned function runs or the tab closes. */
-	hold(roomId: string, seat: Seat, options?: HoldOptions): () => void;
+	hold(tableId: string, seat: Seat, options?: HoldOptions): () => void;
 }
 
 const LOCK_PREFIX = storageName("seat/");
 
-function lockName(roomId: string, seat: Seat): string {
-	return `${LOCK_PREFIX}${roomId}.${seat}`;
+function lockName(tableId: string, seat: Seat): string {
+	return `${LOCK_PREFIX}${tableId}.${seat}`;
 }
 
 /**
@@ -139,12 +139,12 @@ function lockName(roomId: string, seat: Seat): string {
  */
 export function webSeatLocks(locks: LockManager | undefined): SeatLocks {
 	return {
-		async heldElsewhere(roomId) {
+		async heldElsewhere(tableId) {
 			const held = new Set<Seat>();
 			if (!locks) return held;
 			const snapshot = await locks.query();
 			for (const lock of snapshot.held ?? []) {
-				const prefix = `${LOCK_PREFIX}${roomId}.`;
+				const prefix = `${LOCK_PREFIX}${tableId}.`;
 				const seat = lock.name?.startsWith(prefix)
 					? lock.name.slice(prefix.length)
 					: undefined;
@@ -152,7 +152,7 @@ export function webSeatLocks(locks: LockManager | undefined): SeatLocks {
 			}
 			return held;
 		},
-		hold(roomId, seat, options = {}) {
+		hold(tableId, seat, options = {}) {
 			if (!locks) {
 				let released = false;
 				queueMicrotask(() => {
@@ -173,7 +173,7 @@ export function webSeatLocks(locks: LockManager | undefined): SeatLocks {
 			const requestOptions = options.ifAvailable ? { ifAvailable: true } : {};
 			// The request rejects when the page can no longer hold the lock.
 			locks
-				.request(lockName(roomId, seat), requestOptions, (lock) => {
+				.request(lockName(tableId, seat), requestOptions, (lock) => {
 					if (lock === null) {
 						ended = true;
 						options.onLost?.();

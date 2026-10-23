@@ -1,4 +1,4 @@
-const ROOM_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
+const TABLE_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 
 export type RandomBytes = (length: number) => Uint8Array;
 
@@ -15,8 +15,8 @@ export function base64url(bytes: Uint8Array): string {
 		.replace(/=+$/, "");
 }
 
-export function isRoomId(value: unknown): value is string {
-	return typeof value === "string" && ROOM_ID_PATTERN.test(value);
+export function isTableId(value: unknown): value is string {
+	return typeof value === "string" && TABLE_ID_PATTERN.test(value);
 }
 
 export function newCommandId(): string {

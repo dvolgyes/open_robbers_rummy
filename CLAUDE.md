@@ -15,8 +15,8 @@ npm test                             # unit and browser projects (headless Chrom
 npx playwright test                  # end-to-end tests; builds the app, serves ports 4173 and 4174
 npx biome check --write <files>      # format and lint
 pre-commit run --all-files           # every hook, including the layer checks
-npm run bot -- <room-url> --user <name>  # solver bot CLI
-npm run bot -- <room-url> --random   # a bot that picks random legal options
+npm run bot -- <table-url> --user <name>  # solver bot CLI
+npm run bot -- <table-url> --random   # a bot that picks random legal options
 ```
 
 The end-to-end tests use public trackers and run with one worker.
@@ -35,7 +35,7 @@ The `layer-*` hooks in `.pre-commit-config.yaml` refuse imports in the wrong dir
 | `src/game/` | `GameModule` adapter from the engine to the table (`rummy.ts`), and the chat. |
 | `src/p2p/` | Trackers, WebRTC mesh, host election, replicated log, seats and bot seats. |
 | `src/bot/` | Meld solver, bot turn policy and its worker, host bot runner, CLI; the OpenRouter clients are kept but not wired. |
-| `src/ui/` | Screens: create, join, room, table. |
+| `src/ui/` | Screens: create, join, lobby, table page. |
 | `src/*.ts` | Shared root files; they import no layer folder. `main.ts` is the entry point. |
 
 ## Rules

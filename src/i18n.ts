@@ -30,7 +30,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			Language: "Sprache",
 			Automatic: "Automatisch",
 			and: "und",
-			"Room lobby": "Raumlobby",
+			"Table lobby": "Tisch-Lobby",
 			"Waiting for {players} to come back":
 				"Warten auf die Rückkehr von {players}",
 			"CONNECTING TO HOST": "VERBINDUNG ZUM HOST",
@@ -112,7 +112,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Leave call": "Anruf verlassen",
 			"Rejoin the call": "Anruf erneut beitreten",
 			Optional: "Optional",
-			"room call": "Raumanruf",
+			"table call": "Tischanruf",
 			"Game actions": "Spielaktionen",
 			"Send mic": "Mikrofon senden",
 			"Send mic audio": "Mikrofonton senden",
@@ -279,7 +279,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Copied.": "Kopiert.",
 			"Could not copy the link. Allow clipboard access and try again.":
 				"Der Link konnte nicht kopiert werden. Erlaube den Zugriff auf die Zwischenablage und versuche es erneut.",
-			"Room call": "Raumanruf",
+			"Table call": "Tischanruf",
 			Storage: "Speicher",
 			failed: "fehlgeschlagen",
 			"Send this link to the three other players. Each one opens it and takes a seat.":
@@ -348,7 +348,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			Language: "Nyelv",
 			Automatic: "Automatikus",
 			and: "és",
-			"Room lobby": "Játékszoba várója",
+			"Table lobby": "Asztal várója",
 			"Waiting for {players} to come back":
 				"Várakozás, hogy visszatérjenek: {players}",
 			"CONNECTING TO HOST": "KAPCSOLÓDÁS A HOSTHOZ",
@@ -460,7 +460,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Leave call": "Lerak",
 			"Rejoin the call": "Újracsatlakozás a híváshoz",
 			Optional: "Opcionális",
-			"room call": "szobahívás",
+			"table call": "asztalhívás",
 			"Game actions": "Játékműveletek",
 			"Send mic": "Hang küldés",
 			"Send mic audio": "Hang küldés",
@@ -643,7 +643,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 				"Nem sikerült másolni a hivatkozást. Engedélyezd a vágólap elérését, majd próbáld újra.",
 			Cancel: "Mégse",
 			"OpenRouter spending total": "OpenRouter-kiadások összesen",
-			"Room call": "Szobahívás",
+			"Table call": "Asztalhívás",
 			Storage: "Tárhely",
 			failed: "sikertelen",
 			"Send this link to the three other players. Each one opens it and takes a seat.":
@@ -663,7 +663,7 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			Language: "Språk",
 			Automatic: "Automatisk",
 			and: "og",
-			"Room lobby": "Romlobby",
+			"Table lobby": "Bordlobby",
 			"Waiting for {players} to come back":
 				"Venter på at {players} kommer tilbake",
 			"CONNECTING TO HOST": "KOBLER TIL VERTEN",
@@ -756,8 +756,8 @@ const catalogs: Readonly<Record<Exclude<Locale, "en">, Catalog>> =
 			"Leave call": "Legg på",
 			"Rejoin the call": "Bli med igjen",
 			Optional: "Valgfritt",
-			"room call": "romsamtale",
-			"Room call": "Romsamtale",
+			"table call": "bordsamtale",
+			"Table call": "Bordsamtale",
 			"Game actions": "Spillhandlinger",
 			"Send mic": "Send lyd",
 			"Send mic audio": "Send lyd",

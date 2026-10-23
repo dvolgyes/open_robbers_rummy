@@ -6,10 +6,10 @@ import {
 	MAX_NAME_LENGTH,
 	MIN_JOKERS,
 	MIN_PLAYERS,
-	type RoomConfig,
 	SEATS,
 	type Seat,
 	seatsOf,
+	type TableConfig,
 	type TableSetup,
 } from "./protocol";
 
@@ -42,8 +42,8 @@ export interface Bookmark {
 	readonly botSetup?: BotSetup;
 }
 
-export interface RoomSetup {
-	readonly config: RoomConfig;
+export interface LinkSetup {
+	readonly config: TableConfig;
 	readonly host: Seat;
 }
 
@@ -71,10 +71,10 @@ export function parseBookmark(search: string): Bookmark {
 }
 
 /**
- * Reads the complete setup needed to start a room from a shared link. It fails closed: a seat gap, fewer than two
+ * Reads the complete setup needed to start a table from a shared link. It fails closed: a seat gap, fewer than two
  * players, a host or bot outside the table, a missing or invalid rule value, or a repeated key gives `undefined`.
  */
-export function parseRoomSetup(search: string): RoomSetup | undefined {
+export function parseLinkSetup(search: string): LinkSetup | undefined {
 	const params = new URLSearchParams(search);
 	if (
 		[...RULE_PARAMS, ...SEATS.map((seat) => SEAT_PARAM[seat])].some(
@@ -143,7 +143,7 @@ function parseTableParams(params: URLSearchParams): Partial<TableSetup> {
 	};
 }
 
-/** Reads an explicit seat choice from a room URL. Invalid or repeated values are ignored. */
+/** Reads an explicit seat choice from a table URL. Invalid or repeated values are ignored. */
 export function parseSelectedPlayer(search: string): Seat | undefined {
 	const params = new URLSearchParams(search);
 	const values = params.getAll(SELECTED_PLAYER_PARAM);
@@ -151,14 +151,14 @@ export function parseSelectedPlayer(search: string): Seat | undefined {
 	return values[0];
 }
 
-/** Adds the selected seat to the current query while preserving other room or bookmark values. */
+/** Adds the selected seat to the current query while preserving other table or bookmark values. */
 export function selectedPlayerQuery(search: string, seat: Seat): string {
 	const params = new URLSearchParams(search);
 	params.set(SELECTED_PLAYER_PARAM, seat);
 	return params.toString();
 }
 
-/** Replaces the bot-seat snapshot in a room URL while preserving player, model, and selection parameters. */
+/** Replaces the bot-seat snapshot in a table URL while preserving player, model, and selection parameters. */
 export function botSeatsQuery(search: string, bots: readonly Seat[]): string {
 	const params = new URLSearchParams(search);
 	const selected = new Set(bots);
@@ -180,7 +180,7 @@ export function botsPausedQuery(search: string, paused: boolean): string {
 }
 
 /** The query of a bookmark for a table: the names, the creator's seat, the table rules and the bot seats. */
-export function bookmarkQuery(config: RoomConfig, host: Seat): string {
+export function bookmarkQuery(config: TableConfig, host: Seat): string {
 	const pairs = seatsOf(config).map((seat): [string, string] => [
 		SEAT_PARAM[seat],
 		config.names[seat] ?? "",

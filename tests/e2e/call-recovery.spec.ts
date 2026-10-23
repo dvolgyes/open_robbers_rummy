@@ -16,13 +16,13 @@ import {
 import { Player, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
-	createRoom,
+	createTable,
 	expectBanner,
 	expectSeat,
 	hostRows,
 	pick,
 	type SeatKey,
-} from "./room";
+} from "./table";
 
 /**
  * The call after a crash, a host change and a lost permission, on one P2P table through the public
@@ -150,7 +150,7 @@ test.afterAll(async () => {
 
 test("1: four browsers join the call; Player 1 turns its microphone off, and Player 2 stops hearing", async () => {
 	tab["4"] = await players["4"].page("./");
-	link = await createRoom(tab["4"]);
+	link = await createTable(tab["4"]);
 	for (const seat of ["1", "2"] as const) {
 		tab[seat] = await players[seat].page(link);
 		await pick(tab[seat], seat);

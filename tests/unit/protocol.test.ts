@@ -1,29 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
 	envelopeEvent,
-	parseRoomConfig,
+	parseTableConfig,
 	SEATS,
 	seatLabel,
 	seatsOf,
 } from "../../src/protocol";
-import { CONFIG, ROOM_ID } from "./fixtures";
+import { CONFIG, TABLE_ID } from "./fixtures";
 
-describe("parseRoomConfig", () => {
+describe("parseTableConfig", () => {
 	it("accepts a complete configuration", () => {
-		expect(parseRoomConfig(structuredClone(CONFIG))).toEqual(CONFIG);
+		expect(parseTableConfig(structuredClone(CONFIG))).toEqual(CONFIG);
 	});
 
 	it("keeps the bot seats inside the players in play", () => {
 		const botSetup = { seats: ["4"] };
-		expect(parseRoomConfig({ ...CONFIG, botSetup })).toEqual({
+		expect(parseTableConfig({ ...CONFIG, botSetup })).toEqual({
 			...CONFIG,
 			botSetup,
 		});
 		expect(
-			parseRoomConfig({ ...CONFIG, botSetup: { seats: ["5"] } }),
+			parseTableConfig({ ...CONFIG, botSetup: { seats: ["5"] } }),
 		).toBeUndefined();
 		expect(
-			parseRoomConfig({ ...CONFIG, botSetup: { seats: ["4", "4"] } }),
+			parseTableConfig({ ...CONFIG, botSetup: { seats: ["4", "4"] } }),
 		).toBeUndefined();
 	});
 
@@ -33,11 +33,11 @@ describe("parseRoomConfig", () => {
 			names: { ...CONFIG.names, "1": "robot", "2": "bot" },
 			botSetup: { seats: [] },
 		};
-		expect(parseRoomConfig(config)?.botSetup?.seats).toEqual([]);
+		expect(parseTableConfig(config)?.botSetup?.seats).toEqual([]);
 	});
 
 	it("accepts two and six players, and lists the seats in play in turn order", () => {
-		const two = parseRoomConfig({ ...CONFIG, names: { "1": "a", "2": "b" } });
+		const two = parseTableConfig({ ...CONFIG, names: { "1": "a", "2": "b" } });
 		expect(two === undefined ? [] : seatsOf(two)).toEqual(["1", "2"]);
 		const names = {
 			"1": "a",
@@ -47,7 +47,7 @@ describe("parseRoomConfig", () => {
 			"5": "e",
 			"6": "f",
 		};
-		const six = parseRoomConfig({ ...CONFIG, names });
+		const six = parseTableConfig({ ...CONFIG, names });
 		expect(six === undefined ? [] : seatsOf(six)).toEqual(SEATS);
 	});
 
@@ -79,7 +79,7 @@ describe("parseRoomConfig", () => {
 			{ ...CONFIG, table: { ...CONFIG.table, assist: 1 } },
 		],
 	])("rejects %s", (_label, value) => {
-		expect(parseRoomConfig(value)).toBeUndefined();
+		expect(parseTableConfig(value)).toBeUndefined();
 	});
 });
 
@@ -92,11 +92,11 @@ describe("seat helpers", () => {
 describe("envelopeEvent", () => {
 	it("lets the envelope win over forged body fields", () => {
 		const event = envelopeEvent(
-			{ roomId: ROOM_ID, seq: 4, commandId: "cmd", fromSeat: "3" },
+			{ tableId: TABLE_ID, seq: 4, commandId: "cmd", fromSeat: "3" },
 			{
 				text: "hi",
 				v: 9,
-				roomId: "elsewhere",
+				tableId: "elsewhere",
 				type: "chat",
 				seq: 1,
 				commandId: "other",
@@ -106,7 +106,7 @@ describe("envelopeEvent", () => {
 		expect(event).toEqual({
 			text: "hi",
 			v: 1,
-			roomId: ROOM_ID,
+			tableId: TABLE_ID,
 			type: "event",
 			seq: 4,
 			commandId: "cmd",

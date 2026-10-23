@@ -173,9 +173,9 @@ export function callControls(
 		"section",
 		{
 			className: "call-panel",
-			attrs: { "aria-label": t("Room call"), "data-testid": "call-panel" },
+			attrs: { "aria-label": t("Table call"), "data-testid": "call-panel" },
 		},
-		el("h4", {}, t("Optional"), el("br", {}), t("room call")),
+		el("h4", {}, t("Optional"), el("br", {}), t("table call")),
 		joinButton(true),
 		el(
 			"div",
@@ -199,7 +199,7 @@ export function callControls(
 			"div",
 			{
 				className: "icon-group",
-				attrs: { role: "group", "aria-label": t("Room call") },
+				attrs: { role: "group", "aria-label": t("Table call") },
 			},
 			joinButton(false),
 			// Compact devices are audio only: no camera controls.

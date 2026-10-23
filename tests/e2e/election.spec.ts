@@ -10,7 +10,7 @@ import { freeze } from "./lifecycle";
 import { Player, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
-	createRoom,
+	createTable,
 	expectBanner,
 	expectSeat,
 	hostRows,
@@ -21,7 +21,7 @@ import {
 	type SeatKey,
 	sendDraft,
 	texts,
-} from "./room";
+} from "./table";
 
 /**
  * Host election on the peer-to-peer table. The owner's numbers: the "Make me the host" button
@@ -60,7 +60,7 @@ async function seatTable(
 	const tab: Partial<Record<SeatKey, Page>> = {};
 	const creator = await player4.page("./");
 	tab["4"] = creator;
-	const link = await createRoom(creator);
+	const link = await createTable(creator);
 	for (const seat of seats) {
 		const page = await (await openBrowser(seat)).page(link);
 		await expect(page.getByTestId(`pick-${seat}`)).toBeVisible({

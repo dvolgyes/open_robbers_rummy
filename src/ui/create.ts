@@ -8,11 +8,11 @@ import {
 	MAX_JOKERS,
 	MIN_JOKERS,
 	MIN_PLAYERS,
-	type RoomConfig,
 	SEAT_NAMES,
 	SEATS,
 	type Seat,
 	TABLE_PRESETS,
+	type TableConfig,
 	type TablePreset,
 } from "../protocol";
 import type { AppDeps, Dispose } from "./deps";
@@ -36,7 +36,7 @@ export function showCreate(
 	prefill: Bookmark,
 	onCreated: (
 		key: string,
-		config: RoomConfig,
+		config: TableConfig,
 		seat: Seat,
 		hostBots: boolean,
 	) => void,
@@ -198,7 +198,7 @@ export function showCreate(
 			(item) =>
 				check.config.names[item] !== undefined && botChoices[item].checked,
 		);
-		const config: RoomConfig = {
+		const config: TableConfig = {
 			...check.config,
 			botSetup: { seats: botSeats },
 		};
@@ -209,7 +209,7 @@ export function showCreate(
 	});
 
 	async function create(
-		config: RoomConfig,
+		config: TableConfig,
 		seat: Seat,
 		hostBots: boolean,
 	): Promise<void> {

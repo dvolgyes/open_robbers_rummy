@@ -736,7 +736,7 @@ export class HostEngine {
 		const applied = this.#deps.module.apply(
 			table.state,
 			{
-				roomId: this.#tableId,
+				tableId: this.#tableId,
 				config: table.config,
 				seat: bound.seat,
 				holder,
@@ -764,7 +764,7 @@ export class HostEngine {
 			return this.#result(peer, id, status, reasonText(applied.reason));
 		}
 		const event = envelopeEvent(
-			{ roomId: this.#tableId, seq, commandId: id, fromSeat: bound.seat },
+			{ tableId: this.#tableId, seq, commandId: id, fromSeat: bound.seat },
 			applied.event,
 		);
 		const fits =

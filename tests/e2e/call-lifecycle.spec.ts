@@ -30,7 +30,7 @@ import type { CallReceived, CallView, Harness } from "./harness/main";
 import { Player, reportNetwork } from "./player";
 import {
 	CONNECT_MS,
-	createRoom,
+	createTable,
 	expectSeat,
 	openDrawer,
 	pick,
@@ -38,7 +38,7 @@ import {
 	type SeatKey,
 	takeTurn,
 	turnOrder,
-} from "./room";
+} from "./table";
 
 /**
  * Call lifecycle, adversarial and partial-failure rows, on one P2P table through the public
@@ -312,7 +312,7 @@ test("1: Player 4, Player 1 and Player 2 join with audio; Player 3's seat is hel
 	browser,
 }) => {
 	tab["4"] = await openPage(players["4"], "./");
-	link = await createRoom(tab["4"]);
+	link = await createTable(tab["4"]);
 	for (const seat of ["1", "2"] as const) {
 		tab[seat] = await openPage(players[seat], link);
 		await pick(tab[seat], seat);
@@ -589,7 +589,7 @@ test("5: when one player leaves, the other three pairs keep their sound", async 
 	}
 });
 
-test("6: leaving the room during the call ends the tracks and the links; back in the room, the player rejoins with the stored status", async () => {
+test("6: leaving the table during the call ends the tracks and the links; back at the table, the player rejoins with the stored status", async () => {
 	await tab["2"].evaluate(() => {
 		location.hash = "";
 	});

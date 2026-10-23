@@ -1,4 +1,4 @@
-import { isRoomId } from "../ids";
+import { isTableId } from "../ids";
 import { storageName } from "../project";
 import { isNonNegativeInteger, isObject, isSeat, type Seat } from "../protocol";
 import { type Authority, sameAuthority } from "./authority";
@@ -74,7 +74,7 @@ export interface TableStorage {
 	partitions(): Promise<StorageResult<PartitionInfo[]>>;
 	/** Deletes every partition of the table and records its tombstone. */
 	expireTable(tableId: string, now: number): Promise<StorageResult<void>>;
-	/** Removes this table's tombstone when a valid room link starts a new session. */
+	/** Removes this table's tombstone when a valid table link starts a new session. */
 	reviveTable(tableId: string): Promise<StorageResult<void>>;
 	tombstone(tableId: string): Promise<StorageResult<Tombstone | null>>;
 	/** Deletes tombstones that expired before `before`; returns how many. */
@@ -164,7 +164,7 @@ function partitionKey(tableId: string, replica: Seat): string {
 function partitionInfo(value: unknown): PartitionInfo | undefined {
 	if (!isObject(value)) return undefined;
 	const { tableId, replica, lastActivityAt } = value;
-	return isRoomId(tableId) &&
+	return isTableId(tableId) &&
 		isSeat(replica) &&
 		isNonNegativeInteger(lastActivityAt)
 		? { tableId, replica, lastActivityAt }

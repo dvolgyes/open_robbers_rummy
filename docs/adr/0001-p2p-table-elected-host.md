@@ -1,7 +1,7 @@
 # ADR 0001: Peer-to-peer table with an elected host
 
 Status: accepted (2026-10-19).
-Room URL setup and post-expiry bootstrap are amended by [ADR 0002](0002-reusable-room-link-bootstrap.md).
+Table URL setup and post-expiry bootstrap are amended by [ADR 0002](0002-reusable-table-link-bootstrap.md).
 Amended 2026-10-23: the project ID `github.com/dvolgyes/open_robbers_rummy` (`src/project.ts`) namespaces the app ID, the derived identifiers and the storage names; the actions have short names.
 
 ## Context
@@ -122,7 +122,7 @@ Call signaling:
     Few entries are at risk, because every game action needs every seat present.
   - Peers more than two links apart can each see a different host, because host reports are not relayed.
 - A browser that refuses to store data can take a seat and play with a memory replica, but it cannot create a table or become the host.
-- After expiry or loss of every local replica, the room link can seed a fresh session from the setup values; the old game state is not restored (ADR 0002).
+- After expiry or loss of every local replica, the table link can seed a fresh session from the setup values; the old game state is not restored (ADR 0002).
 - A device clock change moves that device's local expiry.
 - Updates of Trystero are manual.
 

@@ -1,4 +1,4 @@
-import type { RoomSetup } from "../bookmark";
+import type { LinkSetup } from "../bookmark";
 import { rummyModule } from "../game/rummy";
 import { newCommandId } from "../ids";
 import { randomNonce } from "../p2p/checks";
@@ -22,11 +22,11 @@ import {
 	TEXT,
 } from "./model";
 import { networkPanel } from "./network";
-import { showRoom } from "./room-view";
+import { showTablePage } from "./table-page";
 import { turnSound } from "./turn-sound";
 
-/** A room in one of these states stays on the screen, read-only, after its seat is gone. */
-const KEEP_ROOM: ReadonlySet<TableStatus> = new Set([
+/** A table page in one of these states stays on the screen, read-only, after its seat is gone. */
+const KEEP_PAGE: ReadonlySet<TableStatus> = new Set([
 	"expired",
 	"superseded",
 	"incompatible",
@@ -41,7 +41,7 @@ function message(...children: (Node | string)[]): HTMLElement {
 }
 
 /**
- * A table link. Runs one table controller at a time: the lobby while this page holds no seat, and the room
+ * A table link. Runs one table controller at a time: the lobby while this page holds no seat, and the table
  * screen while it holds one. `creator` is true only for the page load that has just created the table.
  */
 export function showTable(
@@ -51,7 +51,7 @@ export function showTable(
 	creator: boolean,
 	navigation: Navigation,
 	seatHint?: Seat,
-	bootstrap?: RoomSetup,
+	bootstrap?: LinkSetup,
 	autoCopy?: Promise<string>,
 	hostBots = false,
 ): Dispose {
@@ -65,8 +65,8 @@ export function showTable(
 	let unsubscribe: (() => void) | undefined;
 	/** True while a controller starts; the screen shows "Connecting" until it is ready. */
 	let opening = false;
-	let room: Dispose | undefined;
-	let roomSeat: Seat | undefined;
+	let page: Dispose | undefined;
+	let pageSeat: Seat | undefined;
 	/** Why the last seat request of this page failed. */
 	let notice: string | undefined;
 	/** The lobby as last built: an equal lobby only updates its status line and the network panel. */
@@ -79,10 +79,10 @@ export function showTable(
 	});
 	const network = networkPanel(deps.t);
 
-	const leaveRoom = (): void => {
-		room?.();
-		room = undefined;
-		roomSeat = undefined;
+	const leavePage = (): void => {
+		page?.();
+		page = undefined;
+		pageSeat = undefined;
 	};
 
 	const stopController = (): void => {
@@ -99,10 +99,10 @@ export function showTable(
 	};
 
 	/** Tries to claim this seat again, if no active tab holds it and the host allows it. */
-	const retryRoomSeat = (): void => {
-		const seat = roomSeat;
+	const retryPageSeat = (): void => {
+		const seat = pageSeat;
 		if (seat === undefined) return;
-		leaveRoom();
+		leavePage();
 		stopController();
 		showConnecting();
 		void open(false, async (table) => {
@@ -162,18 +162,18 @@ export function showTable(
 		const table = controller;
 		if (disposed || opening || !table) return;
 		const view = table.view();
-		if (room !== undefined) {
-			// The room renders itself. It goes only when the host refused or dropped the seat.
-			if (view.seat === roomSeat || KEEP_ROOM.has(view.status)) return;
-			leaveRoom();
+		if (page !== undefined) {
+			// The table renders itself. It goes only when the host refused or dropped the seat.
+			if (view.seat === pageSeat || KEEP_PAGE.has(view.status)) return;
+			leavePage();
 		}
 		if (view.seat !== null) {
 			navigation.rememberSeat(view.seat);
 			document.title = `Open Robber's Rummy: ${view.table?.config.names[view.seat] ?? SEAT_NAMES[view.seat]} (${deps.t(SEAT_NAMES[view.seat])})`;
 			shown = undefined;
 			notice = undefined;
-			roomSeat = view.seat;
-			room = showRoom(
+			pageSeat = view.seat;
+			page = showTablePage(
 				root,
 				deps,
 				table,
@@ -181,7 +181,7 @@ export function showTable(
 				view.seat,
 				{
 					...navigation,
-					retrySeat: retryRoomSeat,
+					retrySeat: retryPageSeat,
 					turnSound: turnAlert,
 				},
 				bootstrap?.config,
@@ -324,7 +324,7 @@ export function showTable(
 		window.removeEventListener("pageshow", onWake);
 		root.removeEventListener("pointerdown", unlockTurnAlert);
 		root.removeEventListener("keydown", unlockTurnAlert);
-		leaveRoom();
+		leavePage();
 		stopController();
 		turnAlert.dispose();
 	};

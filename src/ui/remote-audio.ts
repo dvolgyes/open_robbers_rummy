@@ -13,7 +13,7 @@ export interface RemoteAudio {
 	render(remotes: readonly RemoteView[]): void;
 	/** A user gesture: start the elements that the browser's autoplay rule blocked. */
 	resume(): void;
-	/** The room screen is gone: stop all playback. */
+	/** The table screen is gone: stop all playback. */
 	detach(): void;
 }
 

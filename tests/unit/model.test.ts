@@ -13,8 +13,8 @@ import type { Entry, Lobby, Roster } from "../../src/p2p/wire";
 import {
 	DEFAULT_TABLE_SETUP,
 	type JsonObject,
-	type RoomConfig,
 	type Seat,
+	type TableConfig,
 } from "../../src/protocol";
 import {
 	type BannerInput,
@@ -29,13 +29,13 @@ import {
 	lobbyScreen,
 	networkLines,
 	presentSeats,
-	type RoomViewInput,
-	roomView,
+	type TablePageViewInput,
 	TEXT,
+	tablePageView,
 } from "../../src/ui/model";
 
 const TABLE_ID = "Table_ID-0123456789abc";
-const CONFIG: RoomConfig = {
+const CONFIG: TableConfig = {
 	names: { "1": "player1", "2": "player3", "3": "player2", "4": "player4" },
 	table: DEFAULT_TABLE_SETUP,
 };
@@ -59,7 +59,7 @@ function chatEntry(
 		payload: chatPayload(TABLE_ID, text),
 		event: {
 			v: 1,
-			roomId: TABLE_ID,
+			tableId: TABLE_ID,
 			type: "event",
 			seq,
 			commandId: id,
@@ -70,7 +70,9 @@ function chatEntry(
 	};
 }
 
-function input(overrides: Partial<RoomViewInput> = {}): RoomViewInput {
+function input(
+	overrides: Partial<TablePageViewInput> = {},
+): TablePageViewInput {
 	return {
 		config: CONFIG,
 		seat: "1",
@@ -417,9 +419,9 @@ describe("seats", () => {
 	});
 });
 
-describe("roomView", () => {
+describe("tablePageView", () => {
 	it("counts receipts from the seats other than the sender", () => {
-		const view = roomView(
+		const view = tablePageView(
 			input({
 				entries: [chatEntry(1, "4", "hello all")],
 				acked: { "1": 1, "2": 0, "3": 1, "4": 1 },
@@ -449,7 +451,7 @@ describe("roomView", () => {
 			...call,
 			payload: {
 				v: 1,
-				roomId: TABLE_ID,
+				tableId: TABLE_ID,
 				type: "action",
 				hand: 1,
 				at: 0,
@@ -457,7 +459,7 @@ describe("roomView", () => {
 			},
 			event: { ...call.event, kind: "action" },
 		};
-		const view = roomView(
+		const view = tablePageView(
 			input({ entries: [claim, tableEvent, chatEntry(3, "2", "good luck")] }),
 		);
 		expect(view.transcript.map((line) => [line.seq, line.text])).toEqual([
@@ -489,13 +491,13 @@ describe("roomView", () => {
 		});
 		const play: JsonObject = {
 			v: 1,
-			roomId: TABLE_ID,
+			tableId: TABLE_ID,
 			type: "action",
 			hand: 1,
 			at: 4,
 			action: { type: "draw" },
 		};
-		const view = roomView(
+		const view = tablePageView(
 			input({
 				undone: [chatEntry(5, "1", "lost")],
 				failures: [
@@ -525,19 +527,22 @@ describe("roomView", () => {
 	});
 
 	it("lets a seated tab always send, with a hint while no host is connected, but not a terminal tab", () => {
-		expect(roomView(input()).send).toEqual({ label: TEXT.send, enabled: true });
-		expect(roomView(input({ ready: false })).send).toEqual({
+		expect(tablePageView(input()).send).toEqual({
+			label: TEXT.send,
+			enabled: true,
+		});
+		expect(tablePageView(input({ ready: false })).send).toEqual({
 			label: TEXT.send,
 			enabled: true,
 			hint: TEXT.sendHint,
 		});
-		expect(roomView(input({ terminal: true })).send.enabled).toBe(false);
+		expect(tablePageView(input({ terminal: true })).send.enabled).toBe(false);
 	});
 
 	it("marks seats online, offline or free; any seated player may release another player's offline seat", () => {
 		const held = new Set<Seat>(["1", "3", "4"]);
 		const online = new Set<Seat>(["1", "4"]);
-		const view = roomView(input({ held, online, hostSeat: "4" }));
+		const view = tablePageView(input({ held, online, hostSeat: "4" }));
 		expect(
 			view.roster.map((row) => [row.seat, row.state, row.host, row.releasable]),
 		).toEqual([
@@ -546,7 +551,7 @@ describe("roomView", () => {
 			["3", "offline", false, true],
 			["4", "online", true, false],
 		]);
-		const terminal = roomView(input({ held, online, terminal: true }));
+		const terminal = tablePageView(input({ held, online, terminal: true }));
 		expect(terminal.roster.some((row) => row.releasable)).toBe(false);
 	});
 

@@ -1,9 +1,9 @@
 import {
 	envelopeEvent,
 	type JsonObject,
-	type RoomConfig,
 	SEATS,
 	type Seat,
+	type TableConfig,
 } from "../protocol";
 import {
 	type Authority,
@@ -219,7 +219,7 @@ export function seatEvent(
 	by: Seat = seat,
 ): JsonObject {
 	return envelopeEvent(
-		{ roomId: tableId, seq, commandId: id, fromSeat: by },
+		{ tableId: tableId, seq, commandId: id, fromSeat: by },
 		{ kind: "seat", change, seat },
 	);
 }
@@ -252,7 +252,7 @@ export function appendCommit(
 export interface Replacement {
 	readonly tableId: string;
 	readonly replica: Seat;
-	readonly config: RoomConfig;
+	readonly config: TableConfig;
 	/** The whole new log, from entry 1. */
 	readonly entries: readonly Entry[];
 	readonly state: JsonObject;
@@ -296,7 +296,7 @@ export interface Creation {
 	readonly tableId: string;
 	readonly seat: Seat;
 	readonly holder: string;
-	readonly config: RoomConfig;
+	readonly config: TableConfig;
 	readonly state: JsonObject;
 	/** Term 1 with the creator's tag. */
 	readonly auth: Authority;

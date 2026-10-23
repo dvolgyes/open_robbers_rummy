@@ -3,16 +3,16 @@ import {
 	bookmarkQuery,
 	botSeatsQuery,
 	parseBookmark,
-	parseRoomSetup,
+	parseLinkSetup,
 } from "../../src/bookmark";
-import { DEFAULT_TABLE_SETUP, type RoomConfig } from "../../src/protocol";
+import { DEFAULT_TABLE_SETUP, type TableConfig } from "../../src/protocol";
 
-const TWO: RoomConfig = {
+const TWO: TableConfig = {
 	names: { "1": "ann", "2": "ben" },
 	table: DEFAULT_TABLE_SETUP,
 };
 
-const SIX: RoomConfig = {
+const SIX: TableConfig = {
 	names: {
 		"1": "a&b=c",
 		"2": "x y",
@@ -71,7 +71,7 @@ describe("parseBookmark", () => {
 });
 
 describe("bookmarkQuery", () => {
-	it("updates the bot-seat snapshot without changing other room settings", () => {
+	it("updates the bot-seat snapshot without changing other table settings", () => {
 		const query = botSeatsQuery(
 			"?p1=ann&p2=ben&p3=cy&host=1&rules=gamerules&bot_seats=2&selected_player=1",
 			["3", "2"],
@@ -89,23 +89,23 @@ describe("bookmarkQuery", () => {
 		);
 	});
 
-	it("round-trips two and six players through parseRoomSetup", () => {
-		expect(parseRoomSetup(`?${bookmarkQuery(TWO, "1")}`)).toEqual({
+	it("round-trips two and six players through parseLinkSetup", () => {
+		expect(parseLinkSetup(`?${bookmarkQuery(TWO, "1")}`)).toEqual({
 			config: TWO,
 			host: "1",
 		});
 		const query = bookmarkQuery(SIX, "4");
 		expect(query).toContain("bot_seats=3%2C6");
 		expect(query).not.toMatch(/api.?key|secret|model/i);
-		expect(parseRoomSetup(`?${query}`)).toEqual({ config: SIX, host: "4" });
+		expect(parseLinkSetup(`?${query}`)).toEqual({ config: SIX, host: "4" });
 	});
 });
 
-describe("parseRoomSetup", () => {
+describe("parseLinkSetup", () => {
 	const VALID = "p1=ann&p2=ben&p3=cy&host=1&rules=gamerules&jokers=4&assist=1";
 
 	it("accepts a complete link", () => {
-		expect(parseRoomSetup(`?${VALID}`)?.config.names).toEqual({
+		expect(parseLinkSetup(`?${VALID}`)?.config.names).toEqual({
 			"1": "ann",
 			"2": "ben",
 			"3": "cy",
@@ -135,6 +135,6 @@ describe("parseRoomSetup", () => {
 		["a repeated bot seat", `${VALID}&bot_seats=2,2`],
 		["a repeated rule value", `${VALID}&jokers=5`],
 	])("refuses a link with %s", (_case, query) => {
-		expect(parseRoomSetup(`?${query}`)).toBeUndefined();
+		expect(parseLinkSetup(`?${query}`)).toBeUndefined();
 	});
 });

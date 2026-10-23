@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CallController } from "../../src/call/call";
 import type { Form } from "../../src/call/device-class";
-import type { CallRoomSnapshot } from "../../src/call/mesh";
+import type { CallTableSnapshot } from "../../src/call/mesh";
 import type { CallMessage } from "../../src/call/messages";
 import { type Medium, type PresetId, presetById } from "../../src/call/policy";
 import type {
@@ -17,7 +17,7 @@ import {
 	FakeTrack,
 	fakeStream,
 } from "./call-rtc-fakes";
-import { ROOM_ID } from "./fixtures";
+import { TABLE_ID } from "./fixtures";
 
 const SUBSCRIBE_MS = 60;
 const DELIVERY_MS = 50;
@@ -34,7 +34,7 @@ interface Sent {
 	readonly message: CallMessage;
 }
 
-/** Call signaling between the inboxes of one room: every message arrives after DELIVERY_MS, in order. */
+/** Call signaling between the inboxes of one table: every message arrives after DELIVERY_MS, in order. */
 class Wire {
 	readonly sent: Sent[] = [];
 	readonly #inboxes = new Map<Seat, CallSignalingHandlers>();
@@ -190,9 +190,9 @@ class Player {
 }
 
 /** A four-player table; seats 1 and 2 are held at generation 1 and present. */
-function snapshot(self: Seat | null): CallRoomSnapshot {
+function snapshot(self: Seat | null): CallTableSnapshot {
 	return {
-		roomId: ROOM_ID,
+		tableId: TABLE_ID,
 		self: self === null ? null : { seat: self, generation: 1 },
 		seats: ["1", "2", "3", "4"],
 		holders: { "1": 1, "2": 1 },
@@ -423,7 +423,7 @@ describe("CallController", () => {
 		expect(player1.sending).toBe(asTrack(mic));
 
 		const player3 = new Player("3", wire);
-		const three = (self: Seat): CallRoomSnapshot => ({
+		const three = (self: Seat): CallTableSnapshot => ({
 			...snapshot(self),
 			holders: { "1": 1, "2": 1, "3": 1 },
 			online: new Set<Seat>(["1", "2", "3"]),

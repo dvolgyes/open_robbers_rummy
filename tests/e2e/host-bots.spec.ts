@@ -2,12 +2,12 @@ import { expect, type Page, test } from "@playwright/test";
 import { Player } from "./player";
 import {
 	CONNECT_MS,
-	createRoom,
+	createTable,
 	openDrawer,
 	pick,
 	takeTurn,
 	turnOrder,
-} from "./room";
+} from "./table";
 
 /**
  * The host page's solver bots. They need no key and no network, so the tests count the table actions (`data-at`).
@@ -33,10 +33,10 @@ test("host bots take the turns of every seat", async ({ page }) => {
 		await page.locator(`input[name="bot-${seat}"]`).check();
 	await page.getByTestId("create").click();
 	await expect(page.getByTestId("table")).toBeVisible();
-	const roomUrl = new URL(page.url());
-	expect(roomUrl.searchParams.get("bot_seats")).toBe("1,2,3,4");
+	const tableUrl = new URL(page.url());
+	expect(tableUrl.searchParams.get("bot_seats")).toBe("1,2,3,4");
 	// The solver bots have no model settings and no key.
-	expect(roomUrl.href).not.toMatch(/bot_model|api.?key/i);
+	expect(tableUrl.href).not.toMatch(/bot_model|api.?key/i);
 	await openDrawer(page);
 	await page.getByRole("button", { name: "Pause bots" }).click();
 	await expect(page.getByRole("button", { name: "Resume bots" })).toBeVisible();
@@ -118,7 +118,7 @@ test("switching the player whose turn it is to a bot starts it at once; the call
 	const three = await Player.open(browser, baseURL, "three");
 	try {
 		const hostPage = await host.page("./");
-		const link = await createRoom(hostPage);
+		const link = await createTable(hostPage);
 		const onePage = await one.page(link);
 		await pick(onePage, "1");
 		const threePage = await three.page(link);

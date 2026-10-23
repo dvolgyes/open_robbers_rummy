@@ -3,9 +3,9 @@ import type { OutboxRecord, TableRecord } from "../../src/p2p/records";
 import type { Entry } from "../../src/p2p/wire";
 import {
 	DEFAULT_TABLE_SETUP,
-	type RoomConfig,
 	SEATS,
 	type Seat,
+	type TableConfig,
 } from "../../src/protocol";
 
 export const TABLE = "vKg29g0NeA3vntlnYBW0TP";
@@ -17,7 +17,7 @@ export const HOLDER_2 = "AAAAAAAAAAAAAAAA";
 export const AUTH_1: Authority = { term: 1, tag: `${HOLDER_1}.1`, inc: 1 };
 export const AUTH_2: Authority = { term: 2, tag: `${HOLDER_2}.2`, inc: 1 };
 
-export const CONFIG: RoomConfig = {
+export const CONFIG: TableConfig = {
 	names: { "1": "player1", "2": "player3", "3": "player2", "4": "player4" },
 	table: DEFAULT_TABLE_SETUP,
 };

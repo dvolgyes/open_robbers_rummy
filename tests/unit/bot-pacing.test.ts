@@ -25,7 +25,7 @@ import {
 import { type RandomBelow, randomBelowFrom } from "../../src/random";
 import type { Action } from "../../src/rummy";
 
-const ROOM = "room-1";
+const TABLE = "table-1";
 const config = {
 	names: { "1": "Ann", "2": "Bot", "3": "Bot", "4": "Bot" },
 	table: DEFAULT_TABLE_SETUP,
@@ -44,7 +44,7 @@ const module = createRummyModule(seededRandom(7));
 
 function context(seat: Seat): ApplyContext {
 	return {
-		roomId: ROOM,
+		tableId: TABLE,
 		config,
 		seat,
 		holder: `holder-${seat}`,
@@ -55,16 +55,16 @@ function context(seat: Seat): ApplyContext {
 }
 
 function matchOf(state: JsonObject): RummyMatch {
-	const match = parseRummyState(state, ROOM)?.match;
+	const match = parseRummyState(state, TABLE)?.match;
 	if (!match) throw new Error("no game");
 	return match;
 }
 
 function started(): JsonObject {
 	const result = module.apply(
-		module.initialState(ROOM, config),
+		module.initialState(TABLE, config),
 		context("1"),
-		startPayload(ROOM),
+		startPayload(TABLE),
 	);
 	if (!result.ok) throw new Error(result.reason);
 	return result.state;
@@ -82,7 +82,7 @@ function hostTable(state: JsonObject, bots: readonly Seat[], hostSeat: Seat) {
 	const listeners = new Set<() => void>();
 	const sent: { readonly at: number; readonly type: string }[] = [];
 	const table: BotTable = {
-		tableId: ROOM,
+		tableId: TABLE,
 		view: () => ({
 			hosting: true,
 			ready: true,
