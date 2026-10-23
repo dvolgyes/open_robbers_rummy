@@ -13,6 +13,7 @@ import type { Seat as TableSeat } from "../../src/protocol";
 import type { CallView, Harness, TranscriptLine } from "./harness/main";
 import { withholdOffers } from "./network";
 import { buildTrackerUrls } from "./player";
+import { HARNESS_URL } from "./ports";
 
 /**
  * The P2P table on the real network: production modules in Chrome, Trystero over
@@ -21,7 +22,7 @@ import { buildTrackerUrls } from "./player";
  * an assertion message.
  */
 
-const HARNESS = "http://localhost:4174/";
+const HARNESS = HARNESS_URL;
 /** These tests fill a table of four players. */
 type Seat = Extract<TableSeat, "1" | "2" | "3" | "4">;
 const SEATS: readonly Seat[] = ["1", "2", "3", "4"];

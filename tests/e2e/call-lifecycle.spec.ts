@@ -28,6 +28,7 @@ import {
 } from "./call-probe";
 import type { CallReceived, CallView, Harness } from "./harness/main";
 import { Player, reportNetwork } from "./player";
+import { HARNESS_URL } from "./ports";
 import {
 	CONNECT_MS,
 	createTable,
@@ -49,7 +50,7 @@ import {
  */
 test.describe.configure({ mode: "serial" });
 
-const HARNESS = "http://localhost:4174/";
+const HARNESS = HARNESS_URL;
 const SEATS = ["4", "1", "2", "3"] as const satisfies readonly SeatKey[];
 const IN_CALL = ["4", "1", "2"] as const satisfies readonly SeatKey[];
 

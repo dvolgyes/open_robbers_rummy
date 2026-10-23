@@ -12,7 +12,7 @@ npm run dev                          # Vite development server
 npm run typecheck                    # tsc for src, tests and scripts
 npx vitest run --project unit        # fast unit tests (Node)
 npm test                             # unit and browser projects (headless Chrome)
-npx playwright test                  # end-to-end tests; builds the app, serves ports 4173 and 4174
+npx playwright test                  # end-to-end tests; builds the app, serves ports 4273 and 4274 (tests/e2e/ports.ts)
 npx biome check --write <files>      # format and lint
 pre-commit run --all-files           # every hook, including the layer checks
 npm run bot -- <table-url> --user <name>  # solver bot CLI
@@ -20,7 +20,7 @@ npm run bot -- <table-url> --random   # a bot that picks random legal options
 ```
 
 The end-to-end tests use public trackers and run with one worker.
-Free the ports with `lsof -ti:4173,4174 | xargs -r kill` when a run was interrupted.
+Free the ports with `lsof -ti:4273,4274 | xargs -r kill` when a run was interrupted.
 Never print, log, or commit the OpenRouter key from `.env`.
 
 ## Module map
