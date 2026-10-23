@@ -512,9 +512,12 @@ export class HostEngine {
 		this.#features.set(peer, hello.features ?? []);
 		if (hello.seat !== undefined) {
 			const row = seatRow(table, hello.seat);
+			// The host's bot for an autoplay seat shares the binding; the holder's page binds beside it.
+			const botPeer = this.#localPeer(hello.seat);
 			const anotherActivePeer = [...this.#bindings].some(
 				([boundPeer, bound]) =>
 					boundPeer !== peer &&
+					boundPeer !== botPeer &&
 					bound.seat === hello.seat &&
 					this.#connected.has(boundPeer) &&
 					this.#current(table, bound),

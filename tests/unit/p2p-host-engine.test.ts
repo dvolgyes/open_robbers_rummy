@@ -278,6 +278,40 @@ describe("host-local bots", () => {
 		);
 	});
 
+	it("binds a player who reloads during autoplay, and lets them return control", async () => {
+		const rig = await new Rig().create();
+		const gen = await rig.seat(PLAYER2, CLIENT_2, "2");
+		rig.autoplay = async (seat, enabled) =>
+			(await rig.host.setBotSeat(seat, enabled))
+				? enabled
+					? "enabled"
+					: "disabled"
+				: "failed";
+		await rig.from(PLAYER2, { k: "autoplay-request", req: 1, enabled: true });
+		rig.host.leave(PLAYER2);
+		rig.to(PLAYER2);
+
+		await rig.hello(PLAYER2B, CLIENT_2, { seat: "2", gen });
+		expect(rig.to(PLAYER2B)).toContainEqual({
+			k: "welcome",
+			status: "bound",
+			auth: rig.auth,
+			seat: "2",
+			gen,
+		});
+		await rig.from(PLAYER2B, {
+			k: "autoplay-request",
+			req: 2,
+			enabled: false,
+		});
+		expect(rig.to(PLAYER2B)).toContainEqual({
+			k: "autoplay-result",
+			req: 2,
+			status: "disabled",
+		});
+		expect(rig.host.roster()?.bots).not.toContain("2");
+	});
+
 	it("claims bot seats privately and orders their actions through normal validation", async () => {
 		const config = {
 			...CONFIG,
