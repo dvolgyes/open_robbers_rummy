@@ -386,8 +386,15 @@ function rebuild(
 	return melds;
 }
 
-/** Joins runs of one suit that continue each other, so the table shows long runs instead of their pieces. */
-function joinRuns(melds: string[][], rules: MeldRules): string[][] {
+/**
+ * Joins runs of one suit that continue each other, so the table shows long runs instead of their pieces. For an
+ * opening, a join that gives a joker a lower rank, and so fewer points, is left out.
+ */
+function joinRuns(
+	melds: string[][],
+	rules: MeldRules,
+	keepPoints: boolean,
+): string[][] {
 	const out = melds.map((meld) => [...meld]);
 	let joined = true;
 	while (joined) {
@@ -403,6 +410,7 @@ function joinRuns(melds: string[][], rules: MeldRules): string[][] {
 				if (shapeA.kind !== "run" || shapeB.kind !== "run") continue;
 				const both = analyzeMeld([...a, ...b].map(cardOf), rules);
 				if (!both.ok || both.kind !== "run") continue;
+				if (keepPoints && both.points < shapeA.points + shapeB.points) continue;
 				out[i] = [...both.order];
 				out.splice(j, 1);
 				joined = true;
@@ -499,7 +507,7 @@ export function solve(input: SolveInput): SolveResult {
 				best = search;
 		}
 		aborted = best.aborted;
-		if (best.melds !== null) result = joinRuns(best.melds, input.rules);
+		if (best.melds !== null) result = joinRuns(best.melds, input.rules, false);
 	}
 	if (result === null) {
 		// Before opening, or when the search cannot rebuild the table (a long joker run, for example), only new melds.
@@ -509,7 +517,7 @@ export function solve(input: SolveInput): SolveResult {
 		if (fresh.melds !== null) {
 			result = [
 				...input.table.map((meld) => [...meld]),
-				...joinRuns(fresh.melds, input.rules),
+				...joinRuns(fresh.melds, input.rules, opening > 0),
 			];
 		}
 	}

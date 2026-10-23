@@ -168,6 +168,34 @@ describe("solve", () => {
 		);
 	});
 
+	it("keeps the opening points when it joins runs with a joker", () => {
+		// Apart, 2-3-4 and JK(8)-6-7 of hearts give 9 + 21; joined, the joker is the 5 and the run gives 27.
+		const result = solve({
+			rules: GAMERULES,
+			table: [],
+			hand: [
+				"0-2H",
+				"0-3H",
+				"0-4H",
+				"JK0",
+				"0-6H",
+				"0-7H",
+				"0-3C",
+				"0-4C",
+				"0-5C",
+				"0-9S",
+				"0-KD",
+			],
+			useHandJokers: true,
+			openingPoints: 40,
+		});
+		const points = (result.melds ?? []).reduce((sum, meld) => {
+			const shape = analyzeMeld(meld.map(cardOf), GAMERULES);
+			return sum + (shape.ok ? shape.points : 0);
+		}, 0);
+		expect(points).toBeGreaterThanOrEqual(40);
+	});
+
 	it("matches a brute-force optimum on small positions", {
 		timeout: 120_000,
 	}, () => {
