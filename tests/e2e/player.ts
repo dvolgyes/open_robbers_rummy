@@ -28,32 +28,44 @@ export interface RigOptions {
 	 * in Chrome. Chrome then refuses localStorage, sessionStorage, IndexedDB and Web Locks.
 	 */
 	readonly blockSiteData?: boolean;
+	/**
+	 * Starts a separate Chrome whose fake media devices have a microphone but no camera, as on a desktop
+	 * without a webcam.
+	 */
+	readonly noCamera?: boolean;
 }
 
 /**
- * A Chrome with a new profile that blocks site data, as the "Don't allow sites to save data" setting does. The
- * channel and the fake media device match playwright.config.ts. Returns the context and a cleanup of the
- * profile.
+ * A separate Chrome with a new profile. With `blockSiteData` the profile blocks site data, as the "Don't allow
+ * sites to save data" setting does; with `noCamera` its fake media devices have no camera. The channel and the
+ * fake media device otherwise match playwright.config.ts. Returns the context and a cleanup of the profile.
  */
-async function blockedContext(
+async function separateContext(
 	options: ContextOptions,
 	baseURL: string,
+	rig: RigOptions,
 ): Promise<{ context: BrowserContext; cleanup: () => Promise<void> }> {
 	const dir = await mkdtemp(
-		join(process.env.TMPDIR ?? tmpdir(), "rr-blocked-"),
+		join(process.env.TMPDIR ?? tmpdir(), "rr-separate-"),
 	);
-	await mkdir(join(dir, "Default"));
-	await writeFile(
-		join(dir, "Default", "Preferences"),
-		JSON.stringify({
-			profile: { default_content_setting_values: { cookies: 2 } },
-		}),
-	);
+	if (rig.blockSiteData) {
+		await mkdir(join(dir, "Default"));
+		await writeFile(
+			join(dir, "Default", "Preferences"),
+			JSON.stringify({
+				profile: { default_content_setting_values: { cookies: 2 } },
+			}),
+		);
+	}
 	const context = await chromium.launchPersistentContext(dir, {
 		...options,
 		baseURL,
 		channel: "chrome",
-		args: ["--use-fake-device-for-media-stream"],
+		args: [
+			rig.noCamera
+				? "--use-fake-device-for-media-stream=device-count=0"
+				: "--use-fake-device-for-media-stream",
+		],
 	});
 	for (const page of context.pages()) await page.close();
 	return {
@@ -206,10 +218,14 @@ export class Player {
 
 	async #start(state: StorageState | undefined): Promise<void> {
 		let context: BrowserContext;
-		if (this.#rig.blockSiteData) {
-			const blocked = await blockedContext(this.#options, this.#baseURL);
-			context = blocked.context;
-			this.#cleanup = blocked.cleanup;
+		if (this.#rig.blockSiteData || this.#rig.noCamera) {
+			const separate = await separateContext(
+				this.#options,
+				this.#baseURL,
+				this.#rig,
+			);
+			context = separate.context;
+			this.#cleanup = separate.cleanup;
 		} else
 			context = await this.#browser.newContext({
 				...this.#options,
